@@ -1,0 +1,8 @@
+{
+  "name": "VeloPulse Dashboard",
+  "description": "Real-time fitness dashboard for Bluetooth-connected stationary bikes and heart rate monitors.",
+  "requestFramePermissions": [
+    "bluetooth"
+  ],
+  "majorCapabilities": []
+}
