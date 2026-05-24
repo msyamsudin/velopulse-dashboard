@@ -11,7 +11,6 @@ import { useGoogleFitSync } from './hooks/useGoogleFitSync';
 // Components
 import { PerformanceChart } from './components/PerformanceChart';
 import { DevicePanel } from './components/DevicePanel';
-import { SessionControls } from './components/SessionControls';
 import { TelemetryLog } from './components/TelemetryLog';
 import { WorkoutHistory } from './components/WorkoutHistory';
 import { SettingsModal } from './components/SettingsModal';
@@ -22,7 +21,8 @@ import { SessionSummaryModal } from './components/SessionSummaryModal';
 import { DashboardHeader } from './components/layout/DashboardHeader';
 import { DashboardFooter } from './components/layout/DashboardFooter';
 import { SyncActionBar } from './components/dashboard/SyncActionBar';
-import { TelemetryGrid } from './components/dashboard/TelemetryGrid';
+import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
+import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
 
 export default function App() {
   const isRecording = useWorkoutStore(state => state.isRecording);
@@ -64,8 +64,7 @@ export default function App() {
   const [showSummary, setShowSummary] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
   const [wasRecording, setWasRecording] = useState(false);
-
-  const isAnyConnected = hrConnected || bikeConnected;
+  const chartAvailable = workoutHistory.length > 0;
 
   // Sync session data with BLE data
   useEffect(() => {
@@ -73,6 +72,12 @@ export default function App() {
       addHistoryPoint(bleData);
     }
   }, [bleData, isRecording, addHistoryPoint]);
+
+  useEffect(() => {
+    if (viewMode === 'telemetry' && !chartAvailable) {
+      setViewMode('grid');
+    }
+  }, [viewMode, chartAvailable]);
 
   // Timer Effect
   useEffect(() => {
@@ -212,6 +217,7 @@ export default function App() {
               setShowSettings={setShowSettings}
               viewMode={viewMode}
               setViewMode={setViewMode}
+              chartAvailable={chartAvailable}
             />
           </motion.div>
         )}
@@ -285,38 +291,24 @@ export default function App() {
               transition={{ duration: 0.3 }}
               className="h-full flex flex-col space-y-6 overflow-y-auto no-scrollbar px-4 pb-8"
             >
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 shrink-0">
-                <AnimatePresence>
-                  {!isRecording && (
-                    <motion.div
-                      key="device-panel"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="lg:col-span-3"
-                    >
-                      <DevicePanel
-                        hrConnected={hrConnected}
-                        bikeConnected={bikeConnected}
-                        error={bleError}
-                        connectHeartRate={connectHeartRate}
-                        connectBike={connectBike}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className={`${isRecording ? 'hidden' : 'lg:col-span-1'}`}>
-                  <div className="hardware-card h-full flex flex-col justify-center transition-all duration-500">
-                      <SessionControls
-                        isRecording={isRecording}
-                        toggleRecording={toggleRecording}
-                        isAnyConnected={isAnyConnected}
-                        disconnect={disconnect}
-                      />
-                  </div>
+              {!isRecording && (
+                <div className="grid grid-cols-1 gap-4 shrink-0">
+                  <motion.div
+                    key="device-panel"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                  >
+                    <DevicePanel
+                      hrConnected={hrConnected}
+                      bikeConnected={bikeConnected}
+                      error={bleError}
+                      connectHeartRate={connectHeartRate}
+                      connectBike={connectBike}
+                    />
+                  </motion.div>
                 </div>
-              </div>
+              )}
 
               {!isRecording && workoutHistory.length > 0 && isGoogleConnected && (
                 <SyncActionBar
@@ -328,12 +320,27 @@ export default function App() {
               )}
 
               <div className="flex-1 min-h-0">
-                <TelemetryGrid
-                  currentData={currentData}
-                  liveStats={liveStats}
-                  userProfile={userProfile}
-                  workout={{ history: workoutHistory, elapsed, formatTime }}
-                />
+                {isRecording ? (
+                  <RecordingCockpit
+                    currentData={currentData}
+                    liveStats={liveStats}
+                    userProfile={userProfile}
+                    workout={{ history: workoutHistory, elapsed, formatTime }}
+                    hrConnected={hrConnected}
+                    bikeConnected={bikeConnected}
+                  />
+                ) : (
+                  <PreRideCockpit
+                    currentData={currentData}
+                    userProfile={userProfile}
+                    sessions={sessionHistory}
+                    hrConnected={hrConnected}
+                    bikeConnected={bikeConnected}
+                    isGoogleConnected={isGoogleConnected}
+                    onStart={toggleRecording}
+                    onDisconnect={disconnect}
+                  />
+                )}
               </div>
             </motion.div>
           )}

@@ -28,30 +28,15 @@ export const SpeedVisual = ({ currentSpeed, avgSpeed, maxSpeed }: SpeedVisualPro
 
       {/* Ribbon Track */}
       <div className="h-6 w-full bg-hw-muted/5 border border-hw-muted/10 rounded-sm overflow-hidden relative group">
-        {/* Moving Background Pattern (Ribbon Effect) */}
-        <motion.div 
-          className="absolute inset-0 flex"
-          animate={{ x: [0, -40] }}
-          transition={{ 
-            repeat: Infinity, 
-            duration: currentSpeed > 0 ? Math.max(0.2, 5 / (currentSpeed / 5)) : 0, 
-            ease: "linear" 
-          }}
-          style={{ width: '200%' }}
-        >
-          <div className="w-full h-full opacity-10" style={{ 
-            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, currentColor 10px, currentColor 11px)',
-            backgroundSize: '20px 20px'
-          }} />
-          <div className="w-full h-full opacity-10" style={{ 
-            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, currentColor 10px, currentColor 11px)',
-            backgroundSize: '20px 20px'
-          }} />
-        </motion.div>
+        <motion.div
+          className="absolute inset-0 bg-blue-400/5"
+          animate={{ opacity: currentSpeed > 0 ? [0.08, 0.18, 0.08] : 0.05 }}
+          transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+        />
 
-        {/* Speed Gradient Overlay */}
+        {/* Speed Overlay */}
         <motion.div 
-          className="absolute inset-y-0 left-0 bg-linear-to-r from-blue-600/40 to-blue-400/60 shadow-[0_0_15px_rgba(59,130,246,0.5)] border-r border-blue-400/50 z-10"
+          className="absolute inset-y-0 left-0 bg-blue-400/60 shadow-[0_0_15px_rgba(59,130,246,0.45)] border-r border-blue-400/50 z-10"
           initial={{ width: 0 }}
           animate={{ width: `${currentPos}%` }}
           transition={{ type: "spring", stiffness: 40, damping: 15 }}

@@ -142,7 +142,7 @@ export const HistorySummary = ({
       )}
 
       <div className="mt-2 flex flex-col gap-4">
-        <div className="hardware-card border-hw-muted/20 p-6 flex flex-col bg-linear-to-b from-black/40 to-transparent">
+        <div className="hardware-card border-hw-muted/20 p-6 flex flex-col bg-black/30">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-6 border-b border-white/5 pb-4 gap-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,255,170,0.15)', border: '1px solid rgba(0,255,170,0.3)' }}>
@@ -382,7 +382,7 @@ export const HistorySummary = ({
                           <div
                             className="w-full h-full rounded-t-md transition-all duration-500"
                             style={{
-                              background: `linear-gradient(180deg, ${metricColor} 0%, rgba(${metricColorRgba},0.6) 100%)`,
+                              background: metricColor,
                               boxShadow: `0 0 12px rgba(${metricColorRgba},0.5)`,
                             }}
                           />
@@ -390,7 +390,7 @@ export const HistorySummary = ({
                           <div
                             className="w-full h-full rounded-t-md transition-all duration-500 group-hover:opacity-90"
                             style={{
-                              background: `linear-gradient(180deg, rgba(${metricColorRgba},0.55) 0%, rgba(${metricColorRgba},0.2) 100%)`,
+                              background: `rgba(${metricColorRgba},0.42)`,
                               borderTop: `1px solid rgba(${metricColorRgba},0.3)`,
                               borderLeft: `1px solid rgba(${metricColorRgba},0.3)`,
                               borderRight: `1px solid rgba(${metricColorRgba},0.3)`,
@@ -430,7 +430,7 @@ export const HistorySummary = ({
 
         </div>
 
-        <div className="hardware-card border-hw-muted/20 p-5 flex flex-col bg-linear-to-b from-black/30 to-transparent">
+        <div className="hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25">
           <div className="flex items-center justify-between gap-3 mb-4 border-b border-white/5 pb-3">
             <div>
               <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">Summary Insights</div>
@@ -595,7 +595,7 @@ export const HistorySummary = ({
                                     className="h-6 w-full rounded-md border transition-all"
                                     style={{
                                       background: day.hasData
-                                        ? `linear-gradient(180deg, rgba(${metricColorRgba},${Math.min(1, opacity + 0.12)}) 0%, rgba(${metricColorRgba},${opacity}) 100%)`
+                                        ? `rgba(${metricColorRgba},${opacity})`
                                         : 'rgba(255,255,255,0.04)',
                                       borderColor: day.isToday
                                         ? `rgba(${metricColorRgba},0.75)`
@@ -646,7 +646,7 @@ export const HistorySummary = ({
                                 className="h-9 w-full rounded-lg border transition-all"
                                 style={{
                                   background: day.hasData
-                                    ? `linear-gradient(180deg, rgba(${metricColorRgba},${Math.min(1, opacity + 0.12)}) 0%, rgba(${metricColorRgba},${opacity}) 100%)`
+                                    ? `rgba(${metricColorRgba},${opacity})`
                                     : 'rgba(255,255,255,0.04)',
                                   borderColor: day.isToday
                                     ? `rgba(${metricColorRgba},0.75)`

@@ -9,11 +9,7 @@ interface SetupLandingProps {
 
 export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: SetupLandingProps) => {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-hw-accent/5 via-hw-bg to-hw-bg overflow-hidden relative">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-1/4 -left-20 w-80 h-80 bg-hw-accent/10 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-blue-500/5 rounded-full blur-[120px] animate-pulse delay-700" />
-
+    <div className="min-h-screen flex items-center justify-center p-6 bg-hw-bg overflow-hidden relative">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -22,7 +18,7 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
       >
         <div className="hardware-card border-hw-accent/20 bg-hw-bg/40 backdrop-blur-xl p-12 relative overflow-hidden">
           {/* Accent Line */}
-          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-hw-accent to-transparent opacity-50" />
+          <div className="absolute top-0 left-0 w-full h-1 bg-hw-accent/60" />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">

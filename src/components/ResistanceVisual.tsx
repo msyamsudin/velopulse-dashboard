@@ -37,27 +37,15 @@ export const ResistanceVisual = ({ resistance }: ResistanceVisualProps) => {
       </div>
 
       <div className="relative w-full h-8 bg-hw-muted/5 border border-hw-muted/10 rounded-sm overflow-hidden">
-        {/* Grid Background */}
-        <div className="absolute inset-0 opacity-10" style={{ 
-            backgroundImage: 'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)',
-            backgroundSize: '10px 10px'
-        }} />
-
         {/* Slope SVG */}
         <svg viewBox="0 0 100 40" className="absolute inset-0 w-full h-full preserve-3d" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="slopeGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={accentColor} stopOpacity="0.5" />
-              <stop offset="100%" stopColor={accentColor} stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-          
           {/* Fill */}
           <motion.path 
             initial={{ d: `M0,40 L100,40 L100,40 Z` }}
             animate={{ d: `M0,40 L100,${rightY} L100,40 Z` }}
             transition={{ type: "spring", stiffness: 60, damping: 15 }}
-            fill="url(#slopeGradient)"
+            fill={accentColor}
+            fillOpacity="0.18"
           />
           
           {/* Top Line (Road) */}

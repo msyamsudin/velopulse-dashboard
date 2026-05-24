@@ -11,6 +11,7 @@ interface DashboardHeaderProps {
   setShowSettings: (show: boolean) => void;
   viewMode: 'grid' | 'telemetry';
   setViewMode: (mode: 'grid' | 'telemetry') => void;
+  chartAvailable: boolean;
 }
 
 export const DashboardHeader = ({
@@ -23,7 +24,8 @@ export const DashboardHeader = ({
   setShowDebug,
   setShowSettings,
   viewMode,
-  setViewMode
+  setViewMode,
+  chartAvailable
 }: DashboardHeaderProps) => {
   return (
     <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -48,17 +50,21 @@ export const DashboardHeader = ({
                 : 'text-hw-muted hover:text-white'
             }`}
           >
-            Grid
+            Ride
           </button>
           <button 
             onClick={() => setViewMode('telemetry')}
+            disabled={!chartAvailable}
+            title={chartAvailable ? 'Open session chart' : 'Start a session to enable chart view'}
             className={`px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all duration-200 ${
               viewMode === 'telemetry' 
                 ? 'bg-hw-accent text-hw-bg font-bold' 
-                : 'text-hw-muted hover:text-white'
+                : chartAvailable
+                  ? 'text-hw-muted hover:text-white'
+                  : 'text-hw-muted/35 cursor-not-allowed'
             }`}
           >
-            Telemetry
+            Chart
           </button>
         </div>
       </div>

@@ -70,14 +70,11 @@ export const DistanceVisual = ({ distanceMeters, currentSpeedKmh }: DistanceVisu
 
       <div className="relative w-full h-2.5 bg-hw-muted/10 rounded-full overflow-hidden border border-white/5">
         <motion.div 
-          className="absolute top-0 left-0 h-full bg-linear-to-r from-purple-600/60 to-fuchsia-400 rounded-full shadow-[0_0_12px_rgba(168,85,247,0.55)]"
+          className="absolute top-0 left-0 h-full bg-purple-400/80 rounded-full shadow-[0_0_12px_rgba(168,85,247,0.45)]"
           initial={{ width: 0 }}
           animate={{ width: `${progressPct}%` }}
           transition={{ type: "spring", stiffness: 30, damping: 15 }}
-        >
-          {/* Shine effect */}
-          <div className="absolute top-0 right-0 bottom-0 w-8 bg-linear-to-r from-transparent to-white/30 rounded-r-full" />
-        </motion.div>
+        />
       </div>
 
       <div className="flex justify-between text-[9px] font-mono text-hw-muted/55 px-0.5 uppercase">
