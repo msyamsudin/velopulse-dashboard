@@ -1,5 +1,5 @@
 import { Activity, Bike, ChevronRight, Heart, Radio, Settings, Timer, Zap } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
 import { HrZoneBar } from '../HrZoneBar';
 import { PowerGauge } from '../PowerGauge';
@@ -24,6 +24,7 @@ interface MainMetricProps {
   subValue: string;
   visual: ReactNode;
   isWaiting?: boolean;
+  accentStyle?: CSSProperties;
 }
 
 interface StripMetricProps {
@@ -39,49 +40,12 @@ interface StripMetricProps {
 
 const clampPct = (value: number) => Math.min(100, Math.max(0, value));
 
-const INTENSITY_THEMES = [
-  {
-    label: 'Idle',
-    glow: '74, 92, 86',
-    panel: 'border-white/5 bg-white/[0.03]',
-    dot: 'bg-hw-muted shadow-[0_0_10px_rgba(74,92,86,0.65)]',
-    text: 'text-hw-muted'
-  },
-  {
-    label: 'Zone 1',
-    glow: '74, 92, 86',
-    panel: 'border-hw-muted/20 bg-white/[0.03]',
-    dot: 'bg-hw-muted shadow-[0_0_10px_rgba(74,92,86,0.65)]',
-    text: 'text-hw-muted'
-  },
-  {
-    label: 'Zone 2',
-    glow: '74, 222, 128',
-    panel: 'border-green-400/15 bg-green-400/[0.025]',
-    dot: 'bg-green-400 shadow-[0_0_12px_rgba(74,222,128,0.65)]',
-    text: 'text-green-400'
-  },
-  {
-    label: 'Zone 3',
-    glow: '250, 204, 21',
-    panel: 'border-yellow-400/15 bg-yellow-400/[0.025]',
-    dot: 'bg-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.65)]',
-    text: 'text-yellow-400'
-  },
-  {
-    label: 'Zone 4',
-    glow: '249, 115, 22',
-    panel: 'border-orange-500/15 bg-orange-500/[0.025]',
-    dot: 'bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.65)]',
-    text: 'text-orange-500'
-  },
-  {
-    label: 'Zone 5',
-    glow: '239, 68, 68',
-    panel: 'border-red-500/15 bg-red-500/[0.025]',
-    dot: 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.65)]',
-    text: 'text-red-500'
-  },
+const HR_CARD_AURAS = [
+  { rgb: '74, 92, 86', borderAlpha: 0.22, bgAlpha: 0.025, glowAlpha: 0.14 },
+  { rgb: '74, 222, 128', borderAlpha: 0.34, bgAlpha: 0.035, glowAlpha: 0.2 },
+  { rgb: '250, 204, 21', borderAlpha: 0.34, bgAlpha: 0.035, glowAlpha: 0.2 },
+  { rgb: '249, 115, 22', borderAlpha: 0.36, bgAlpha: 0.035, glowAlpha: 0.22 },
+  { rgb: '239, 68, 68', borderAlpha: 0.38, bgAlpha: 0.04, glowAlpha: 0.24 },
 ];
 
 const MainMetric = ({
@@ -93,9 +57,13 @@ const MainMetric = ({
   subLabel,
   subValue,
   visual,
-  isWaiting = false
+  isWaiting = false,
+  accentStyle
 }: MainMetricProps) => (
-  <section className={`hardware-card h-full min-h-[240px] flex flex-col ${isWaiting ? 'opacity-75' : ''}`}>
+  <section
+    className={`hardware-card h-full min-h-[240px] flex flex-col ${isWaiting ? 'opacity-75' : ''}`}
+    style={accentStyle}
+  >
     <div className="flex items-start justify-between gap-4">
       <div className="stat-label flex items-center gap-2 mb-0">
         <span className={colorClass}>{icon}</span>
@@ -195,30 +163,29 @@ export const RecordingCockpit = ({
   const activeHrZoneIndex = getActiveHrZoneIndex(currentData.hr, userProfile.maxHr);
   const activeHrZone = activeHrZoneIndex >= 0 ? HR_ZONES[activeHrZoneIndex] : null;
   const hrZoneLabel = activeHrZone?.label || 'IDLE';
-  const intensityTheme = INTENSITY_THEMES[activeHrZoneIndex + 1] || INTENSITY_THEMES[0];
-  const hrZoneColor = activeHrZone?.color || intensityTheme.text;
+  const hrZoneColor = activeHrZone?.color || 'text-hw-muted';
+  const hrCardAura = activeHrZoneIndex >= 0 ? HR_CARD_AURAS[activeHrZoneIndex] : null;
+  const hrCardStyle = hrCardAura
+    ? {
+        backgroundColor: `rgba(${hrCardAura.rgb}, ${hrCardAura.bgAlpha})`,
+        borderColor: `rgba(${hrCardAura.rgb}, ${hrCardAura.borderAlpha})`,
+        boxShadow: `0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(${hrCardAura.rgb}, 0.08) inset, 0 0 34px -14px rgba(${hrCardAura.rgb}, ${hrCardAura.glowAlpha})`,
+      }
+    : undefined;
 
   return (
-    <div
-      className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-2 md:px-4 pb-4 transition-colors duration-700"
-      style={{
-        backgroundColor: `rgba(${intensityTheme.glow}, 0.035)`
-      }}
-    >
-      <div
-        className="pointer-events-none absolute inset-x-8 top-0 h-px opacity-70 transition-colors duration-700"
-        style={{ backgroundColor: `rgba(${intensityTheme.glow}, 0.55)` }}
-      />
+    <div className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-2 md:px-4 pb-4">
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-white/10 opacity-40" />
 
-      <div className={`relative shrink-0 flex flex-col gap-3 rounded-xl border px-4 py-3 transition-colors duration-700 lg:flex-row lg:items-center lg:justify-between ${intensityTheme.panel}`}>
+      <div className="relative shrink-0 flex flex-col gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`h-2 w-2 rounded-full transition-colors duration-700 ${intensityTheme.dot}`} />
+          <div className="h-2 w-2 rounded-full bg-hw-accent shadow-[0_0_10px_rgba(0,255,170,0.45)]" />
           <div>
             <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-hw-muted">Recording</div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <span>Ride cockpit</span>
-              <span className={`text-[9px] font-mono uppercase tracking-[0.16em] ${intensityTheme.text}`}>
-                {intensityTheme.label}
+              <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-hw-muted">
+                Live
               </span>
             </div>
           </div>
@@ -251,6 +218,7 @@ export const RecordingCockpit = ({
           subValue={currentData.hr ? `${hrPct}%` : 'Waiting'}
           visual={<HrZoneBar currentHr={currentData.hr} maxHr={userProfile.maxHr} />}
           isWaiting={!currentData.hr}
+          accentStyle={hrCardStyle}
         />
         <MainMetric
           label="Power"
