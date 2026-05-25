@@ -143,125 +143,142 @@ export const HistorySummary = ({
 
       <div className="mt-2 flex flex-col gap-4">
         <div className="hardware-card border-hw-muted/20 p-6 flex flex-col bg-black/30">
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-6 border-b border-white/5 pb-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,255,170,0.15)', border: '1px solid rgba(0,255,170,0.3)' }}>
-                <Activity size={14} style={{ color: '#00ffaa' }} />
-              </div>
-              <div>
-                <div className="text-[9px] text-hw-muted uppercase font-mono tracking-[0.2em] flex items-center gap-2">
-                  Training Progress
-                  <button
-                    onClick={() => setShowTotals(!showTotals)}
-                    className="text-[8px] bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition-colors text-white border border-white/10"
-                  >
-                    {showTotals ? 'Hide Totals' : 'Show Totals'}
-                  </button>
+          <div className="flex flex-col gap-5 mb-6 border-b border-white/5 pb-5">
+            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,255,170,0.15)', border: '1px solid rgba(0,255,170,0.3)' }}>
+                  <Activity size={14} style={{ color: '#00ffaa' }} />
                 </div>
-                <div className="text-white font-bold text-sm font-mono mt-0.5">
-                  {periodLabel}
-                  <span className="ml-2 text-[10px] font-normal" style={{ color: 'rgba(0,255,170,0.8)' }}>
-                    {normalizedChartData.filter(d => d.hasData).length} active periods in {rangeLabel}
-                  </span>
-                  {summaryRange !== 'all' && (
-                    <div className="flex items-center gap-1 ml-4 bg-white/5 p-0.5 rounded-lg border border-white/10">
-                      <button
-                        onClick={() => {
-                          const shift = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
-                          setOffsetDays(offsetDays + shift);
-                        }}
-                        className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
-                        title="Previous Period"
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      <div className="px-2 text-[8px] font-mono uppercase text-white/40 tracking-widest border-x border-white/5">
-                        {offsetDays === 0 ? 'Current' : `${offsetDays}d back`}
-                      </div>
-                      <button
-                        onClick={() => {
-                          const shift = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
-                          setOffsetDays(Math.max(0, offsetDays - shift));
-                        }}
-                        disabled={offsetDays === 0}
-                        className={`p-1 rounded transition-colors ${offsetDays === 0 ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
-                        title="Next Period"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
+                <div className="min-w-0">
+                  <div className="text-[9px] text-hw-muted uppercase font-mono tracking-[0.2em] flex flex-wrap items-center gap-2">
+                    Training Progress
+                    <button
+                      onClick={() => setShowTotals(!showTotals)}
+                      className="text-[8px] bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition-colors text-white border border-white/10"
+                    >
+                      {showTotals ? 'Hide Totals' : 'Show Totals'}
+                    </button>
+                  </div>
+                  <div className="text-white font-bold text-sm font-mono mt-0.5">
+                    {periodLabel}
+                    <span className="ml-2 text-[10px] font-normal" style={{ color: 'rgba(0,255,170,0.8)' }}>
+                      {normalizedChartData.filter(d => d.hasData).length} active periods in {rangeLabel}
+                    </span>
+                  </div>
+                  {denseData && (
+                    <div className="mt-2 text-[10px] font-mono uppercase tracking-[0.16em] text-hw-muted">
+                      Dense timeline detected. Showing line view for readability.
                     </div>
                   )}
                 </div>
-                {denseData && (
-                  <div className="mt-2 text-[10px] font-mono uppercase tracking-[0.16em] text-hw-muted">
-                    Dense timeline detected. Showing line view for readability.
+              </div>
+
+              {summaryRange !== 'all' && (
+                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1 self-start xl:self-auto">
+                  <button
+                    onClick={() => {
+                      const shift = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
+                      setOffsetDays(offsetDays + shift);
+                    }}
+                    className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
+                    title="Previous Period"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <div className="min-w-20 px-2 text-center text-[8px] font-mono uppercase text-white/45 tracking-widest border-x border-white/5">
+                    {offsetDays === 0 ? 'Current' : `${offsetDays}d back`}
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
-              <div className="flex rounded-lg overflow-hidden border border-white/8 flex-wrap" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                {['daily', 'weekly', 'monthly', 'yearly'].map(p => (
                   <button
-                    key={p}
-                    onClick={() => setSummaryPeriod(p as any)}
-                    style={summaryPeriod === p ? { background: '#262626', color: '#fff' } : {}}
-                    className={`px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryPeriod === p ? '' : 'text-hw-muted hover:text-white'
-                      }`}
+                    onClick={() => {
+                      const shift = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
+                      setOffsetDays(Math.max(0, offsetDays - shift));
+                    }}
+                    disabled={offsetDays === 0}
+                    className={`p-1 rounded transition-colors ${offsetDays === 0 ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
+                    title="Next Period"
                   >
-                    {p}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex rounded-lg overflow-hidden border border-white/8 flex-wrap" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                {rangeOptions.map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => setSummaryRange(option.value)}
-                    style={summaryRange === option.value ? { background: '#262626', color: '#fff' } : {}}
-                    className={`px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryRange === option.value ? '' : 'text-hw-muted hover:text-white'
-                      }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex rounded-lg overflow-hidden border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                  <button
-                    onClick={() => setChartType('bar')}
-                    style={chartType === 'bar' ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
-                    className={`px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'bar' ? '' : 'text-hw-muted hover:text-white'
-                      }`}
-                    title={denseData ? 'Dense ranges are displayed as line view automatically' : undefined}
-                  >
-                    BAR
-                  </button>
-                  <button
-                    onClick={() => setChartType('line')}
-                    style={chartType === 'line' ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
-                    className={`px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'line' ? '' : 'text-hw-muted hover:text-white'
-                      }`}
-                  >
-                    LINE
+                    <ChevronRight size={14} />
                   </button>
                 </div>
+              )}
+            </div>
 
-                <div className="flex rounded-lg overflow-hidden border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                  {(['distance', 'calories', 'duration', 'cadence'] as const).map(m => (
+            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
+                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Period</div>
+                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                    {['daily', 'weekly', 'monthly', 'yearly'].map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setSummaryPeriod(p as any)}
+                        style={summaryPeriod === p ? { background: '#262626', color: '#fff' } : {}}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryPeriod === p ? '' : 'text-hw-muted hover:text-white'
+                          }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
+                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Range</div>
+                  <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                    {rangeOptions.map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => setSummaryRange(option.value)}
+                        style={summaryRange === option.value ? { background: '#262626', color: '#fff' } : {}}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryRange === option.value ? '' : 'text-hw-muted hover:text-white'
+                          }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-3">
+                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
+                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">View</div>
+                  <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
                     <button
-                      key={m}
-                      onClick={() => setWeeklyMetric(m)}
-                      style={weeklyMetric === m ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
-                      className={`px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${weeklyMetric === m ? '' : 'text-hw-muted hover:text-white'
+                      onClick={() => setChartType('bar')}
+                      style={chartType === 'bar' ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
+                      className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'bar' ? '' : 'text-hw-muted hover:text-white'
+                        }`}
+                      title={denseData ? 'Dense ranges are displayed as line view automatically' : undefined}
+                    >
+                      BAR
+                    </button>
+                    <button
+                      onClick={() => setChartType('line')}
+                      style={chartType === 'line' ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
+                      className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'line' ? '' : 'text-hw-muted hover:text-white'
                         }`}
                     >
-                      {m === 'distance' ? 'KM' : m === 'calories' ? 'KCAL' : m === 'duration' ? 'MIN' : 'RPM'}
+                      LINE
                     </button>
-                  ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
+                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Metric</div>
+                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                    {(['distance', 'calories', 'duration', 'cadence'] as const).map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setWeeklyMetric(m)}
+                        style={weeklyMetric === m ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${weeklyMetric === m ? '' : 'text-hw-muted hover:text-white'
+                          }`}
+                      >
+                        {m === 'distance' ? 'KM' : m === 'calories' ? 'KCAL' : m === 'duration' ? 'MIN' : 'RPM'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

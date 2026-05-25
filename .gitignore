@@ -10,3 +10,4 @@ coverage/
 !.env.example
 .app-data/
 src/data/
+scratch/
