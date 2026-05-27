@@ -4,6 +4,8 @@ import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
+import { downloadCombinedTCX, downloadTCXZip } from '../lib/export-service';
+import { Download } from 'lucide-react';
 
 interface WorkoutHistoryProps {
   sessions: any[];
@@ -22,6 +24,39 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [showTotals, setShowTotals] = useState(false);
   const [offsetDays, setOffsetDays] = useState(0);
+
+  // Batch selection states
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedSessionIds([]);
+  };
+
+  const handleToggleSelectSession = (id: string) => {
+    setSelectedSessionIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedSessionIds(sessions.map(s => s.id));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedSessionIds([]);
+  };
+
+  const handleExportZip = async () => {
+    const selectedSessions = sessions.filter(s => selectedSessionIds.includes(s.id));
+    await downloadTCXZip(selectedSessions);
+  };
+
+  const handleExportCombined = () => {
+    const selectedSessions = sessions.filter(s => selectedSessionIds.includes(s.id));
+    downloadCombinedTCX(selectedSessions);
+  };
 
   // Reset offset when range changes
   useMemo(() => {
@@ -91,12 +126,67 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
             </div>
 
             {viewMode === 'sessions' ? (
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-8">
-                <HistoryList 
-                  sessions={sessions} 
-                  maxHr={maxHr} 
-                  onSelectSession={setSelectedSessionId} 
-                />
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Batch Export Control Panel */}
+                {sessions.length > 0 && (
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 p-4 rounded-lg bg-hw-muted/5 border border-hw-muted/10 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleToggleSelectionMode}
+                        className={`px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest transition-all border ${
+                          isSelectionMode 
+                            ? 'bg-hw-accent text-hw-bg border-hw-accent font-bold' 
+                            : 'border-hw-muted/30 text-hw-muted hover:border-hw-accent hover:text-hw-accent'
+                        }`}
+                      >
+                        {isSelectionMode ? 'Cancel Batch' : '✓ Batch Export'}
+                      </button>
+                      {isSelectionMode && (
+                        <span className="text-[10px] font-mono uppercase text-hw-accent tracking-widest font-bold">
+                          {selectedSessionIds.length} of {sessions.length} selected
+                        </span>
+                      )}
+                    </div>
+
+                    {isSelectionMode && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={selectedSessionIds.length === sessions.length ? handleClearSelection : handleSelectAll}
+                          className="px-3 py-1.5 rounded border border-white/10 text-white hover:border-white/30 font-mono text-[10px] uppercase tracking-widest transition-all"
+                        >
+                          {selectedSessionIds.length === sessions.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <button
+                          onClick={handleExportCombined}
+                          disabled={selectedSessionIds.length === 0}
+                          className="px-3 py-1.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500 hover:text-black font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Download size={10} />
+                          Combined TCX
+                        </button>
+                        <button
+                          onClick={handleExportZip}
+                          disabled={selectedSessionIds.length === 0}
+                          className="px-3 py-1.5 rounded bg-hw-accent/10 border border-hw-accent/30 text-hw-accent hover:bg-hw-accent hover:text-hw-bg font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Download size={10} />
+                          ZIP (Individual)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-8">
+                  <HistoryList 
+                    sessions={sessions} 
+                    maxHr={maxHr} 
+                    onSelectSession={setSelectedSessionId} 
+                    isSelectionMode={isSelectionMode}
+                    selectedSessionIds={selectedSessionIds}
+                    onToggleSelectSession={handleToggleSelectSession}
+                  />
+                </div>
               </div>
             ) : (
               <HistorySummary 
