@@ -68,6 +68,56 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         filters: [{ services: ['heart_rate'] }],
       });
       
+      const onHrDisconnect = async () => {
+        addLog("HR device disconnected. Attempting to reconnect...");
+        set({ hrConnected: false });
+        
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        const attemptReconnect = async () => {
+          // Stop if the device object was cleared (manual disconnect)
+          if (!get().hrDevice) {
+            addLog("HR auto-reconnect aborted (manually disconnected).");
+            return;
+          }
+          
+          try {
+            attempts++;
+            addLog(`HR Reconnect attempt ${attempts}/${maxAttempts}...`);
+            const server = await get().hrDevice?.gatt?.connect();
+            const service = await server?.getPrimaryService('heart_rate');
+            const characteristic = await service?.getCharacteristic('heart_rate_measurement');
+            
+            await characteristic?.startNotifications();
+            addLog("Notifications started for Heart Rate");
+
+            characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
+              const value = event.target.value;
+              const flags = value.getUint8(0);
+              const rate = flags & 0x01 ? value.getUint16(1, true) : value.getUint8(1);
+              
+              get().lastUpdate.heartRate = Date.now();
+              set((state) => ({
+                data: { ...state.data, heartRate: rate }
+              }));
+            });
+
+            addLog("HR reconnected successfully!");
+            set({ hrConnected: true, error: null });
+          } catch (err: any) {
+            addLog(`HR Reconnect failed: ${err.message}`);
+            if (attempts < maxAttempts && get().hrDevice) {
+              setTimeout(attemptReconnect, 3000);
+            } else {
+              set({ error: "HR connection lost. Please reconnect manually." });
+            }
+          }
+        };
+
+        setTimeout(attemptReconnect, 2000);
+      };
+
       addLog(`Connecting to ${device.name}...`);
       const server = await device.gatt?.connect();
       const service = await server?.getPrimaryService('heart_rate');
@@ -87,6 +137,8 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         }));
       });
 
+      device.addEventListener('gattserverdisconnected', onHrDisconnect);
+
       set({ hrDevice: device, hrConnected: true, error: null });
     } catch (err: any) {
       addLog(`HR Error: ${err.message}`);
@@ -105,6 +157,138 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         ],
       });
       
+      const onBikeDisconnect = async () => {
+        addLog("Bike device disconnected. Attempting to reconnect...");
+        set({ bikeConnected: false });
+        
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        const attemptReconnect = async () => {
+          if (!get().bikeDevice) {
+            addLog("Bike auto-reconnect aborted (manually disconnected).");
+            return;
+          }
+          
+          try {
+            attempts++;
+            addLog(`Bike Reconnect attempt ${attempts}/${maxAttempts}...`);
+            const server = await get().bikeDevice?.gatt?.connect();
+            
+            try {
+              const service = await server?.getPrimaryService('fitness_machine');
+              const characteristic = await service?.getCharacteristic('indoor_bike_data');
+              await characteristic?.startNotifications();
+              addLog("Notifications started for FTMS Indoor Bike Data");
+
+              characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
+                const value = event.target.value;
+                const flags = value.getUint16(0, true);
+                let offset = 2;
+                const updates: Partial<BluetoothData> = {};
+                const now = Date.now();
+                const state = get();
+                
+                if (!(flags & 0x0001)) {
+                  updates.speed = value.getUint16(offset, true) / 100;
+                  get().lastUpdate.speed = now;
+                  offset += 2;
+                }
+                if (flags & 0x0002) offset += 2;
+                if (flags & 0x0004) {
+                  updates.cadence = value.getUint16(offset, true) / 2;
+                  get().lastUpdate.cadence = now;
+                  offset += 2;
+                }
+                if (flags & 0x0008) offset += 2;
+                if (flags & 0x0010) {
+                  const d1 = value.getUint8(offset);
+                  const d2 = value.getUint8(offset + 1);
+                  const d3 = value.getUint8(offset + 2);
+                  const rawDistance = d1 + (d2 << 8) + (d3 << 16);
+                  
+                  const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance) 
+                    ? rawDistance 
+                    : Math.max(0, rawDistance - state.lastRawDistance);
+                  
+                  const newCumulative = state.cumulativeDistance + delta;
+                  
+                  updates.distance = newCumulative;
+                  set({ 
+                    cumulativeDistance: newCumulative, 
+                    lastRawDistance: rawDistance 
+                  });
+                  
+                  offset += 3;
+                }
+                if (flags & 0x0020) {
+                  updates.resistance = value.getInt16(offset, true);
+                  offset += 2;
+                }
+                if (flags & 0x0040) {
+                  updates.power = value.getInt16(offset, true);
+                  get().lastUpdate.power = now;
+                  offset += 2;
+                }
+                if (flags & 0x0080) offset += 2;
+                if (flags & 0x0100) {
+                  const rawCalories = value.getUint16(offset, true);
+                  
+                  const delta = (state.lastRawCalories > 0 && rawCalories < state.lastRawCalories)
+                    ? rawCalories
+                    : Math.max(0, rawCalories - state.lastRawCalories);
+                  
+                  const newCumulative = state.cumulativeCalories + delta;
+                  
+                  updates.calories = newCumulative;
+                  set({
+                    cumulativeCalories: newCumulative,
+                    lastRawCalories: rawCalories
+                  });
+                  
+                  offset += 5;
+                }
+
+                if (Object.keys(updates).length > 0) {
+                  set((s) => ({ data: { ...s.data, ...updates } }));
+                }
+              });
+            } catch (e) {
+              addLog("FTMS not found on reconnect, trying CSC service...");
+              const service = await server?.getPrimaryService('cycling_speed_and_cadence');
+              const characteristic = await service?.getCharacteristic('csc_measurement');
+              await characteristic?.startNotifications();
+              characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
+                const value = event.target.value;
+                const flags = value.getUint8(0);
+                let offset = 1;
+                const now = Date.now();
+                if (flags & 0x01) offset += 6;
+                if (flags & 0x02) {
+                   const crankRevs = value.getUint16(offset, true);
+                   get().lastUpdate.cadence = now;
+                   set((s) => ({ 
+                     data: { ...s.data, cadence: crankRevs % 200 } 
+                   })); 
+                }
+              });
+            }
+
+            addLog("Bike reconnected successfully!");
+            set({ bikeConnected: true, error: null });
+          } catch (err: any) {
+            addLog(`Bike Reconnect failed: ${err.message}`);
+            if (attempts < maxAttempts && get().bikeDevice) {
+              setTimeout(attemptReconnect, 3000);
+            } else {
+              set({ error: "Bike connection lost. Please reconnect manually." });
+            }
+          }
+        };
+
+        setTimeout(attemptReconnect, 2000);
+      };
+
       addLog(`Connecting to ${device.name}...`);
       const server = await device.gatt?.connect();
       
@@ -208,6 +392,8 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
           }
         });
       }
+
+      device.addEventListener('gattserverdisconnected', onBikeDisconnect);
 
       set({ bikeDevice: device, bikeConnected: true, error: null });
     } catch (err: any) {

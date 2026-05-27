@@ -51,6 +51,33 @@ interface WorkoutState {
   formatTime: (seconds: number) => string;
 }
 
+const persistActiveSession = (state: {
+  isRecording: boolean;
+  elapsed: number;
+  sessionStartTime: number | null;
+  startDistance: number;
+  startCalories: number;
+  history: HistoryData[];
+}) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (state.sessionStartTime === null) {
+      localStorage.removeItem('velopulse_active_session');
+    } else {
+      localStorage.setItem('velopulse_active_session', JSON.stringify({
+        isRecording: state.isRecording,
+        elapsed: state.elapsed,
+        sessionStartTime: state.sessionStartTime,
+        startDistance: state.startDistance,
+        startCalories: state.startCalories,
+        history: state.history
+      }));
+    }
+  } catch (e) {
+    console.error('Failed to persist active session to localStorage:', e);
+  }
+};
+
 export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   isRecording: false,
   elapsed: 0,
@@ -63,20 +90,42 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   toggleRecording: () => {
     const { isRecording } = get();
     if (!isRecording) {
+      const startTime = Date.now();
+      const sDist = useBluetoothStore.getState().data.distance || 0;
+      const sCal = useBluetoothStore.getState().data.calories || 0;
       set({
         history: [],
         elapsed: 0,
-        sessionStartTime: Date.now(),
-        startDistance: useBluetoothStore.getState().data.distance || 0,
-        startCalories: useBluetoothStore.getState().data.calories || 0,
+        sessionStartTime: startTime,
+        startDistance: sDist,
+        startCalories: sCal,
         isRecording: true,
+      });
+      persistActiveSession({
+        isRecording: true,
+        elapsed: 0,
+        sessionStartTime: startTime,
+        startDistance: sDist,
+        startCalories: sCal,
+        history: []
       });
     } else {
       set({ isRecording: false });
+      persistActiveSession({
+        ...get(),
+        isRecording: false
+      });
     }
   },
 
-  incrementElapsed: () => set((state) => ({ elapsed: state.elapsed + 1 })),
+  incrementElapsed: () => {
+    set((state) => {
+      const nextElapsed = state.elapsed + 1;
+      const nextState = { ...state, elapsed: nextElapsed };
+      persistActiveSession(nextState);
+      return { elapsed: nextElapsed };
+    });
+  },
 
   addHistoryPoint: (data) => {
     if (!get().isRecording) return;
@@ -88,8 +137,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const lastPoint = get().history[get().history.length - 1];
     if (lastPoint && lastPoint.time === timeStr) return;
 
-    set((state) => ({
-      history: [...state.history, {
+    set((state) => {
+      const newHistory = [...state.history, {
         time: timeStr,
         hr: data.heartRate || 0,
         cadence: data.cadence || 0,
@@ -98,8 +147,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         distance: Math.max(0, (data.distance || 0) - startDistance),
         resistance: data.resistance || 0,
         calories: Math.max(0, (data.calories || 0) - startCalories)
-      }]
-    }));
+      }];
+      const nextState = { ...state, history: newHistory };
+      persistActiveSession(nextState);
+      return { history: newHistory };
+    });
   },
 
 
@@ -114,12 +166,12 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     }
 
     const stats = {
-      avgHr: Math.round(history.reduce((a, b) => a + b.hr, 0) / history.length),
-      maxHr: Math.max(...history.map(h => h.hr)),
-      avgPower: Math.round(history.reduce((a, b) => a + b.power, 0) / history.length),
-      maxPower: Math.max(...history.map(h => h.power)),
-      avgCadence: Math.round(history.reduce((a, b) => a + b.cadence, 0) / history.length),
-      maxCadence: Math.max(...history.map(h => h.cadence)),
+      avgHr: Math.round(history.reduce((a, b) => a + b.hr, 0) / history.length) || 0,
+      maxHr: Math.max(...history.map(h => h.hr)) || 0,
+      avgPower: Math.round(history.reduce((a, b) => a + b.power, 0) / history.length) || 0,
+      maxPower: Math.max(...history.map(h => h.power)) || 0,
+      avgCadence: Math.round(history.reduce((a, b) => a + b.cadence, 0) / history.length) || 0,
+      maxCadence: Math.max(...history.map(h => h.cadence)) || 0,
     };
 
     const newSession: WorkoutSession = {
@@ -163,17 +215,50 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     set({
       history: [],
       elapsed: 0,
-      sessionStartTime: null
+      sessionStartTime: null,
+      isRecording: false
+    });
+    persistActiveSession({
+      isRecording: false,
+      elapsed: 0,
+      sessionStartTime: null,
+      startDistance: 0,
+      startCalories: 0,
+      history: []
     });
   },
 
   loadHistory: () => {
+    // 1. Load general workout session history
     const saved = localStorage.getItem('velopulse_sessions');
     if (saved) {
       try {
         set({ sessionHistory: JSON.parse(saved) });
       } catch (e) {
         console.error('Failed to load session history');
+      }
+    }
+
+    // 2. Recover active workout session if it exists from a previous crash/reload
+    if (typeof window !== 'undefined') {
+      try {
+        const activeSession = localStorage.getItem('velopulse_active_session');
+        if (activeSession) {
+          const parsed = JSON.parse(activeSession);
+          if (parsed && parsed.sessionStartTime) {
+            console.log('[Recovery] Restoring active session from crash/reload:', parsed);
+            set({
+              isRecording: parsed.isRecording || false,
+              elapsed: parsed.elapsed || 0,
+              sessionStartTime: parsed.sessionStartTime,
+              startDistance: parsed.startDistance || 0,
+              startCalories: parsed.startCalories || 0,
+              history: parsed.history || []
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to recover active session:', e);
       }
     }
   },
