@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
           </script>
           <div style="text-align: center;">
             <h2>AUTHENTICATION SUCCESSFUL</h2>
-            <p>Syncing with Mission Control...</p>
+            <p>Syncing with VeloPulse Pro...</p>
           </div>
         </body>
       </html>

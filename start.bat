@@ -1,6 +1,6 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
-TITLE VeloPulse Pro - Mission Control Dashboard
+TITLE VeloPulse Pro - Dashboard
 SET PORT=3000
 
 echo =======================================================
@@ -45,7 +45,7 @@ if not exist "node_modules\" (
 )
 
 :: 3. Launch the browser in the background after a short delay
-echo [INFO] Mission Control will launch at http://localhost:%PORT%
+echo [INFO] VeloPulse Pro will launch at http://localhost:%PORT%
 start cmd /c "timeout /t 5 /nobreak > nul && start http://localhost:%PORT%"
 
 :: 4. Start the application

@@ -36,7 +36,7 @@ export const DashboardHeader = ({
             VELOPULSE <span className="text-hw-muted font-light">PRO</span>
           </h1>
           <p className="text-hw-muted text-xs font-mono uppercase tracking-widest mt-1">
-            Mission Control / Fitness Telemetry
+            Fitness Telemetry
           </p>
         </div>
 
