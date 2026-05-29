@@ -209,3 +209,102 @@ export const downloadTCXZip = async (sessions: WorkoutSession[]) => {
   URL.revokeObjectURL(url);
 };
 
+const downloadTextFile = (content: string, filename: string, type: string) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const csvEscape = (value: string | number) => {
+  const raw = String(value ?? '');
+  return /[",\n]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
+};
+
+const getSessionReportRows = (sessions: WorkoutSession[]) => {
+  return sessions.map(session => {
+    const lastPoint = session.history[session.history.length - 1] || {} as HistoryData;
+    const distanceKm = Number(((lastPoint.distance || 0) / 1000).toFixed(2));
+    const calories = Math.round(lastPoint.calories || 0);
+    const avgSpeed = session.duration > 0 ? Number((distanceKm / (session.duration / 3600)).toFixed(1)) : 0;
+
+    return {
+      date: new Date(session.date).toISOString(),
+      durationSeconds: session.duration,
+      distanceKm,
+      calories,
+      avgSpeed,
+      avgPower: session.stats.avgPower,
+      maxPower: session.stats.maxPower,
+      avgHr: session.stats.avgHr,
+      maxHr: session.stats.maxHr,
+      avgCadence: session.stats.avgCadence,
+      maxCadence: session.stats.maxCadence,
+      syncedToGoogle: Boolean(session.synced_to_google),
+    };
+  });
+};
+
+export const downloadSummaryCSV = (sessions: WorkoutSession[]) => {
+  const headers = [
+    'date',
+    'duration_seconds',
+    'distance_km',
+    'calories',
+    'avg_speed_kmh',
+    'avg_power_w',
+    'max_power_w',
+    'avg_hr_bpm',
+    'max_hr_bpm',
+    'avg_cadence_rpm',
+    'max_cadence_rpm',
+    'synced_to_google',
+  ];
+  const rows = getSessionReportRows(sessions);
+  const csv = [
+    headers.join(','),
+    ...rows.map(row => [
+      row.date,
+      row.durationSeconds,
+      row.distanceKm,
+      row.calories,
+      row.avgSpeed,
+      row.avgPower,
+      row.maxPower,
+      row.avgHr,
+      row.maxHr,
+      row.avgCadence,
+      row.maxCadence,
+      row.syncedToGoogle,
+    ].map(csvEscape).join(',')),
+  ].join('\n');
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  downloadTextFile(csv, `velopulse_summary_${dateStr}.csv`, 'text/csv;charset=utf-8');
+};
+
+export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
+  const rows = getSessionReportRows(sessions);
+  const totals = rows.reduce((acc, row) => {
+    acc.sessions += 1;
+    acc.durationSeconds += row.durationSeconds;
+    acc.distanceKm += row.distanceKm;
+    acc.calories += row.calories;
+    return acc;
+  }, { sessions: 0, durationSeconds: 0, distanceKm: 0, calories: 0 });
+  const report = {
+    generatedAt: new Date().toISOString(),
+    totals: {
+      ...totals,
+      distanceKm: Number(totals.distanceKm.toFixed(2)),
+    },
+    sessions: rows,
+  };
+  const dateStr = new Date().toISOString().split('T')[0];
+  downloadTextFile(JSON.stringify(report, null, 2), `velopulse_summary_${dateStr}.json`, 'application/json;charset=utf-8');
+};

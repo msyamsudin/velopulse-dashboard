@@ -1,8 +1,10 @@
-import { ChevronLeft, ChevronRight, Activity } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Activity, Download, Trophy } from 'lucide-react';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area } from 'recharts';
-import { generateSummaryInsights, getInsightToneClasses } from '../../lib/workout-analysis';
+import { generateSummaryInsights, getInsightToneClasses, getPersonalRecords } from '../../lib/workout-analysis';
+import { downloadSummaryCSV, downloadSummaryJSON } from '../../lib/export-service';
 
 interface HistorySummaryProps {
+  sessions: any[];
   globalSummary: any;
   showTotals: boolean;
   setShowTotals: (show: boolean) => void;
@@ -58,6 +60,7 @@ interface HistorySummaryProps {
 }
 
 export const HistorySummary = ({
+  sessions,
   globalSummary,
   showTotals,
   setShowTotals,
@@ -136,6 +139,7 @@ export const HistorySummary = ({
     weeklyDailyData,
     rangeLabel,
   });
+  const personalRecords = getPersonalRecords(sessions);
 
   return (
     <div className="pb-8 flex flex-col gap-4">
@@ -194,6 +198,58 @@ export const HistorySummary = ({
           </div>
         </div>
       )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
+        <div className="hardware-card border-hw-muted/20 p-4 bg-black/20">
+          <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/5 pb-3">
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted flex items-center gap-2">
+                <Trophy size={12} className="text-yellow-300" />
+                Personal Records
+              </div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">All-time best efforts from saved sessions</div>
+            </div>
+            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">{sessions.length} sessions</div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {personalRecords.map(record => (
+              <div key={record.title} className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{record.title}</div>
+                <div className="mt-1 text-lg font-bold font-mono text-white tabular-nums">
+                  {record.value} <span className="text-[10px] font-normal text-white/35">{record.unit}</span>
+                </div>
+                <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{record.dateLabel}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="hardware-card border-hw-muted/20 p-4 bg-black/20 self-start">
+          <div className="mb-4 border-b border-white/5 pb-3">
+            <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted flex items-center gap-2">
+              <Download size={12} className="text-hw-accent" />
+              Summary Export
+            </div>
+            <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">Download session report data</div>
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              onClick={() => downloadSummaryCSV(sessions)}
+              disabled={sessions.length === 0}
+              className="rounded-lg border border-hw-accent/30 bg-hw-accent/10 px-4 py-3 text-[10px] font-mono uppercase tracking-widest text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg disabled:pointer-events-none disabled:opacity-40"
+            >
+              Export CSV
+            </button>
+            <button
+              onClick={() => downloadSummaryJSON(sessions)}
+              disabled={sessions.length === 0}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-[10px] font-mono uppercase tracking-widest text-white/60 transition-colors hover:border-white/30 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+            >
+              Export JSON
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-2 flex flex-col gap-4">
         <div className="hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25">

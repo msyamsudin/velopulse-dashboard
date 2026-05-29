@@ -54,6 +54,14 @@ type TrainingInsight = {
   tone: 'good' | 'watch' | 'neutral';
 };
 
+export type PersonalRecord = {
+  title: string;
+  value: string;
+  unit: string;
+  dateLabel: string;
+  sessionId: string;
+};
+
 const formatDelta = (value: number, unit: string, decimals = 0) => {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(decimals)} ${unit}`;
@@ -201,4 +209,79 @@ export const generateSummaryInsights = ({
   }
 
   return insights.slice(0, 4);
+};
+
+export const getPersonalRecords = (sessions: any[]): PersonalRecord[] => {
+  if (sessions.length === 0) return [];
+
+  const enriched = sessions.map(session => {
+    const outcome = getSessionOutcome(session);
+    const speed = outcome.duration > 0 ? outcome.distanceKm / (outcome.duration / 3600) : 0;
+    const date = new Date(session.date);
+    const dateLabel = Number.isNaN(date.getTime())
+      ? 'Unknown date'
+      : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    return {
+      session,
+      outcome,
+      speed,
+      dateLabel,
+    };
+  });
+
+  const bestBy = (selector: (item: typeof enriched[number]) => number) =>
+    enriched.reduce((best, current) => selector(current) > selector(best) ? current : best, enriched[0]);
+
+  const longest = bestBy(item => item.outcome.duration);
+  const distance = bestBy(item => item.outcome.distanceKm);
+  const calories = bestBy(item => item.outcome.calories);
+  const avgPower = bestBy(item => item.session?.stats?.avgPower || 0);
+  const maxPower = bestBy(item => item.session?.stats?.maxPower || 0);
+  const speed = bestBy(item => item.speed);
+
+  return [
+    {
+      title: 'Longest Ride',
+      value: `${Math.floor(longest.outcome.duration / 60)}`,
+      unit: 'min',
+      dateLabel: longest.dateLabel,
+      sessionId: longest.session.id,
+    },
+    {
+      title: 'Best Distance',
+      value: distance.outcome.distanceKm.toFixed(2),
+      unit: 'km',
+      dateLabel: distance.dateLabel,
+      sessionId: distance.session.id,
+    },
+    {
+      title: 'Top Calories',
+      value: `${calories.outcome.calories}`,
+      unit: 'kcal',
+      dateLabel: calories.dateLabel,
+      sessionId: calories.session.id,
+    },
+    {
+      title: 'Best Avg Power',
+      value: `${avgPower.session?.stats?.avgPower || 0}`,
+      unit: 'w',
+      dateLabel: avgPower.dateLabel,
+      sessionId: avgPower.session.id,
+    },
+    {
+      title: 'Peak Power',
+      value: `${maxPower.session?.stats?.maxPower || 0}`,
+      unit: 'w',
+      dateLabel: maxPower.dateLabel,
+      sessionId: maxPower.session.id,
+    },
+    {
+      title: 'Fastest Avg Speed',
+      value: speed.speed.toFixed(1),
+      unit: 'km/h',
+      dateLabel: speed.dateLabel,
+      sessionId: speed.session.id,
+    },
+  ];
 };
