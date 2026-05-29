@@ -1,5 +1,6 @@
-import { Calendar, Clock, Zap, Heart, Bike, Timer } from 'lucide-react';
+import { Calendar, Clock, Zap, Heart, Route, Flame } from 'lucide-react';
 import { formatDate, formatDuration } from '../../utils/formatters';
+import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 
 interface HistoryListProps {
   sessions: any[];
@@ -30,6 +31,8 @@ export const HistoryList = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {sessions.map((session) => {
         const isSelected = selectedSessionIds.includes(session.id);
+        const outcome = getSessionOutcome(session);
+        const quality = getWorkoutQuality(session, maxHr);
         
         return (
           <div
@@ -48,7 +51,7 @@ export const HistoryList = ({
             }`}
           >
             <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-2 text-hw-accent">
+              <div className="flex items-center gap-2 text-hw-accent min-w-0">
                 {isSelectionMode && (
                   <div className={`w-4.5 h-4.5 rounded flex items-center justify-center transition-all border ${
                     isSelected 
@@ -63,41 +66,48 @@ export const HistoryList = ({
                   </div>
                 )}
                 <Calendar size={14} />
-                <span className="text-xs font-bold font-mono uppercase">
+                <span className="text-xs font-bold font-mono uppercase truncate">
                   {formatDate(session.date)}
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-hw-muted">
-                <Clock size={12} />
-                <span className="text-[10px] font-mono">{formatDuration(session.duration)}</span>
+              <div className={`shrink-0 rounded border px-2 py-1 text-[8px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
+                {quality.label}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-4 flex-1">
               <div className="flex flex-col bg-black/20 p-2 rounded">
+                <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Distance</span>
+                <div className="flex items-center gap-1.5 text-blue-400 font-bold text-base tabular-nums">
+                  <Route size={12} /> {outcome.distanceKm.toFixed(2)}<span className="text-[10px] font-normal opacity-50">KM</span>
+                </div>
+              </div>
+              <div className="flex flex-col bg-black/20 p-2 rounded">
+                <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Duration</span>
+                <div className="flex items-center gap-1.5 text-white font-bold text-base tabular-nums">
+                  <Clock size={12} /> {formatDuration(outcome.duration)}
+                </div>
+              </div>
+              <div className="flex flex-col bg-black/20 p-2 rounded">
+                <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Calories</span>
+                <div className="flex items-center gap-1.5 text-pink-400 font-bold text-base tabular-nums">
+                  <Flame size={12} /> {outcome.calories}<span className="text-[10px] font-normal opacity-50">KCAL</span>
+                </div>
+              </div>
+              <div className="flex flex-col bg-black/20 p-2 rounded">
                 <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Avg Power</span>
                 <div className="flex items-center gap-1.5 text-yellow-400 font-bold text-base tabular-nums">
-                  <Zap size={12} /> {session.stats.avgPower}<span className="text-[10px] font-normal opacity-50">W</span>
+                  <Zap size={12} /> {outcome.avgPower}<span className="text-[10px] font-normal opacity-50">W</span>
                 </div>
               </div>
-              <div className="flex flex-col bg-black/20 p-2 rounded">
-                <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Avg HR</span>
-                <div className="flex items-center gap-1.5 text-red-500 font-bold text-base tabular-nums">
-                  <Heart size={12} /> {session.stats.avgHr}<span className="text-[10px] font-normal opacity-50">BPM</span>
-                </div>
-              </div>
-              <div className="flex flex-col bg-black/20 p-2 rounded">
-                <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Avg Cadence</span>
-                <div className="flex items-center gap-1.5 text-hw-accent font-bold text-base tabular-nums">
-                  <Bike size={12} /> {session.stats.avgCadence}<span className="text-[10px] font-normal opacity-50">RPM</span>
-                </div>
-              </div>
-              <div className="flex flex-col bg-black/20 p-2 rounded">
-                <span className="text-[9px] text-hw-muted uppercase font-mono mb-1">Move Mins</span>
-                <div className="flex items-center gap-1.5 text-blue-400 font-bold text-base tabular-nums">
-                  <Timer size={12} /> {Math.floor(((session.history?.filter((h: any) => h.hr >= (maxHr * 0.5)).length || 0) / Math.max(1, session.history?.length || 1)) * session.duration / 60)}<span className="text-[10px] font-normal opacity-50">MIN</span>
-                </div>
-              </div>
+            </div>
+
+            <div className="mb-3 flex items-center justify-between rounded bg-black/20 px-2 py-1.5 text-[9px] font-mono uppercase tracking-widest text-hw-muted">
+              <span className="flex items-center gap-1.5">
+                <Heart size={10} className="text-red-500" />
+                Avg HR <span className="text-white">{outcome.avgHr}</span> BPM
+              </span>
+              <span>{session.stats.avgCadence || 0} RPM</span>
             </div>
 
             <div className="mt-auto flex justify-between items-center pt-3 border-t border-white/5">

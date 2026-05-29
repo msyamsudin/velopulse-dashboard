@@ -82,6 +82,20 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
     [selectedSession, calculateFullStats]
   );
 
+  const previousSession = useMemo(() => {
+    if (!selectedSession) return null;
+    const sorted = [...sessions].sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const selectedIndex = sorted.findIndex(s => s.id === selectedSession.id);
+    return selectedIndex > 0 ? sorted[selectedIndex - 1] : null;
+  }, [sessions, selectedSession]);
+
+  const previousFullStats = useMemo(() =>
+    previousSession ? calculateFullStats(previousSession) : null,
+    [previousSession, calculateFullStats]
+  );
+
   return (
     <AnimatePresence mode="wait">
       {!selectedSessionId ? (
@@ -219,6 +233,9 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
         <HistoryDetail 
           session={selectedSession}
           fullStats={fullStats}
+          previousSession={previousSession}
+          previousFullStats={previousFullStats}
+          maxHr={maxHr}
           isGoogleConnected={isGoogleConnected}
           onSyncSession={onSyncSession}
           onBack={() => setSelectedSessionId(null)}

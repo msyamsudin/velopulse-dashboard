@@ -106,13 +106,14 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
 
   return (
     <div 
-      className="flex flex-col w-full bg-[#121212] rounded-xl overflow-hidden border border-white/10 shadow-2xl"
+      className="flex flex-col w-full overflow-hidden rounded-2xl border border-hw-border backdrop-blur-xl"
+      style={{ backgroundColor: 'var(--color-hw-card)', boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.45)' }}
       onMouseLeave={handleMouseLeave}
     >
 
       {/* Top Header / Time Axis */}
-      <div className="flex items-stretch border-b border-white/5 bg-[#1a1a1a]">
-        <div className="w-[180px] flex flex-col justify-center px-8 py-2 border-r border-white/5">
+      <div className="flex items-stretch border-b border-hw-border bg-hw-muted/5">
+        <div className="w-[180px] flex flex-col justify-center px-8 py-2 border-r border-hw-border">
           <div className="text-[10px] text-hw-muted font-mono uppercase tracking-widest opacity-60">Time</div>
           <div className="text-sm font-bold text-hw-accent font-mono tabular-nums">
             {activeIndex !== null ? chartData[activeIndex]?.relativeTime : chartData[chartData.length - 1]?.relativeTime}
@@ -133,7 +134,7 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
                 dataKey="relativeTime"
                 axisLine={false}
                 tickLine={true}
-                stroke="#333"
+                stroke="rgba(74,92,86,0.5)"
                 fontSize={10}
                 tick={{ fill: '#8e9299', fontWeight: 500 }}
                 interval="preserveStartEnd"
@@ -149,7 +150,7 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
           </ResponsiveContainer>
 
         </div>
-        <div className="w-[120px] border-l border-white/5" />
+        <div className="w-[120px] border-l border-hw-border" />
       </div>
 
       {/* Tracks */}
@@ -157,17 +158,17 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
         {tracks.map((track, index) => (
           <div
             key={track.id}
-            className={`flex items-stretch min-h-[140px] ${index !== tracks.length - 1 ? 'border-b border-white/5' : ''}`}
+            className={`flex items-stretch min-h-[140px] ${index !== tracks.length - 1 ? 'border-b border-hw-border' : ''}`}
           >
             {/* Left Sidebar: Labels */}
-            <div className="w-[180px] flex flex-col justify-center px-8 py-4 border-r border-white/5 bg-[#161616]">
+            <div className="w-[180px] flex flex-col justify-center px-8 py-4 border-r border-hw-border bg-hw-muted/5">
               <div className="text-sm font-bold text-white mb-1 uppercase tracking-tight">{track.name}</div>
               <div className="text-[10px] text-hw-muted font-mono uppercase tracking-widest opacity-60">Max {track.max}</div>
               <div className="text-[10px] text-hw-muted font-mono uppercase tracking-widest opacity-60">Avg {track.avg}</div>
             </div>
 
             {/* Main Chart Area */}
-            <div className="flex-1 relative group bg-[#111]">
+            <div className="flex-1 relative group bg-black/10">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={chartData}
@@ -176,7 +177,7 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
                   onMouseMove={handleMouseMove}
                 >
 
-                  <CartesianGrid strokeDasharray="0" stroke="#ffffff05" vertical={true} horizontal={false} />
+                  <CartesianGrid strokeDasharray="0" stroke="rgba(0,255,170,0.04)" vertical={true} horizontal={false} />
                   <YAxis hide domain={['dataMin', 'dataMax']} />
                   <Tooltip
                     content={() => null}
@@ -213,7 +214,7 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
               </div>
             </div>
 
-            <div className="w-[120px] flex flex-col items-center justify-center border-l border-white/5 bg-[#161616]">
+            <div className="w-[120px] flex flex-col items-center justify-center border-l border-hw-border bg-hw-muted/5">
               <div className="flex flex-col items-center">
                 <span className="text-2xl font-bold text-white tabular-nums leading-none">
                   {(() => {
