@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Activity } from 'lucide-react';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area } from 'recharts';
+import { generateSummaryInsights, getInsightToneClasses } from '../../lib/workout-analysis';
 
 interface HistorySummaryProps {
   globalSummary: any;
@@ -109,60 +110,105 @@ export const HistorySummary = ({
     ? '7 days'
     : summaryRange === '30d'
       ? '30 days'
-      : summaryRange === '90d'
-        ? '90 days'
-        : summaryRange === '1y'
-          ? '1 year'
-          : 'all time';
+    : summaryRange === '90d'
+      ? '90 days'
+      : summaryRange === '1y'
+        ? '1 year'
+        : 'all time';
+  const periodOptions = ['daily', 'weekly', 'monthly', 'yearly'] as const;
+  const metricOptions = [
+    { value: 'distance', label: 'KM' },
+    { value: 'calories', label: 'KCAL' },
+    { value: 'duration', label: 'MIN' },
+    { value: 'cadence', label: 'RPM' },
+  ] as const;
+  const shiftDays = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
+  const summaryKpis = [
+    { label: 'Sessions', value: globalSummary.totalSessions, unit: '', color: '#00ffaa' },
+    { label: 'Distance', value: globalSummary.totalDistance, unit: 'KM', color: '#00d2ff' },
+    { label: 'Time', value: globalSummary.totalDuration, unit: '', color: '#fbbf24' },
+    { label: 'Calories', value: globalSummary.totalCalories, unit: 'KCAL', color: '#f472b6' },
+  ];
+  const autoInsights = generateSummaryInsights({
+    comparisonSummary,
+    summaryInsights,
+    globalSummary,
+    weeklyDailyData,
+    rangeLabel,
+  });
 
   return (
     <div className="pb-8 flex flex-col gap-4">
-      {showTotals && (
-        <div className="hardware-card border-hw-muted/20 px-4 py-3 flex items-center justify-between bg-black/40 backdrop-blur-md">
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-[9px] text-hw-muted uppercase font-mono tracking-wider mb-0.5">Sessions</span>
-            <span className="text-sm font-bold text-hw-accent tabular-nums">{globalSummary.totalSessions}</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryKpis.map(kpi => (
+          <div key={kpi.label} className="rounded-2xl border border-hw-border bg-hw-muted/5 px-4 py-3">
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.22em]">{kpi.label}</div>
+            <div className="mt-1 text-xl font-bold font-mono tabular-nums" style={{ color: kpi.color }}>
+              {kpi.value} {kpi.unit && <span className="text-[10px] font-normal text-white/40">{kpi.unit}</span>}
+            </div>
           </div>
-          <div className="w-px h-6 bg-white/10" />
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-[9px] text-hw-muted uppercase font-mono tracking-wider mb-0.5">Distance</span>
-            <span className="text-sm font-bold tabular-nums" style={{ color: "#00d2ff" }}>{globalSummary.totalDistance} <span className="text-[8px] font-normal opacity-60">KM</span></span>
+        ))}
+      </div>
+
+      {showTotals && summaryInsights && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Avg / Session</div>
+            <div className="mt-1 text-sm font-bold font-mono text-white">{summaryInsights.avgDistancePerSession} <span className="text-[9px] text-hw-muted">KM</span></div>
+            <div className="text-[9px] font-mono text-white/45">{summaryInsights.avgDurationPerSession}</div>
           </div>
-          <div className="w-px h-6 bg-white/10" />
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-[9px] text-hw-muted uppercase font-mono tracking-wider mb-0.5">Calories</span>
-            <span className="text-sm font-bold tabular-nums" style={{ color: "#f472b6" }}>{globalSummary.totalCalories} <span className="text-[8px] font-normal opacity-60">KCAL</span></span>
+          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Best Period</div>
+            <div className="mt-1 text-sm font-bold font-mono" style={{ color: metricColor }}>{summaryInsights.bestPeriodDistance} <span className="text-[9px] text-white/40">KM</span></div>
+            <div className="text-[9px] font-mono text-white/45">{summaryInsights.bestPeriodLabel}</div>
           </div>
-          <div className="w-px h-6 bg-white/10" />
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-[9px] text-hw-muted uppercase font-mono tracking-wider mb-0.5">Time</span>
-            <span className="text-sm font-bold tabular-nums" style={{ color: "#fbbf24" }}>{globalSummary.totalDuration}</span>
+          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Current Streak</div>
+            <div className="mt-1 text-sm font-bold font-mono text-white">{summaryInsights.currentStreakLabel}</div>
+            <div className="text-[9px] font-mono text-white/45">{summaryInsights.activeDaysLabel} active</div>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Active Span</div>
+            <div className="mt-1 text-sm font-bold font-mono text-white">{summaryInsights.activeSpanLabel}</div>
+            <div className="text-[9px] font-mono text-white/45">First to latest</div>
+          </div>
+        </div>
+      )}
+
+      {autoInsights.length > 0 && (
+        <div className="hardware-card border-hw-muted/20 p-4 bg-black/20">
+          <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/5 pb-3">
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">Automatic Insights</div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">Generated from range trends and consistency</div>
+            </div>
+            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">{rangeLabel}</div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {autoInsights.map(insight => (
+              <div key={`${insight.title}-${insight.body}`} className={`rounded-xl border px-4 py-3 ${getInsightToneClasses(insight.tone)}`}>
+                <div className="text-[9px] font-mono uppercase tracking-[0.18em]">{insight.title}</div>
+                <div className="mt-2 text-[11px] leading-relaxed text-white/65">{insight.body}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       <div className="mt-2 flex flex-col gap-4">
-        <div className="hardware-card border-hw-muted/20 p-6 flex flex-col bg-black/30">
-          <div className="flex flex-col gap-5 mb-6 border-b border-white/5 pb-5">
-            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+        <div className="hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25">
+          <div className="mb-5 flex flex-col gap-4 border-b border-white/5 pb-5">
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
               <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,255,170,0.15)', border: '1px solid rgba(0,255,170,0.3)' }}>
-                  <Activity size={14} style={{ color: '#00ffaa' }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-hw-accent/10 border border-hw-accent/25">
+                  <Activity size={14} className="text-hw-accent" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[9px] text-hw-muted uppercase font-mono tracking-[0.2em] flex flex-wrap items-center gap-2">
-                    Training Progress
-                    <button
-                      onClick={() => setShowTotals(!showTotals)}
-                      className="text-[8px] bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition-colors text-white border border-white/10"
-                    >
-                      {showTotals ? 'Hide Totals' : 'Show Totals'}
-                    </button>
-                  </div>
+                  <div className="text-[9px] text-hw-muted uppercase font-mono tracking-[0.2em]">Training Progress</div>
                   <div className="text-white font-bold text-sm font-mono mt-0.5">
                     {periodLabel}
-                    <span className="ml-2 text-[10px] font-normal" style={{ color: 'rgba(0,255,170,0.8)' }}>
-                      {normalizedChartData.filter(d => d.hasData).length} active periods in {rangeLabel}
+                    <span className="ml-2 text-[10px] font-normal text-hw-accent/80">
+                      {activePeriods} active periods in {rangeLabel}
                     </span>
                   </div>
                   {denseData && (
@@ -173,65 +219,60 @@ export const HistorySummary = ({
                 </div>
               </div>
 
-              {summaryRange !== 'all' && (
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1 self-start xl:self-auto">
-                  <button
-                    onClick={() => {
-                      const shift = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
-                      setOffsetDays(offsetDays + shift);
-                    }}
-                    className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
-                    title="Previous Period"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <div className="min-w-20 px-2 text-center text-[8px] font-mono uppercase text-white/45 tracking-widest border-x border-white/5">
-                    {offsetDays === 0 ? 'Current' : `${offsetDays}d back`}
+              <div className="flex flex-wrap items-center gap-2">
+                {summaryRange !== 'all' && (
+                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
+                    <button
+                      onClick={() => setOffsetDays(offsetDays + shiftDays)}
+                      className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
+                      title="Previous Period"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <div className="min-w-20 px-2 text-center text-[8px] font-mono uppercase text-white/45 tracking-widest border-x border-white/5">
+                      {offsetDays === 0 ? 'Current' : `${offsetDays}d back`}
+                    </div>
+                    <button
+                      onClick={() => setOffsetDays(Math.max(0, offsetDays - shiftDays))}
+                      disabled={offsetDays === 0}
+                      className={`p-1 rounded transition-colors ${offsetDays === 0 ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
+                      title="Next Period"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      const shift = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
-                      setOffsetDays(Math.max(0, offsetDays - shift));
-                    }}
-                    disabled={offsetDays === 0}
-                    className={`p-1 rounded transition-colors ${offsetDays === 0 ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
-                    title="Next Period"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
+                )}
+                <button
+                  onClick={() => setShowTotals(!showTotals)}
+                  className={`rounded-lg border px-3 py-2 text-[9px] font-mono uppercase tracking-widest transition-colors ${showTotals ? 'border-hw-accent/40 bg-hw-accent/10 text-hw-accent' : 'border-white/10 bg-white/5 text-white/45 hover:text-white'}`}
+                >
+                  {showTotals ? 'Compact' : 'Totals'}
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] gap-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
-                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Period</div>
-                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                    {['daily', 'weekly', 'monthly', 'yearly'].map(p => (
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3">
+              <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5">
+                <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Timeline</div>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_1.1fr] gap-2">
+                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8 bg-black/20">
+                    {periodOptions.map(p => (
                       <button
                         key={p}
-                        onClick={() => setSummaryPeriod(p as any)}
-                        style={summaryPeriod === p ? { background: '#262626', color: '#fff' } : {}}
-                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryPeriod === p ? '' : 'text-hw-muted hover:text-white'
-                          }`}
+                        onClick={() => setSummaryPeriod(p)}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryPeriod === p ? 'bg-white/10 text-white' : 'text-hw-muted hover:text-white'}`}
                       >
                         {p}
                       </button>
                     ))}
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
-                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Range</div>
-                  <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                  <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-white/8 bg-black/20">
                     {rangeOptions.map(option => (
                       <button
                         key={option.value}
                         onClick={() => setSummaryRange(option.value)}
-                        style={summaryRange === option.value ? { background: '#262626', color: '#fff' } : {}}
-                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryRange === option.value ? '' : 'text-hw-muted hover:text-white'
-                          }`}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryRange === option.value ? 'bg-white/10 text-white' : 'text-hw-muted hover:text-white'}`}
                       >
                         {option.label}
                       </button>
@@ -240,42 +281,33 @@ export const HistorySummary = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-3">
-                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
-                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">View</div>
-                  <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
+              <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5 xl:min-w-[430px]">
+                <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Display</div>
+                <div className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-2">
+                  <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8 bg-black/20">
                     <button
                       onClick={() => setChartType('bar')}
-                      style={chartType === 'bar' ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
-                      className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'bar' ? '' : 'text-hw-muted hover:text-white'
-                        }`}
+                      className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'bar' ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
                       title={denseData ? 'Dense ranges are displayed as line view automatically' : undefined}
                     >
                       BAR
                     </button>
                     <button
                       onClick={() => setChartType('line')}
-                      style={chartType === 'line' ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
-                      className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'line' ? '' : 'text-hw-muted hover:text-white'
-                        }`}
+                      className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartType === 'line' ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
                     >
                       LINE
                     </button>
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-white/8 bg-black/25 p-2.5">
-                  <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Metric</div>
-                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                    {(['distance', 'calories', 'duration', 'cadence'] as const).map(m => (
+                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8 bg-black/20">
+                    {metricOptions.map(option => (
                       <button
-                        key={m}
-                        onClick={() => setWeeklyMetric(m)}
-                        style={weeklyMetric === m ? { background: '#00ffaa', color: '#0a0a0a' } : {}}
-                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${weeklyMetric === m ? '' : 'text-hw-muted hover:text-white'
-                          }`}
+                        key={option.value}
+                        onClick={() => setWeeklyMetric(option.value)}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${weeklyMetric === option.value ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
                       >
-                        {m === 'distance' ? 'KM' : m === 'calories' ? 'KCAL' : m === 'duration' ? 'MIN' : 'RPM'}
+                        {option.label}
                       </button>
                     ))}
                   </div>

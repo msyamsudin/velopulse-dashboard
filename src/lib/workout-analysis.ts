@@ -47,3 +47,158 @@ export const getMetricDelta = (current: number, previous?: number) => {
   if (Math.abs(delta) < 0.01) return { delta: 0, direction: 'flat' as const };
   return { delta, direction: delta > 0 ? 'up' as const : 'down' as const };
 };
+
+type TrainingInsight = {
+  title: string;
+  body: string;
+  tone: 'good' | 'watch' | 'neutral';
+};
+
+const formatDelta = (value: number, unit: string, decimals = 0) => {
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(decimals)} ${unit}`;
+};
+
+const getToneClasses = (tone: TrainingInsight['tone']) => {
+  if (tone === 'good') return 'border-green-400/20 bg-green-400/5 text-green-300';
+  if (tone === 'watch') return 'border-yellow-400/20 bg-yellow-400/5 text-yellow-200';
+  return 'border-hw-border bg-white/[0.03] text-white/70';
+};
+
+export const getInsightToneClasses = getToneClasses;
+
+export const generateSessionInsights = ({
+  session,
+  fullStats,
+  previousSession,
+  previousFullStats,
+  maxHr,
+}: {
+  session: any;
+  fullStats: any;
+  previousSession?: any;
+  previousFullStats?: any;
+  maxHr: number;
+}): TrainingInsight[] => {
+  const insights: TrainingInsight[] = [];
+  const current = getSessionOutcome(session);
+  const previous = previousSession ? getSessionOutcome(previousSession) : null;
+  const quality = getWorkoutQuality(session, maxHr);
+  const zoneText = getZoneInsight(fullStats?.zones || []);
+  const durationMinutes = current.duration / 60;
+  const previousDurationMinutes = previous ? previous.duration / 60 : undefined;
+  const powerDelta = getMetricDelta(session?.stats?.avgPower || 0, previousSession?.stats?.avgPower);
+  const durationDelta = getMetricDelta(durationMinutes, previousDurationMinutes);
+  const distanceDelta = getMetricDelta(current.distanceKm, previous?.distanceKm);
+  const hrDelta = getMetricDelta(session?.stats?.avgHr || 0, previousSession?.stats?.avgHr);
+  const speedDelta = getMetricDelta(Number(fullStats?.avgSpeed || 0), previousFullStats ? Number(previousFullStats.avgSpeed || 0) : undefined);
+
+  insights.push({
+    title: quality.label,
+    body: `${zoneText}. Avg HR ${session?.stats?.avgHr || 0} bpm with ${fullStats?.moveMinutes || 0} active minutes.`,
+    tone: quality.label === 'Easy' ? 'neutral' : quality.label === 'Peak' || quality.label === 'Hard' ? 'watch' : 'good',
+  });
+
+  if (powerDelta && durationDelta) {
+    if (powerDelta.direction === 'up' && durationDelta.direction === 'down') {
+      insights.push({
+        title: 'Higher intensity',
+        body: `Avg power ${formatDelta(powerDelta.delta, 'W')} while duration ${formatDelta(durationDelta.delta, 'min')}. Shorter, harder effort.`,
+        tone: 'watch',
+      });
+    } else if (powerDelta.direction === 'up') {
+      insights.push({
+        title: 'Power improved',
+        body: `Avg power rose ${formatDelta(powerDelta.delta, 'W')} versus the previous workout.`,
+        tone: 'good',
+      });
+    } else if (powerDelta.direction === 'down' && durationDelta.direction === 'up') {
+      insights.push({
+        title: 'Longer endurance work',
+        body: `Duration ${formatDelta(durationDelta.delta, 'min')} with lower power, indicating an easier longer ride.`,
+        tone: 'neutral',
+      });
+    }
+  }
+
+  if (distanceDelta && distanceDelta.direction === 'up') {
+    insights.push({
+      title: 'More distance',
+      body: `Distance increased ${formatDelta(distanceDelta.delta, 'km', 2)} from the previous workout.`,
+      tone: 'good',
+    });
+  } else if (speedDelta && speedDelta.direction === 'up') {
+    insights.push({
+      title: 'Faster pace',
+      body: `Average speed improved ${formatDelta(speedDelta.delta, 'km/h', 1)} with this session.`,
+      tone: 'good',
+    });
+  }
+
+  if (hrDelta && Math.abs(hrDelta.delta) >= 5 && powerDelta && powerDelta.direction !== 'down') {
+    insights.push({
+      title: hrDelta.direction === 'up' ? 'Higher cardiac load' : 'Lower HR for similar work',
+      body: `Avg HR ${formatDelta(hrDelta.delta, 'bpm')} while power did not drop.`,
+      tone: hrDelta.direction === 'up' ? 'watch' : 'good',
+    });
+  }
+
+  return insights.slice(0, 4);
+};
+
+export const generateSummaryInsights = ({
+  comparisonSummary,
+  summaryInsights,
+  globalSummary,
+  weeklyDailyData,
+  rangeLabel,
+}: {
+  comparisonSummary: any;
+  summaryInsights: any;
+  globalSummary: any;
+  weeklyDailyData: any[];
+  rangeLabel: string;
+}): TrainingInsight[] => {
+  const insights: TrainingInsight[] = [];
+  const activeDays = weeklyDailyData.filter(day => day.hasData).length;
+  const totalDays = Math.max(weeklyDailyData.length, 1);
+  const activeRatio = activeDays / totalDays;
+  const bestDelta = comparisonSummary
+    ? Object.entries(comparisonSummary.deltas)
+      .filter(([, delta]: any) => delta.hasBaseline && delta.value !== null)
+      .sort(([, a]: any, [, b]: any) => Math.abs(b.value) - Math.abs(a.value))[0]
+    : null;
+
+  if (bestDelta) {
+    const [metric, delta] = bestDelta as [string, any];
+    insights.push({
+      title: `${metric} ${delta.direction === 'up' ? 'up' : delta.direction === 'down' ? 'down' : 'flat'}`,
+      body: `${metric} is ${Math.abs(delta.value)}% ${delta.direction === 'up' ? 'higher' : delta.direction === 'down' ? 'lower' : 'unchanged'} than the previous ${rangeLabel}.`,
+      tone: delta.direction === 'up' ? 'good' : delta.direction === 'down' ? 'watch' : 'neutral',
+    });
+  }
+
+  if (summaryInsights) {
+    insights.push({
+      title: 'Consistency',
+      body: `${summaryInsights.activeDaysLabel} active, current streak ${summaryInsights.currentStreakLabel}, longest streak ${summaryInsights.longestStreakLabel}.`,
+      tone: activeRatio >= 0.45 ? 'good' : activeRatio >= 0.25 ? 'neutral' : 'watch',
+    });
+
+    insights.push({
+      title: 'Typical session',
+      body: `Average workout is ${summaryInsights.avgDistancePerSession} km and ${summaryInsights.avgDurationPerSession}.`,
+      tone: 'neutral',
+    });
+  }
+
+  if (comparisonSummary?.metrics?.sessions > 0 && globalSummary) {
+    insights.push({
+      title: 'Training volume',
+      body: `${globalSummary.totalDistance} km over ${comparisonSummary.metrics.sessions} sessions in this range.`,
+      tone: comparisonSummary.metrics.sessions >= 3 ? 'good' : 'neutral',
+    });
+  }
+
+  return insights.slice(0, 4);
+};
