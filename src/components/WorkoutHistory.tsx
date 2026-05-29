@@ -5,7 +5,8 @@ import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
 import { downloadCombinedTCX, downloadTCXZip } from '../lib/export-service';
-import { Download } from 'lucide-react';
+import { Download, Search, X } from 'lucide-react';
+import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 
 interface WorkoutHistoryProps {
   sessions: any[];
@@ -24,6 +25,7 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [showTotals, setShowTotals] = useState(false);
   const [offsetDays, setOffsetDays] = useState(0);
+  const [sessionSearch, setSessionSearch] = useState('');
 
   // Batch selection states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -41,7 +43,7 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
   };
 
   const handleSelectAll = () => {
-    setSelectedSessionIds(sessions.map(s => s.id));
+    setSelectedSessionIds(filteredSessions.map(s => s.id));
   };
 
   const handleClearSelection = () => {
@@ -71,6 +73,45 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
     weeklyMetric,
     offsetDays
   });
+
+  const filteredSessions = useMemo(() => {
+    const query = sessionSearch.trim().toLowerCase();
+    if (!query) return sessions;
+
+    return sessions.filter(session => {
+      const outcome = getSessionOutcome(session);
+      const quality = getWorkoutQuality(session, maxHr);
+      const date = new Date(session.date);
+      const dateText = Number.isNaN(date.getTime())
+        ? ''
+        : date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      const monthText = Number.isNaN(date.getTime())
+        ? ''
+        : date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const searchable = [
+        dateText,
+        monthText,
+        quality.label,
+        `${outcome.distanceKm.toFixed(2)} km`,
+        `${outcome.calories} kcal`,
+        `${outcome.avgPower} w`,
+        `${outcome.avgHr} bpm`,
+        `${session.stats?.avgCadence || 0} rpm`,
+      ].join(' ').toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [sessions, sessionSearch, maxHr]);
+
+  const visibleSelectedCount = useMemo(() =>
+    filteredSessions.filter(session => selectedSessionIds.includes(session.id)).length,
+    [filteredSessions, selectedSessionIds]
+  );
 
   const selectedSession = useMemo(() =>
     sessions.find(s => s.id === selectedSessionId),
@@ -143,8 +184,33 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Batch Export Control Panel */}
                 {sessions.length > 0 && (
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 p-4 rounded-lg bg-hw-muted/5 border border-hw-muted/10 backdrop-blur-md">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-4 mb-6 p-4 rounded-lg bg-hw-muted/5 border border-hw-muted/10 backdrop-blur-md">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                      <div className="relative w-full lg:max-w-md">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-hw-muted" />
+                        <input
+                          value={sessionSearch}
+                          onChange={(event) => setSessionSearch(event.target.value)}
+                          placeholder="Search month, date, intensity, metric..."
+                          className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-9 text-xs text-white outline-none transition-colors placeholder:text-hw-muted focus:border-hw-accent/40 font-mono"
+                        />
+                        {sessionSearch && (
+                          <button
+                            onClick={() => setSessionSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-hw-muted hover:text-white"
+                            title="Clear search"
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">
+                        Showing <span className="text-white">{filteredSessions.length}</span> of {sessions.length} sessions
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex items-center gap-3">
                       <button
                         onClick={handleToggleSelectionMode}
                         className={`px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest transition-all border ${
@@ -157,43 +223,44 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
                       </button>
                       {isSelectionMode && (
                         <span className="text-[10px] font-mono uppercase text-hw-accent tracking-widest font-bold">
-                          {selectedSessionIds.length} of {sessions.length} selected
+                          {visibleSelectedCount} of {filteredSessions.length} visible selected
                         </span>
                       )}
-                    </div>
-
-                    {isSelectionMode && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={selectedSessionIds.length === sessions.length ? handleClearSelection : handleSelectAll}
-                          className="px-3 py-1.5 rounded border border-white/10 text-white hover:border-white/30 font-mono text-[10px] uppercase tracking-widest transition-all"
-                        >
-                          {selectedSessionIds.length === sessions.length ? 'Deselect All' : 'Select All'}
-                        </button>
-                        <button
-                          onClick={handleExportCombined}
-                          disabled={selectedSessionIds.length === 0}
-                          className="px-3 py-1.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500 hover:text-black font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Download size={10} />
-                          Combined TCX
-                        </button>
-                        <button
-                          onClick={handleExportZip}
-                          disabled={selectedSessionIds.length === 0}
-                          className="px-3 py-1.5 rounded bg-hw-accent/10 border border-hw-accent/30 text-hw-accent hover:bg-hw-accent hover:text-hw-bg font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Download size={10} />
-                          ZIP (Individual)
-                        </button>
                       </div>
-                    )}
+
+                      {isSelectionMode && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={visibleSelectedCount === filteredSessions.length ? handleClearSelection : handleSelectAll}
+                            className="px-3 py-1.5 rounded border border-white/10 text-white hover:border-white/30 font-mono text-[10px] uppercase tracking-widest transition-all"
+                          >
+                            {visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible'}
+                          </button>
+                          <button
+                            onClick={handleExportCombined}
+                            disabled={selectedSessionIds.length === 0}
+                            className="px-3 py-1.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500 hover:text-black font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Download size={10} />
+                            Combined TCX
+                          </button>
+                          <button
+                            onClick={handleExportZip}
+                            disabled={selectedSessionIds.length === 0}
+                            className="px-3 py-1.5 rounded bg-hw-accent/10 border border-hw-accent/30 text-hw-accent hover:bg-hw-accent hover:text-hw-bg font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Download size={10} />
+                            ZIP (Individual)
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-8">
                   <HistoryList 
-                    sessions={sessions} 
+                    sessions={filteredSessions}
                     maxHr={maxHr} 
                     onSelectSession={setSelectedSessionId} 
                     isSelectionMode={isSelectionMode}
