@@ -308,3 +308,95 @@ export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
   const dateStr = new Date().toISOString().split('T')[0];
   downloadTextFile(JSON.stringify(report, null, 2), `velopulse_summary_${dateStr}.json`, 'application/json;charset=utf-8');
 };
+
+export const printSummaryPDF = (sessions: WorkoutSession[]) => {
+  if (sessions.length === 0) return;
+
+  const rows = getSessionReportRows(sessions);
+  const totals = rows.reduce((acc, row) => {
+    acc.sessions += 1;
+    acc.durationSeconds += row.durationSeconds;
+    acc.distanceKm += row.distanceKm;
+    acc.calories += row.calories;
+    return acc;
+  }, { sessions: 0, durationSeconds: 0, distanceKm: 0, calories: 0 });
+  const generatedAt = new Date().toLocaleString();
+  const totalHours = totals.durationSeconds / 3600;
+  const avgDistance = totals.sessions > 0 ? totals.distanceKm / totals.sessions : 0;
+  const avgDuration = totals.sessions > 0 ? totals.durationSeconds / totals.sessions : 0;
+
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VeloPulse Summary Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
+    h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .muted { color: #6b7280; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+    .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+    .label { color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; }
+    .value { margin-top: 6px; font-size: 20px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: #374151; text-transform: uppercase; font-size: 9px; letter-spacing: 0.08em; }
+    @media print { body { margin: 18mm; } button { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>VeloPulse Summary Report</h1>
+  <div class="muted">Generated ${generatedAt}</div>
+  <div class="grid">
+    <div class="card"><div class="label">Sessions</div><div class="value">${totals.sessions}</div></div>
+    <div class="card"><div class="label">Distance</div><div class="value">${totals.distanceKm.toFixed(2)} km</div></div>
+    <div class="card"><div class="label">Time</div><div class="value">${totalHours.toFixed(1)} h</div></div>
+    <div class="card"><div class="label">Calories</div><div class="value">${totals.calories} kcal</div></div>
+  </div>
+  <div class="grid">
+    <div class="card"><div class="label">Avg Distance</div><div class="value">${avgDistance.toFixed(2)} km</div></div>
+    <div class="card"><div class="label">Avg Duration</div><div class="value">${Math.round(avgDuration / 60)} min</div></div>
+    <div class="card"><div class="label">Best Distance</div><div class="value">${Math.max(...rows.map(row => row.distanceKm)).toFixed(2)} km</div></div>
+    <div class="card"><div class="label">Best Avg Power</div><div class="value">${Math.max(...rows.map(row => row.avgPower))} w</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Duration</th>
+        <th>Distance</th>
+        <th>Calories</th>
+        <th>Avg Power</th>
+        <th>Avg HR</th>
+        <th>Avg Cadence</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(row => `
+      <tr>
+        <td>${new Date(row.date).toLocaleDateString()}</td>
+        <td>${Math.round(row.durationSeconds / 60)} min</td>
+        <td>${row.distanceKm.toFixed(2)} km</td>
+        <td>${row.calories}</td>
+        <td>${row.avgPower} w</td>
+        <td>${row.avgHr} bpm</td>
+        <td>${row.avgCadence} rpm</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+  <script>
+    window.addEventListener('load', () => {
+      window.focus();
+      window.print();
+    });
+  </script>
+</body>
+</html>`;
+
+  const reportWindow = window.open('', '_blank', 'width=1100,height=800');
+  if (!reportWindow) return;
+  reportWindow.document.open();
+  reportWindow.document.write(html);
+  reportWindow.document.close();
+};

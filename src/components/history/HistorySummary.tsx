@@ -1,10 +1,12 @@
+import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Activity, Download, Trophy } from 'lucide-react';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area } from 'recharts';
 import { generateSummaryInsights, getInsightToneClasses, getPersonalRecords } from '../../lib/workout-analysis';
-import { downloadSummaryCSV, downloadSummaryJSON } from '../../lib/export-service';
+import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../../lib/export-service';
 
 interface HistorySummaryProps {
   sessions: any[];
+  onSelectSession?: (id: string) => void;
   globalSummary: any;
   showTotals: boolean;
   setShowTotals: (show: boolean) => void;
@@ -61,6 +63,7 @@ interface HistorySummaryProps {
 
 export const HistorySummary = ({
   sessions,
+  onSelectSession,
   globalSummary,
   showTotals,
   setShowTotals,
@@ -79,6 +82,8 @@ export const HistorySummary = ({
   offsetDays,
   setOffsetDays
 }: HistorySummaryProps) => {
+  const [recordRange, setRecordRange] = useState<'30d' | '90d' | 'all'>('all');
+
   if (!globalSummary) return null;
 
   const rangeOptions = [
@@ -139,7 +144,25 @@ export const HistorySummary = ({
     weeklyDailyData,
     rangeLabel,
   });
-  const personalRecords = getPersonalRecords(sessions);
+  const recordRangeOptions = [
+    { value: '30d', label: '30D' },
+    { value: '90d', label: '90D' },
+    { value: 'all', label: 'ALL' },
+  ] as const;
+  const recordSessions = useMemo(() => {
+    if (recordRange === 'all') return sessions;
+
+    const days = recordRange === '30d' ? 30 : 90;
+    const start = new Date();
+    start.setDate(start.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+
+    return sessions.filter(session => {
+      const sessionDate = new Date(session.date);
+      return !Number.isNaN(sessionDate.getTime()) && sessionDate >= start;
+    });
+  }, [sessions, recordRange]);
+  const personalRecords = getPersonalRecords(recordSessions);
 
   return (
     <div className="pb-8 flex flex-col gap-4">
@@ -207,20 +230,43 @@ export const HistorySummary = ({
                 <Trophy size={12} className="text-yellow-300" />
                 Personal Records
               </div>
-              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">All-time best efforts from saved sessions</div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">Best efforts from the selected period</div>
             </div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">{sessions.length} sessions</div>
+            <div className="flex rounded-lg border border-white/10 bg-white/5 p-1">
+              {recordRangeOptions.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setRecordRange(option.value)}
+                  className={`rounded-md px-2.5 py-1.5 text-[9px] font-mono uppercase tracking-widest transition-colors ${recordRange === option.value ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            {personalRecords.map(record => (
-              <div key={record.title} className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{record.title}</div>
-                <div className="mt-1 text-lg font-bold font-mono text-white tabular-nums">
-                  {record.value} <span className="text-[10px] font-normal text-white/35">{record.unit}</span>
-                </div>
-                <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{record.dateLabel}</div>
-              </div>
-            ))}
+          {personalRecords.length > 0 ? (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {personalRecords.map(record => (
+                <button
+                  key={record.title}
+                  onClick={() => onSelectSession?.(record.sessionId)}
+                  className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:border-hw-accent/40 hover:bg-hw-accent/5"
+                >
+                  <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{record.title}</div>
+                  <div className="mt-1 text-lg font-bold font-mono text-white tabular-nums">
+                    {record.value} <span className="text-[10px] font-normal text-white/35">{record.unit}</span>
+                  </div>
+                  <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{record.dateLabel}</div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">No records in this period</div>
+            </div>
+          )}
+          <div className="mt-3 text-[9px] font-mono uppercase tracking-[0.16em] text-white/35">
+            {recordSessions.length} sessions in record scope
           </div>
         </div>
 
@@ -246,6 +292,13 @@ export const HistorySummary = ({
               className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-[10px] font-mono uppercase tracking-widest text-white/60 transition-colors hover:border-white/30 hover:text-white disabled:pointer-events-none disabled:opacity-40"
             >
               Export JSON
+            </button>
+            <button
+              onClick={() => printSummaryPDF(sessions)}
+              disabled={sessions.length === 0}
+              className="rounded-lg border border-yellow-400/25 bg-yellow-400/10 px-4 py-3 text-[10px] font-mono uppercase tracking-widest text-yellow-200 transition-colors hover:bg-yellow-400 hover:text-black disabled:pointer-events-none disabled:opacity-40"
+            >
+              Export PDF
             </button>
           </div>
         </div>

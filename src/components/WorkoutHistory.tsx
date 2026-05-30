@@ -272,6 +272,7 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
             ) : (
               <HistorySummary 
                 sessions={sessions}
+                onSelectSession={setSelectedSessionId}
                 globalSummary={globalSummary}
                 showTotals={showTotals}
                 setShowTotals={setShowTotals}
