@@ -131,12 +131,6 @@ export const HistorySummary = ({
     { value: 'cadence', label: 'RPM' },
   ] as const;
   const shiftDays = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
-  const summaryKpis = [
-    { label: 'Sessions', value: globalSummary.totalSessions, unit: '', color: '#00ffaa' },
-    { label: 'Distance', value: globalSummary.totalDistance, unit: 'KM', color: '#00d2ff' },
-    { label: 'Time', value: globalSummary.totalDuration, unit: '', color: '#fbbf24' },
-    { label: 'Calories', value: globalSummary.totalCalories, unit: 'KCAL', color: '#f472b6' },
-  ];
   const autoInsights = generateSummaryInsights({
     comparisonSummary,
     summaryInsights,
@@ -166,17 +160,6 @@ export const HistorySummary = ({
 
   return (
     <div className="pb-8 flex flex-col gap-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {summaryKpis.map(kpi => (
-          <div key={kpi.label} className="rounded-2xl border border-hw-border bg-hw-muted/5 px-4 py-3">
-            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.22em]">{kpi.label}</div>
-            <div className="mt-1 text-xl font-bold font-mono tabular-nums" style={{ color: kpi.color }}>
-              {kpi.value} {kpi.unit && <span className="text-[10px] font-normal text-white/40">{kpi.unit}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-
       {globalSummary.hrrSessions > 0 && (
         <div className="hardware-card border-emerald-400/20 bg-emerald-400/5 p-4">
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-emerald-400/10 pb-3">
