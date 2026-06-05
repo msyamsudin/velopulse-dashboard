@@ -75,15 +75,23 @@ interface WorkoutState {
 }
 
 const SUPABASE_HISTORY_PAGE_SIZE = 50;
+const ACTIVE_SESSION_PERSIST_INTERVAL_MS = 5000;
 
-const persistActiveSession = (state: {
+type ActiveSessionSnapshot = {
   isRecording: boolean;
   elapsed: number;
   sessionStartTime: number | null;
   startDistance: number;
   startCalories: number;
   history: HistoryData[];
-}) => {
+};
+
+let pendingActiveSessionSnapshot: ActiveSessionSnapshot | null = null;
+let activeSessionPersistTimer: ReturnType<typeof setTimeout> | null = null;
+let lastActiveSessionPersistAt = 0;
+let hasActiveSessionFlushListener = false;
+
+const writeActiveSession = (state: ActiveSessionSnapshot) => {
   if (typeof window === 'undefined') return;
   try {
     if (state.sessionStartTime === null) {
@@ -100,6 +108,67 @@ const persistActiveSession = (state: {
     }
   } catch (e) {
     console.error('Failed to persist active session to localStorage:', e);
+  }
+};
+
+const persistActiveSession = (
+  state: ActiveSessionSnapshot,
+  options: { immediate?: boolean } = {}
+) => {
+  if (typeof window === 'undefined') return;
+
+  if (!hasActiveSessionFlushListener) {
+    const flushPendingSnapshot = () => {
+      if (pendingActiveSessionSnapshot) {
+        writeActiveSession(pendingActiveSessionSnapshot);
+        pendingActiveSessionSnapshot = null;
+        lastActiveSessionPersistAt = Date.now();
+      }
+    };
+    window.addEventListener('pagehide', flushPendingSnapshot);
+    window.addEventListener('beforeunload', flushPendingSnapshot);
+    hasActiveSessionFlushListener = true;
+  }
+
+  if (options.immediate) {
+    if (activeSessionPersistTimer) {
+      clearTimeout(activeSessionPersistTimer);
+      activeSessionPersistTimer = null;
+    }
+    pendingActiveSessionSnapshot = null;
+    writeActiveSession(state);
+    lastActiveSessionPersistAt = Date.now();
+    return;
+  }
+
+  pendingActiveSessionSnapshot = state;
+
+  const now = Date.now();
+  const elapsedSinceLastPersist = now - lastActiveSessionPersistAt;
+  if (elapsedSinceLastPersist >= ACTIVE_SESSION_PERSIST_INTERVAL_MS) {
+    if (activeSessionPersistTimer) {
+      clearTimeout(activeSessionPersistTimer);
+      activeSessionPersistTimer = null;
+    }
+    const snapshot = pendingActiveSessionSnapshot;
+    pendingActiveSessionSnapshot = null;
+    if (snapshot) {
+      writeActiveSession(snapshot);
+      lastActiveSessionPersistAt = now;
+    }
+    return;
+  }
+
+  if (!activeSessionPersistTimer) {
+    activeSessionPersistTimer = setTimeout(() => {
+      activeSessionPersistTimer = null;
+      const snapshot = pendingActiveSessionSnapshot;
+      pendingActiveSessionSnapshot = null;
+      if (snapshot) {
+        writeActiveSession(snapshot);
+        lastActiveSessionPersistAt = Date.now();
+      }
+    }, ACTIVE_SESSION_PERSIST_INTERVAL_MS - elapsedSinceLastPersist);
   }
 };
 
@@ -294,13 +363,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         startDistance: sDist,
         startCalories: sCal,
         history: []
-      });
+      }, { immediate: true });
     } else {
       set({ isRecording: false });
       persistActiveSession({
         ...get(),
         isRecording: false
-      });
+      }, { immediate: true });
     }
   },
 
@@ -504,7 +573,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       startDistance: 0,
       startCalories: 0,
       history: []
-    });
+    }, { immediate: true });
   },
 
   loadHistory: () => {
