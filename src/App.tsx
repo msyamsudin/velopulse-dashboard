@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBluetoothStore } from './store/useBluetoothStore';
 import { useWorkoutStore } from './store/useWorkoutStore';
@@ -9,13 +10,9 @@ import { useAppInitialization } from './hooks/useAppInitialization';
 import { useGoogleFitSync } from './hooks/useGoogleFitSync';
 
 // Components
-import { PerformanceChart } from './components/PerformanceChart';
 import { DevicePanel } from './components/DevicePanel';
 import { TelemetryLog } from './components/TelemetryLog';
-import { WorkoutHistory } from './components/WorkoutHistory';
-import { SettingsModal } from './components/SettingsModal';
 import { SetupLanding } from './components/SetupLanding';
-import { SessionSummaryModal } from './components/SessionSummaryModal';
 
 // Layout & Dashboard Components
 import { DashboardHeader } from './components/layout/DashboardHeader';
@@ -25,6 +22,34 @@ import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
 import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
 import { useHeartRateRecovery } from './hooks/useHeartRateRecovery';
 import { HrrModal } from './components/dashboard/HrrModal';
+
+const DeferredPanelLoader = () => (
+  <div className="hardware-card h-full min-h-40 flex items-center justify-center">
+    <div className="text-[10px] font-mono text-hw-muted uppercase tracking-[0.2em]">
+      Loading...
+    </div>
+  </div>
+);
+
+const PerformanceChart = dynamic(
+  () => import('./components/PerformanceChart').then(mod => mod.PerformanceChart),
+  { ssr: false, loading: DeferredPanelLoader }
+);
+
+const WorkoutHistory = dynamic(
+  () => import('./components/WorkoutHistory').then(mod => mod.WorkoutHistory),
+  { ssr: false, loading: DeferredPanelLoader }
+);
+
+const SettingsModal = dynamic(
+  () => import('./components/SettingsModal').then(mod => mod.SettingsModal),
+  { ssr: false }
+);
+
+const SessionSummaryModal = dynamic(
+  () => import('./components/SessionSummaryModal').then(mod => mod.SessionSummaryModal),
+  { ssr: false }
+);
 
 export default function App() {
   const hrr = useHeartRateRecovery();

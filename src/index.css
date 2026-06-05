@@ -20,19 +20,19 @@
 }
 
 .hardware-card {
-  @apply rounded-2xl border border-hw-border backdrop-blur-xl saturate-180 p-6 transition-all duration-500 relative overflow-hidden;
-  background-color: var(--color-hw-card);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+  @apply rounded-2xl border border-hw-border p-6 transition-colors duration-200 relative overflow-hidden;
+  background-color: rgba(6, 24, 18, 0.16);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
 }
 
 .hardware-card:hover {
   @apply border-hw-accent/20;
-  box-shadow: 0 12px 48px -12px rgba(0, 255, 170, 0.2);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
 }
 
 .stat-value {
   @apply font-mono text-5xl font-bold tracking-tighter;
-  filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.1));
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.06));
 }
 
 .stat-label {
@@ -40,7 +40,7 @@
 }
 
 .glass-button {
-  @apply relative px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all duration-300 border border-white/5 overflow-hidden backdrop-blur-md bg-white/5;
+  @apply relative px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-colors duration-200 border border-white/5 overflow-hidden bg-white/5;
 }
 
 .glass-button:hover {

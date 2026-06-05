@@ -5,8 +5,10 @@ import { useBluetoothStore } from '../store/useBluetoothStore';
 import { useWorkoutStore } from '../store/useWorkoutStore';
 
 export const useAppInitialization = () => {
-  const ble = useBluetoothStore();
-  const workout = useWorkoutStore();
+  const clearStaleData = useBluetoothStore(state => state.clearStaleData);
+  const loadHistory = useWorkoutStore(state => state.loadHistory);
+  const loadHistoryFromSupabase = useWorkoutStore(state => state.loadHistoryFromSupabase);
+  const syncPendingSupabaseSessions = useWorkoutStore(state => state.syncPendingSupabaseSessions);
 
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [userProfile, setUserProfile] = useState(DEFAULT_PROFILE);
@@ -23,10 +25,10 @@ export const useAppInitialization = () => {
   // Watchdog for stale data
   useEffect(() => {
     const interval = setInterval(() => {
-      ble.clearStaleData();
+      clearStaleData();
     }, 1000);
     return () => clearInterval(interval);
-  }, [ble]);
+  }, [clearStaleData]);
 
   const { data: authStatus, refetch: refetchAuth } = useQuery({
     queryKey: ['authStatus'],
@@ -39,9 +41,9 @@ export const useAppInitialization = () => {
   });
 
   useEffect(() => {
-    workout.loadHistory();
-    workout.loadHistoryFromSupabase()
-      .then(() => workout.syncPendingSupabaseSessions())
+    loadHistory();
+    loadHistoryFromSupabase()
+      .then(() => syncPendingSupabaseSessions())
       .catch(err => {
         console.error('Failed to initialize workout sync:', err);
       });
@@ -68,7 +70,7 @@ export const useAppInitialization = () => {
       .finally(() => {
         setIsLoadingProfile(false);
       });
-  }, []);
+  }, [loadHistory, loadHistoryFromSupabase, syncPendingSupabaseSessions]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
