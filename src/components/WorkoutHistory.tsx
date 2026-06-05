@@ -4,7 +4,6 @@ import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
-import { downloadCombinedTCX, downloadTCXZip } from '../lib/export-service';
 import { Download, RefreshCw, Search, Upload, X } from 'lucide-react';
 import type { ImportTcxResult } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
@@ -72,11 +71,13 @@ export const WorkoutHistory = ({
 
   const handleExportZip = async () => {
     const selectedSessions = sessions.filter(s => selectedSessionIds.includes(s.id));
+    const { downloadTCXZip } = await import('../lib/export-service');
     await downloadTCXZip(selectedSessions);
   };
 
-  const handleExportCombined = () => {
+  const handleExportCombined = async () => {
     const selectedSessions = sessions.filter(s => selectedSessionIds.includes(s.id));
+    const { downloadCombinedTCX } = await import('../lib/export-service');
     downloadCombinedTCX(selectedSessions);
   };
 
