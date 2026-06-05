@@ -37,6 +37,27 @@ export interface WorkoutSession {
   supabase_sync_error?: string;
 }
 
+export interface LiveWorkoutStats {
+  avgHr: number;
+  maxHr: number;
+  avgPower: number;
+  maxPower: number;
+  avgCadence: number;
+  maxCadence: number;
+  avgSpeed: number;
+  maxSpeed: number;
+  hrrScore: number | null;
+  hrrClassification: string | null;
+}
+
+interface LiveWorkoutTotals {
+  count: number;
+  hr: number;
+  power: number;
+  cadence: number;
+  speed: number;
+}
+
 export interface ImportTcxResult {
   imported: number;
   skipped: number;
@@ -55,6 +76,8 @@ interface WorkoutState {
   sessionHistory: WorkoutSession[];
   hrrScore: number | null;
   hrrClassification: string | null;
+  liveStats: LiveWorkoutStats;
+  liveStatsTotals: LiveWorkoutTotals;
   supabaseHistoryLoadedCount: number;
   hasMoreSupabaseHistory: boolean;
   
@@ -76,6 +99,78 @@ interface WorkoutState {
 
 const SUPABASE_HISTORY_PAGE_SIZE = 50;
 const ACTIVE_SESSION_PERSIST_INTERVAL_MS = 5000;
+
+const EMPTY_LIVE_STATS: LiveWorkoutStats = {
+  avgHr: 0,
+  maxHr: 0,
+  avgPower: 0,
+  maxPower: 0,
+  avgCadence: 0,
+  maxCadence: 0,
+  avgSpeed: 0,
+  maxSpeed: 0,
+  hrrScore: null,
+  hrrClassification: null
+};
+
+const EMPTY_LIVE_TOTALS: LiveWorkoutTotals = {
+  count: 0,
+  hr: 0,
+  power: 0,
+  cadence: 0,
+  speed: 0
+};
+
+const calculateLiveStats = (
+  history: HistoryData[],
+  hrrScore: number | null = null,
+  hrrClassification: string | null = null
+) => {
+  if (history.length === 0) {
+    return {
+      stats: { ...EMPTY_LIVE_STATS, hrrScore, hrrClassification },
+      totals: { ...EMPTY_LIVE_TOTALS }
+    };
+  }
+
+  const aggregate = history.reduce((acc, point) => ({
+    totals: {
+      count: acc.totals.count + 1,
+      hr: acc.totals.hr + point.hr,
+      power: acc.totals.power + point.power,
+      cadence: acc.totals.cadence + point.cadence,
+      speed: acc.totals.speed + (point.speed || 0)
+    },
+    maxHr: Math.max(acc.maxHr, point.hr),
+    maxPower: Math.max(acc.maxPower, point.power),
+    maxCadence: Math.max(acc.maxCadence, point.cadence),
+    maxSpeed: Math.max(acc.maxSpeed, point.speed || 0)
+  }), {
+    totals: { ...EMPTY_LIVE_TOTALS },
+    maxHr: 0,
+    maxPower: 0,
+    maxCadence: 0,
+    maxSpeed: 0
+  });
+
+  const { totals } = aggregate;
+
+  return {
+    stats: {
+      avgHr: Math.round(totals.hr / totals.count),
+      maxHr: aggregate.maxHr,
+      avgPower: Math.round(totals.power / totals.count),
+      maxPower: aggregate.maxPower,
+      avgCadence: Math.round(totals.cadence / totals.count),
+      maxCadence: aggregate.maxCadence,
+      avgSpeed: Number((totals.speed / totals.count).toFixed(1)),
+      maxSpeed: Number(aggregate.maxSpeed.toFixed(1)),
+      hrrScore,
+      hrrClassification
+    },
+    totals
+  };
+};
 
 type ActiveSessionSnapshot = {
   isRecording: boolean;
@@ -339,6 +434,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   sessionHistory: [],
   hrrScore: null,
   hrrClassification: null,
+  liveStats: EMPTY_LIVE_STATS,
+  liveStatsTotals: EMPTY_LIVE_TOTALS,
   supabaseHistoryLoadedCount: 0,
   hasMoreSupabaseHistory: false,
 
@@ -354,6 +451,10 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         sessionStartTime: startTime,
         startDistance: sDist,
         startCalories: sCal,
+        liveStats: EMPTY_LIVE_STATS,
+        liveStatsTotals: EMPTY_LIVE_TOTALS,
+        hrrScore: null,
+        hrrClassification: null,
         isRecording: true,
       });
       persistActiveSession({
@@ -393,7 +494,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     if (lastPoint && lastPoint.time === timeStr) return;
 
     set((state) => {
-      const newHistory = [...state.history, {
+      const point = {
         time: timeStr,
         hr: data.heartRate || 0,
         cadence: data.cadence || 0,
@@ -402,15 +503,47 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         distance: Math.max(0, (data.distance || 0) - startDistance),
         resistance: data.resistance || 0,
         calories: Math.max(0, (data.calories || 0) - startCalories)
-      }];
+      };
+      const newHistory = [...state.history, point];
+      const nextTotals = {
+        count: state.liveStatsTotals.count + 1,
+        hr: state.liveStatsTotals.hr + point.hr,
+        power: state.liveStatsTotals.power + point.power,
+        cadence: state.liveStatsTotals.cadence + point.cadence,
+        speed: state.liveStatsTotals.speed + (point.speed || 0)
+      };
+      const nextLiveStats = {
+        avgHr: Math.round(nextTotals.hr / nextTotals.count),
+        maxHr: Math.max(state.liveStats.maxHr, point.hr),
+        avgPower: Math.round(nextTotals.power / nextTotals.count),
+        maxPower: Math.max(state.liveStats.maxPower, point.power),
+        avgCadence: Math.round(nextTotals.cadence / nextTotals.count),
+        maxCadence: Math.max(state.liveStats.maxCadence, point.cadence),
+        avgSpeed: Number((nextTotals.speed / nextTotals.count).toFixed(1)),
+        maxSpeed: Number(Math.max(state.liveStats.maxSpeed, point.speed || 0).toFixed(1)),
+        hrrScore: state.hrrScore,
+        hrrClassification: state.hrrClassification
+      };
       const nextState = { ...state, history: newHistory };
       persistActiveSession(nextState);
-      return { history: newHistory };
+      return {
+        history: newHistory,
+        liveStats: nextLiveStats,
+        liveStatsTotals: nextTotals
+      };
     });
   },
 
   setHrrResult: (score, classification) => {
-    set({ hrrScore: score, hrrClassification: classification });
+    set((state) => ({
+      hrrScore: score,
+      hrrClassification: classification,
+      liveStats: {
+        ...state.liveStats,
+        hrrScore: score,
+        hrrClassification: classification
+      }
+    }));
   },
 
 
@@ -564,7 +697,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       sessionStartTime: null,
       isRecording: false,
       hrrScore: null,
-      hrrClassification: null
+      hrrClassification: null,
+      liveStats: EMPTY_LIVE_STATS,
+      liveStatsTotals: EMPTY_LIVE_TOTALS
     });
     persistActiveSession({
       isRecording: false,
@@ -603,13 +738,17 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           const parsed = JSON.parse(activeSession);
           if (parsed && parsed.sessionStartTime) {
             console.log('[Recovery] Restoring active session from crash/reload:', parsed);
+            const restoredHistory = parsed.history || [];
+            const restoredLiveStats = calculateLiveStats(restoredHistory);
             set({
               isRecording: parsed.isRecording || false,
               elapsed: parsed.elapsed || 0,
               sessionStartTime: parsed.sessionStartTime,
               startDistance: parsed.startDistance || 0,
               startCalories: parsed.startCalories || 0,
-              history: parsed.history || []
+              history: restoredHistory,
+              liveStats: restoredLiveStats.stats,
+              liveStatsTotals: restoredLiveStats.totals
             });
           }
         }

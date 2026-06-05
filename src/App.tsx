@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBluetoothStore } from './store/useBluetoothStore';
@@ -70,8 +70,7 @@ export default function App() {
   const formatTime = useWorkoutStore(state => state.formatTime);
   const startDistance = useWorkoutStore(state => state.startDistance);
   const startCalories = useWorkoutStore(state => state.startCalories);
-  const hrrScore = useWorkoutStore(state => state.hrrScore);
-  const hrrClassification = useWorkoutStore(state => state.hrrClassification);
+  const liveStats = useWorkoutStore(state => state.liveStats);
 
   const bleData = useBluetoothStore(state => state.data);
   const bleRawLogs = useBluetoothStore(state => state.rawLogs);
@@ -150,23 +149,6 @@ export default function App() {
       setWasRecording(false);
     }
   }, [isRecording, wasRecording, workoutHistory.length, discardSession]);
-
-  const liveStats = useMemo(() => {
-    const history = workoutHistory;
-    if (history.length === 0) return { avgHr: 0, maxHr: 0, avgPower: 0, maxPower: 0, avgCadence: 0, maxCadence: 0, avgSpeed: 0, maxSpeed: 0, hrrScore: null, hrrClassification: null };
-    return {
-      avgHr: Math.round(history.reduce((a, b) => a + b.hr, 0) / history.length),
-      maxHr: Math.max(...history.map(h => h.hr)),
-      avgPower: Math.round(history.reduce((a, b) => a + b.power, 0) / history.length),
-      maxPower: Math.max(...history.map(h => h.power)),
-      avgCadence: Math.round(history.reduce((a, b) => a + b.cadence, 0) / history.length),
-      maxCadence: Math.max(...history.map(h => h.cadence)),
-      avgSpeed: Number((history.reduce((a, b) => a + (b.speed || 0), 0) / history.length).toFixed(1)),
-      maxSpeed: Number(Math.max(...history.map(h => h.speed || 0)).toFixed(1)),
-      hrrScore,
-      hrrClassification,
-    };
-  }, [workoutHistory, hrrScore, hrrClassification]);
 
   const { syncMutation, handleSyncGoogle } = useGoogleFitSync(isGoogleConnected, userProfile, liveStats);
 
