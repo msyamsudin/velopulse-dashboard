@@ -226,9 +226,6 @@ export default function App() {
               showDebug={showDebug}
               setShowDebug={setShowDebug}
               setShowSettings={setShowSettings}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              chartAvailable={chartAvailable}
             />
           </motion.div>
         )}
@@ -354,6 +351,8 @@ export default function App() {
                       currentData.speed <= 1
                     }
                     onStartHrr={hrr.startHrrManual}
+                    chartAvailable={chartAvailable}
+                    onOpenChart={() => setViewMode('telemetry')}
                   />
                 ) : (
                   <PreRideCockpit

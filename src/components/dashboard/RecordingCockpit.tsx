@@ -15,6 +15,8 @@ interface RecordingCockpitProps {
   hrrStatus?: 'idle' | 'detecting' | 'buffer' | 'measuring' | 'complete';
   canStartHrr?: boolean;
   onStartHrr?: () => void;
+  chartAvailable?: boolean;
+  onOpenChart?: () => void;
 }
 
 interface MainMetricProps {
@@ -156,7 +158,9 @@ export const RecordingCockpit = ({
   bikeConnected,
   hrrStatus = 'idle',
   canStartHrr = false,
-  onStartHrr
+  onStartHrr,
+  chartAvailable = false,
+  onOpenChart
 }: RecordingCockpitProps) => {
   const safeMaxHr = userProfile.maxHr > 0 ? userProfile.maxHr : 1;
   const hrPct = currentData.hr > 0 ? Math.round((currentData.hr / safeMaxHr) * 100) : 0;
@@ -201,6 +205,19 @@ export const RecordingCockpit = ({
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           <SignalPill label="HR" connected={hrConnected} icon={<Heart size={12} />} />
           <SignalPill label="Bike" connected={bikeConnected} icon={<Bike size={12} />} />
+          {onOpenChart && (
+            <button
+              onClick={onOpenChart}
+              disabled={!chartAvailable}
+              className="flex items-center gap-2 rounded-md border border-hw-accent/25 bg-hw-accent/8 px-2.5 py-1.5 text-hw-accent transition-colors hover:border-hw-accent/45 hover:bg-hw-accent/15 disabled:pointer-events-none disabled:border-hw-muted/15 disabled:bg-white/[0.02] disabled:text-hw-muted/45"
+              title={chartAvailable ? 'Open live telemetry chart' : 'Chart available after telemetry is recorded'}
+            >
+              <Activity size={12} />
+              <span className="text-[9px] font-mono uppercase tracking-[0.14em]">
+                Chart
+              </span>
+            </button>
+          )}
           <button
             onClick={onStartHrr}
             disabled={!canStartHrr || hrrInProgress}
