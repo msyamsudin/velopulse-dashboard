@@ -46,6 +46,8 @@ interface WorkoutState {
   sessionHistory: WorkoutSession[];
   hrrScore: number | null;
   hrrClassification: string | null;
+  supabaseHistoryLoadedCount: number;
+  hasMoreSupabaseHistory: boolean;
   
   // Actions
   toggleRecording: () => void;
@@ -57,9 +59,12 @@ interface WorkoutState {
   discardSession: () => void;
   loadHistory: () => void;
   loadHistoryFromSupabase: () => Promise<void>;
+  loadMoreHistoryFromSupabase: () => Promise<void>;
   markAsSynced: (startTime: number) => Promise<void>;
   formatTime: (seconds: number) => string;
 }
+
+const SUPABASE_HISTORY_PAGE_SIZE = 50;
 
 const persistActiveSession = (state: {
   isRecording: boolean;
@@ -90,7 +95,11 @@ const persistActiveSession = (state: {
 
 const persistSessionHistory = (sessions: WorkoutSession[]) => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('velopulse_sessions', JSON.stringify(sessions));
+  try {
+    localStorage.setItem('velopulse_sessions', JSON.stringify(sessions));
+  } catch (e) {
+    console.error('Failed to persist session history to localStorage:', e);
+  }
 };
 
 const getSessionKey = (session: Pick<WorkoutSession, 'id' | 'sessionStartTime'>) =>
@@ -125,8 +134,22 @@ const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSessions: 
     });
   }
 
-  return sortSessions(Array.from(merged.values())).slice(0, 50);
+  return sortSessions(Array.from(merged.values()));
 };
+
+const mapSupabaseWorkout = (item: any): WorkoutSession => ({
+  id: item.id,
+  sessionStartTime: item.session_start_time,
+  date: item.created_at,
+  duration: item.duration,
+  stats: item.stats,
+  history: item.history,
+  synced_to_google: item.synced_to_google,
+  synced_to_supabase: true,
+  supabase_id: item.id,
+  supabase_synced_at: item.created_at,
+  supabase_sync_error: undefined
+});
 
 const buildSupabasePayload = (session: WorkoutSession) => ({
   session_start_time: session.sessionStartTime,
@@ -213,6 +236,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   sessionHistory: [],
   hrrScore: null,
   hrrClassification: null,
+  supabaseHistoryLoadedCount: 0,
+  hasMoreSupabaseHistory: false,
 
   toggleRecording: () => {
     const { isRecording } = get();
@@ -319,7 +344,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     // Save to LocalStorage first
-    const updatedHistory = [newSession, ...sessionHistory].slice(0, 50);
+    const updatedHistory = [newSession, ...sessionHistory];
     set({ sessionHistory: updatedHistory });
     persistSessionHistory(updatedHistory);
 
@@ -436,30 +461,53 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         .from('workouts')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .range(0, SUPABASE_HISTORY_PAGE_SIZE - 1);
 
       if (error) throw error;
 
       if (data) {
-        const mappedSessions: WorkoutSession[] = data.map(item => ({
-          id: item.id,
-          sessionStartTime: item.session_start_time,
-          date: item.created_at,
-          duration: item.duration,
-          stats: item.stats,
-          history: item.history,
-          synced_to_google: item.synced_to_google,
-          synced_to_supabase: true,
-          supabase_id: item.id,
-          supabase_synced_at: item.created_at,
-          supabase_sync_error: undefined
-        }));
+        const mappedSessions: WorkoutSession[] = data.map(mapSupabaseWorkout);
         const mergedSessions = mergeSessionHistories(get().sessionHistory, mappedSessions);
-        set({ sessionHistory: mergedSessions });
+        set({
+          sessionHistory: mergedSessions,
+          supabaseHistoryLoadedCount: data.length,
+          hasMoreSupabaseHistory: data.length === SUPABASE_HISTORY_PAGE_SIZE
+        });
         persistSessionHistory(mergedSessions);
       }
     } catch (err: any) {
       console.error('Failed to fetch from Supabase:', err?.message || JSON.stringify(err) || err);
+    }
+  },
+
+  loadMoreHistoryFromSupabase: async () => {
+    try {
+      const client = await getSupabaseClient();
+      if (!client) {
+        console.warn('[Supabase] Client not available. Skipping older history load (config not set).');
+        return;
+      }
+
+      const from = get().supabaseHistoryLoadedCount;
+      const to = from + SUPABASE_HISTORY_PAGE_SIZE - 1;
+      const { data, error } = await client
+        .from('workouts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const remoteSessions = (data || []).map(mapSupabaseWorkout);
+      const mergedSessions = mergeSessionHistories(get().sessionHistory, remoteSessions);
+      set({
+        sessionHistory: mergedSessions,
+        supabaseHistoryLoadedCount: from + (data?.length || 0),
+        hasMoreSupabaseHistory: (data?.length || 0) === SUPABASE_HISTORY_PAGE_SIZE
+      });
+      persistSessionHistory(mergedSessions);
+    } catch (err: any) {
+      console.error('Failed to fetch older sessions from Supabase:', err?.message || JSON.stringify(err) || err);
     }
   },
 

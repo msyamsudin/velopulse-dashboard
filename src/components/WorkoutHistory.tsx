@@ -13,11 +13,22 @@ interface WorkoutHistoryProps {
   onClose: () => void;
   onSyncSession?: (session: any) => void;
   onSyncSupabasePending?: () => Promise<void>;
+  onLoadMoreSupabaseHistory?: () => Promise<void>;
+  hasMoreSupabaseHistory?: boolean;
   isGoogleConnected?: boolean;
   maxHr?: number;
 }
 
-export const WorkoutHistory = ({ sessions, onClose, onSyncSession, onSyncSupabasePending, isGoogleConnected, maxHr = 190 }: WorkoutHistoryProps) => {
+export const WorkoutHistory = ({
+  sessions,
+  onClose,
+  onSyncSession,
+  onSyncSupabasePending,
+  onLoadMoreSupabaseHistory,
+  hasMoreSupabaseHistory = false,
+  isGoogleConnected,
+  maxHr = 190
+}: WorkoutHistoryProps) => {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'sessions' | 'summary'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
@@ -28,6 +39,7 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, onSyncSupabas
   const [offsetDays, setOffsetDays] = useState(0);
   const [sessionSearch, setSessionSearch] = useState('');
   const [isSupabaseRetrying, setIsSupabaseRetrying] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
   // Batch selection states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -127,6 +139,16 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, onSyncSupabas
       await onSyncSupabasePending();
     } finally {
       setIsSupabaseRetrying(false);
+    }
+  };
+
+  const handleLoadOlder = async () => {
+    if (!onLoadMoreSupabaseHistory) return;
+    setIsLoadingOlder(true);
+    try {
+      await onLoadMoreSupabaseHistory();
+    } finally {
+      setIsLoadingOlder(false);
     }
   };
 
@@ -302,6 +324,18 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, onSyncSupabas
                     selectedSessionIds={selectedSessionIds}
                     onToggleSelectSession={handleToggleSelectSession}
                   />
+                  {hasMoreSupabaseHistory && !sessionSearch && (
+                    <div className="mt-6 flex justify-center">
+                      <button
+                        onClick={handleLoadOlder}
+                        disabled={isLoadingOlder}
+                        className="inline-flex items-center gap-2 rounded border border-hw-accent/30 px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg disabled:opacity-40"
+                      >
+                        <RefreshCw size={12} className={isLoadingOlder ? 'animate-spin' : ''} />
+                        {isLoadingOlder ? 'Loading older' : 'Load older workouts'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

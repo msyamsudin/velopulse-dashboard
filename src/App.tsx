@@ -37,6 +37,8 @@ export default function App() {
   const addHistoryPoint = useWorkoutStore(state => state.addHistoryPoint);
   const saveSession = useWorkoutStore(state => state.saveSession);
   const syncPendingSupabaseSessions = useWorkoutStore(state => state.syncPendingSupabaseSessions);
+  const loadMoreHistoryFromSupabase = useWorkoutStore(state => state.loadMoreHistoryFromSupabase);
+  const hasMoreSupabaseHistory = useWorkoutStore(state => state.hasMoreSupabaseHistory);
   const discardSession = useWorkoutStore(state => state.discardSession);
   const formatTime = useWorkoutStore(state => state.formatTime);
   const startDistance = useWorkoutStore(state => state.startDistance);
@@ -244,6 +246,8 @@ export default function App() {
             isGoogleConnected={isGoogleConnected}
             maxHr={userProfile.maxHr}
             onSyncSupabasePending={syncPendingSupabaseSessions}
+            onLoadMoreSupabaseHistory={loadMoreHistoryFromSupabase}
+            hasMoreSupabaseHistory={hasMoreSupabaseHistory}
             onSyncSession={(session) => {
               const startTime = session.sessionStartTime || new Date(session.date).getTime();
               syncMutation.mutate({
