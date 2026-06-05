@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { BluetoothData, useBluetoothStore } from './useBluetoothStore';
 import { getSupabaseClient } from '@/lib/supabase';
+import { parseTCXWorkoutSessions } from '@/lib/tcx-import-service';
 
 export interface HistoryData {
   time: string;
@@ -36,6 +37,14 @@ export interface WorkoutSession {
   supabase_sync_error?: string;
 }
 
+export interface ImportTcxResult {
+  imported: number;
+  skipped: number;
+  synced: number;
+  pending: number;
+  messages: string[];
+}
+
 interface WorkoutState {
   isRecording: boolean;
   elapsed: number;
@@ -56,6 +65,7 @@ interface WorkoutState {
   setHrrResult: (score: number, classification: string) => void;
   saveSession: () => Promise<void>;
   syncPendingSupabaseSessions: () => Promise<void>;
+  importTCX: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
   discardSession: () => void;
   loadHistory: () => void;
   loadHistoryFromSupabase: () => Promise<void>;
@@ -105,6 +115,16 @@ const persistSessionHistory = (sessions: WorkoutSession[]) => {
 const getSessionKey = (session: Pick<WorkoutSession, 'id' | 'sessionStartTime'>) =>
   session.sessionStartTime ? `start:${session.sessionStartTime}` : `id:${session.id}`;
 
+const isPotentialDuplicateSession = (a: WorkoutSession, b: WorkoutSession) => {
+  const startDiffSeconds = Math.abs(a.sessionStartTime - b.sessionStartTime) / 1000;
+  const durationDiffSeconds = Math.abs(a.duration - b.duration);
+  const aDistance = a.history[a.history.length - 1]?.distance || 0;
+  const bDistance = b.history[b.history.length - 1]?.distance || 0;
+  const distanceDiffMeters = Math.abs(aDistance - bDistance);
+
+  return startDiffSeconds <= 60 && durationDiffSeconds <= 10 && distanceDiffMeters <= 50;
+};
+
 const sortSessions = (sessions: WorkoutSession[]) =>
   [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -150,6 +170,20 @@ const mapSupabaseWorkout = (item: any): WorkoutSession => ({
   supabase_synced_at: item.created_at,
   supabase_sync_error: undefined
 });
+
+const findSupabaseDuplicate = async (session: WorkoutSession) => {
+  const client = await getSupabaseClient();
+  if (!client) return null;
+
+  const { data, error } = await client
+    .from('workouts')
+    .select('*')
+    .eq('session_start_time', session.sessionStartTime)
+    .limit(1);
+
+  if (error) throw error;
+  return data?.[0] ? mapSupabaseWorkout(data[0]) : null;
+};
 
 const buildSupabasePayload = (session: WorkoutSession) => ({
   session_start_time: session.sessionStartTime,
@@ -385,6 +419,73 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         console.warn('[Supabase] Pending workout sync failed:', syncedSession.supabase_sync_error);
       }
     }
+  },
+
+  importTCX: async (tcxContent, filename = 'TCX file') => {
+    const importedSessions = parseTCXWorkoutSessions(tcxContent);
+    const result: ImportTcxResult = {
+      imported: 0,
+      skipped: 0,
+      synced: 0,
+      pending: 0,
+      messages: []
+    };
+
+    let nextHistory = get().sessionHistory;
+
+    for (const importedSession of importedSessions) {
+      const localDuplicate = nextHistory.find(session =>
+        session.sessionStartTime === importedSession.sessionStartTime ||
+        isPotentialDuplicateSession(session, importedSession)
+      );
+
+      if (localDuplicate) {
+        result.skipped += 1;
+        result.messages.push(`${new Date(importedSession.sessionStartTime).toLocaleString()} already exists locally.`);
+        continue;
+      }
+
+      let remoteDuplicate: WorkoutSession | null = null;
+      try {
+        remoteDuplicate = await findSupabaseDuplicate(importedSession);
+      } catch (err: any) {
+        result.messages.push(`Could not check Supabase duplicate for ${filename}: ${err?.message || err}`);
+      }
+
+      if (remoteDuplicate) {
+        result.skipped += 1;
+        nextHistory = mergeSessionHistories(nextHistory, [remoteDuplicate]);
+        set({ sessionHistory: nextHistory });
+        persistSessionHistory(nextHistory);
+        result.messages.push(`${new Date(importedSession.sessionStartTime).toLocaleString()} already exists in Supabase.`);
+        continue;
+      }
+
+      nextHistory = mergeSessionHistories(nextHistory, [importedSession]);
+      set({ sessionHistory: nextHistory });
+      persistSessionHistory(nextHistory);
+      result.imported += 1;
+
+      const syncedSession = await syncSessionToSupabase(importedSession);
+      nextHistory = nextHistory.map(session =>
+        getSessionKey(session) === getSessionKey(syncedSession) ? syncedSession : session
+      );
+      set({ sessionHistory: nextHistory });
+      persistSessionHistory(nextHistory);
+
+      if (syncedSession.synced_to_supabase) {
+        result.synced += 1;
+      } else {
+        result.pending += 1;
+        result.messages.push(`${new Date(importedSession.sessionStartTime).toLocaleString()} imported locally, Supabase sync pending.`);
+      }
+    }
+
+    if (result.imported === 0 && result.skipped === 0) {
+      result.messages.push(`No importable sessions found in ${filename}.`);
+    }
+
+    return result;
   },
 
   discardSession: () => {

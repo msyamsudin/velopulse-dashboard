@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
 import { downloadCombinedTCX, downloadTCXZip } from '../lib/export-service';
-import { Download, RefreshCw, Search, X } from 'lucide-react';
+import { Download, RefreshCw, Search, Upload, X } from 'lucide-react';
+import type { ImportTcxResult } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 
 interface WorkoutHistoryProps {
@@ -14,6 +15,7 @@ interface WorkoutHistoryProps {
   onSyncSession?: (session: any) => void;
   onSyncSupabasePending?: () => Promise<void>;
   onLoadMoreSupabaseHistory?: () => Promise<void>;
+  onImportTCX?: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
   hasMoreSupabaseHistory?: boolean;
   isGoogleConnected?: boolean;
   maxHr?: number;
@@ -25,6 +27,7 @@ export const WorkoutHistory = ({
   onSyncSession,
   onSyncSupabasePending,
   onLoadMoreSupabaseHistory,
+  onImportTCX,
   hasMoreSupabaseHistory = false,
   isGoogleConnected,
   maxHr = 190
@@ -40,6 +43,9 @@ export const WorkoutHistory = ({
   const [sessionSearch, setSessionSearch] = useState('');
   const [isSupabaseRetrying, setIsSupabaseRetrying] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Batch selection states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -149,6 +155,46 @@ export const WorkoutHistory = ({
       await onLoadMoreSupabaseHistory();
     } finally {
       setIsLoadingOlder(false);
+    }
+  };
+
+  const handleImportFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !onImportTCX) return;
+    setIsImporting(true);
+    setImportNotice(null);
+
+    const totals = { imported: 0, skipped: 0, synced: 0, pending: 0 };
+    const messages: string[] = [];
+
+    try {
+      for (const file of Array.from(files)) {
+        try {
+          const content = await file.text();
+          const result = await onImportTCX(content, file.name);
+          totals.imported += result.imported;
+          totals.skipped += result.skipped;
+          totals.synced += result.synced;
+          totals.pending += result.pending;
+          messages.push(...result.messages);
+        } catch (err: any) {
+          messages.push(`${file.name}: ${err?.message || 'Import failed'}`);
+        }
+      }
+
+      const summary = [
+        totals.imported > 0 ? `${totals.imported} imported` : '',
+        totals.synced > 0 ? `${totals.synced} synced` : '',
+        totals.pending > 0 ? `${totals.pending} pending` : '',
+        totals.skipped > 0 ? `${totals.skipped} skipped` : '',
+      ].filter(Boolean).join(' / ');
+
+      setImportNotice(summary || messages[0] || 'No sessions imported');
+      if (messages.length > 0 && !summary) {
+        console.warn('[TCX Import]', messages.join('\n'));
+      }
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -285,8 +331,27 @@ export const WorkoutHistory = ({
                       )}
                       </div>
 
-                      {isSelectionMode && (
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".tcx,.xml,application/xml,text/xml"
+                          multiple
+                          className="hidden"
+                          onChange={(event) => handleImportFiles(event.target.files)}
+                        />
+                        {onImportTCX && (
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                            className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-white hover:border-hw-accent hover:text-hw-accent font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-1.5"
+                          >
+                            <Upload size={10} />
+                            {isImporting ? 'Importing' : 'Import TCX'}
+                          </button>
+                        )}
+                        {isSelectionMode && (
+                          <>
                           <button
                             onClick={visibleSelectedCount === filteredSessions.length ? handleClearSelection : handleSelectAll}
                             className="px-3 py-1.5 rounded border border-white/10 text-white hover:border-white/30 font-mono text-[10px] uppercase tracking-widest transition-all"
@@ -309,9 +374,15 @@ export const WorkoutHistory = ({
                             <Download size={10} />
                             ZIP (Individual)
                           </button>
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
+                    {importNotice && (
+                      <div className="rounded border border-hw-accent/20 bg-hw-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-accent">
+                        {importNotice}
+                      </div>
+                    )}
                   </div>
                 )}
 
