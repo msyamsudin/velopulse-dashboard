@@ -62,6 +62,7 @@ export default function App() {
   const addHistoryPoint = useWorkoutStore(state => state.addHistoryPoint);
   const saveSession = useWorkoutStore(state => state.saveSession);
   const syncPendingSupabaseSessions = useWorkoutStore(state => state.syncPendingSupabaseSessions);
+  const loadHistoryFromSupabase = useWorkoutStore(state => state.loadHistoryFromSupabase);
   const loadMoreHistoryFromSupabase = useWorkoutStore(state => state.loadMoreHistoryFromSupabase);
   const hasMoreSupabaseHistory = useWorkoutStore(state => state.hasMoreSupabaseHistory);
   const importTCX = useWorkoutStore(state => state.importTCX);
@@ -98,6 +99,7 @@ export default function App() {
   const [showSummary, setShowSummary] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
   const [wasRecording, setWasRecording] = useState(false);
+  const [hasRequestedRemoteHistory, setHasRequestedRemoteHistory] = useState(false);
   const chartAvailable = workoutHistory.length > 0;
 
   // Sync session data with BLE data
@@ -112,6 +114,17 @@ export default function App() {
       setViewMode('grid');
     }
   }, [viewMode, chartAvailable]);
+
+  useEffect(() => {
+    if (!showHistory || hasRequestedRemoteHistory) return;
+
+    setHasRequestedRemoteHistory(true);
+    loadHistoryFromSupabase()
+      .then(() => syncPendingSupabaseSessions())
+      .catch(err => {
+        console.error('Failed to load remote workout history:', err);
+      });
+  }, [showHistory, hasRequestedRemoteHistory, loadHistoryFromSupabase, syncPendingSupabaseSessions]);
 
   // Timer Effect
   useEffect(() => {
