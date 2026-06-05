@@ -290,13 +290,23 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
 
   const globalSummary = useMemo(() => {
     if (summaryData.length === 0) return null;
+    const hrrSessions = filteredSessions.filter(session => typeof session.stats?.hrrScore === 'number');
+    const hrrScores = hrrSessions.map(session => session.stats.hrrScore as number);
+    const bestHrr = hrrScores.length > 0 ? Math.max(...hrrScores) : null;
+    const avgHrr = hrrScores.length > 0
+      ? Math.round(hrrScores.reduce((acc, score) => acc + score, 0) / hrrScores.length)
+      : null;
+
     return {
       totalDistance: summaryData.reduce((acc, curr) => acc + curr.totalDistance, 0).toFixed(2),
       totalCalories: summaryData.reduce((acc, curr) => acc + curr.totalCalories, 0),
       totalDuration: formatDuration(summaryData.reduce((acc, curr) => acc + curr.totalDuration, 0)),
       totalSessions: summaryData.reduce((acc, curr) => acc + curr.sessionCount, 0),
+      hrrSessions: hrrSessions.length,
+      avgHrr,
+      bestHrr,
     };
-  }, [summaryData]);
+  }, [summaryData, filteredSessions]);
 
   const summaryInsights = useMemo(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;

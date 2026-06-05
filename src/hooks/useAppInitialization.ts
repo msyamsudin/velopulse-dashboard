@@ -40,7 +40,11 @@ export const useAppInitialization = () => {
 
   useEffect(() => {
     workout.loadHistory();
-    workout.loadHistoryFromSupabase();
+    workout.loadHistoryFromSupabase()
+      .then(() => workout.syncPendingSupabaseSessions())
+      .catch(err => {
+        console.error('Failed to initialize workout sync:', err);
+      });
     
     setIsLoadingProfile(true);
     fetch('/api/profile')

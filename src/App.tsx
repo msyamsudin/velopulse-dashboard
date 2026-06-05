@@ -23,8 +23,11 @@ import { DashboardFooter } from './components/layout/DashboardFooter';
 import { SyncActionBar } from './components/dashboard/SyncActionBar';
 import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
 import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
+import { useHeartRateRecovery } from './hooks/useHeartRateRecovery';
+import { HrrModal } from './components/dashboard/HrrModal';
 
 export default function App() {
+  const hrr = useHeartRateRecovery();
   const isRecording = useWorkoutStore(state => state.isRecording);
   const elapsed = useWorkoutStore(state => state.elapsed);
   const workoutHistory = useWorkoutStore(state => state.history);
@@ -33,10 +36,13 @@ export default function App() {
   const incrementElapsed = useWorkoutStore(state => state.incrementElapsed);
   const addHistoryPoint = useWorkoutStore(state => state.addHistoryPoint);
   const saveSession = useWorkoutStore(state => state.saveSession);
+  const syncPendingSupabaseSessions = useWorkoutStore(state => state.syncPendingSupabaseSessions);
   const discardSession = useWorkoutStore(state => state.discardSession);
   const formatTime = useWorkoutStore(state => state.formatTime);
   const startDistance = useWorkoutStore(state => state.startDistance);
   const startCalories = useWorkoutStore(state => state.startCalories);
+  const hrrScore = useWorkoutStore(state => state.hrrScore);
+  const hrrClassification = useWorkoutStore(state => state.hrrClassification);
 
   const bleData = useBluetoothStore(state => state.data);
   const bleRawLogs = useBluetoothStore(state => state.rawLogs);
@@ -106,7 +112,7 @@ export default function App() {
 
   const liveStats = useMemo(() => {
     const history = workoutHistory;
-    if (history.length === 0) return { avgHr: 0, maxHr: 0, avgPower: 0, maxPower: 0, avgCadence: 0, maxCadence: 0, avgSpeed: 0, maxSpeed: 0 };
+    if (history.length === 0) return { avgHr: 0, maxHr: 0, avgPower: 0, maxPower: 0, avgCadence: 0, maxCadence: 0, avgSpeed: 0, maxSpeed: 0, hrrScore: null, hrrClassification: null };
     return {
       avgHr: Math.round(history.reduce((a, b) => a + b.hr, 0) / history.length),
       maxHr: Math.max(...history.map(h => h.hr)),
@@ -116,8 +122,10 @@ export default function App() {
       maxCadence: Math.max(...history.map(h => h.cadence)),
       avgSpeed: Number((history.reduce((a, b) => a + (b.speed || 0), 0) / history.length).toFixed(1)),
       maxSpeed: Number(Math.max(...history.map(h => h.speed || 0)).toFixed(1)),
+      hrrScore,
+      hrrClassification,
     };
-  }, [workoutHistory]);
+  }, [workoutHistory, hrrScore, hrrClassification]);
 
   const { syncMutation, handleSyncGoogle } = useGoogleFitSync(isGoogleConnected, userProfile, liveStats);
 
@@ -235,6 +243,7 @@ export default function App() {
             onClose={() => setShowHistory(false)}
             isGoogleConnected={isGoogleConnected}
             maxHr={userProfile.maxHr}
+            onSyncSupabasePending={syncPendingSupabaseSessions}
             onSyncSession={(session) => {
               const startTime = session.sessionStartTime || new Date(session.date).getTime();
               syncMutation.mutate({
@@ -328,6 +337,17 @@ export default function App() {
                     workout={{ history: workoutHistory, elapsed, formatTime }}
                     hrConnected={hrConnected}
                     bikeConnected={bikeConnected}
+                    hrrStatus={hrr.status}
+                    canStartHrr={
+                      hrr.status === 'idle' &&
+                      hrConnected &&
+                      bikeConnected &&
+                      currentData.hr > 0 &&
+                      currentData.cadence <= 5 &&
+                      currentData.power <= 10 &&
+                      currentData.speed <= 1
+                    }
+                    onStartHrr={hrr.startHrrManual}
                   />
                 ) : (
                   <PreRideCockpit
@@ -416,6 +436,27 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <HrrModal
+        status={hrr.status}
+        bufferTime={hrr.bufferTime}
+        measureTime={hrr.measureTime}
+        startHr={hrr.startHr}
+        endHr={hrr.endHr}
+        hrrScore={hrr.hrrScore}
+        classification={hrr.classification}
+        currentHr={currentData.hr}
+        onClose={() => {
+          if (hrr.status === 'complete') {
+            hrr.resetHrr();
+            if (isRecording) {
+              toggleRecording(); // Stops recording and triggers SessionSummaryModal
+            }
+          } else {
+            hrr.resetHrr();
+          }
+        }}
+      />
     </div>
   );
 }

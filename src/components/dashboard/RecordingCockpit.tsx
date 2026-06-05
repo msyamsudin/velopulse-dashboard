@@ -12,6 +12,9 @@ interface RecordingCockpitProps {
   workout: any;
   hrConnected: boolean;
   bikeConnected: boolean;
+  hrrStatus?: 'idle' | 'detecting' | 'buffer' | 'measuring' | 'complete';
+  canStartHrr?: boolean;
+  onStartHrr?: () => void;
 }
 
 interface MainMetricProps {
@@ -150,7 +153,10 @@ export const RecordingCockpit = ({
   userProfile,
   workout,
   hrConnected,
-  bikeConnected
+  bikeConnected,
+  hrrStatus = 'idle',
+  canStartHrr = false,
+  onStartHrr
 }: RecordingCockpitProps) => {
   const safeMaxHr = userProfile.maxHr > 0 ? userProfile.maxHr : 1;
   const hrPct = currentData.hr > 0 ? Math.round((currentData.hr / safeMaxHr) * 100) : 0;
@@ -172,6 +178,7 @@ export const RecordingCockpit = ({
         boxShadow: `0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(${hrCardAura.rgb}, 0.08) inset, 0 0 34px -14px rgba(${hrCardAura.rgb}, ${hrCardAura.glowAlpha})`,
       }
     : undefined;
+  const hrrInProgress = hrrStatus === 'buffer' || hrrStatus === 'measuring';
 
   return (
     <div className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-2 md:px-4 pb-4">
@@ -194,6 +201,17 @@ export const RecordingCockpit = ({
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           <SignalPill label="HR" connected={hrConnected} icon={<Heart size={12} />} />
           <SignalPill label="Bike" connected={bikeConnected} icon={<Bike size={12} />} />
+          <button
+            onClick={onStartHrr}
+            disabled={!canStartHrr || hrrInProgress}
+            className="flex items-center gap-2 rounded-md border border-red-400/25 bg-red-400/8 px-2.5 py-1.5 text-red-300 transition-colors hover:border-red-300/45 hover:bg-red-400/15 disabled:pointer-events-none disabled:opacity-35"
+            title={canStartHrr ? 'Mulai ukur HRR' : 'HRR tersedia saat recording, HR online, bike online, dan sepeda idle'}
+          >
+            <Heart size={12} />
+            <span className="text-[9px] font-mono uppercase tracking-[0.14em]">
+              {hrrInProgress ? 'HRR running' : 'Ukur HRR'}
+            </span>
+          </button>
           <div className={`flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 ${hrZoneColor}`}>
             <Radio size={12} />
             <span className="text-[9px] font-mono uppercase tracking-[0.14em]">Zone {hrZoneLabel}</span>

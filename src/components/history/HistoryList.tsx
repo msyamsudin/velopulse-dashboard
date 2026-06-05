@@ -1,4 +1,4 @@
-import { Calendar, Clock, Zap, Heart, Route, Flame } from 'lucide-react';
+import { Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff } from 'lucide-react';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 
@@ -87,6 +87,7 @@ export const HistoryList = ({
               const isSelected = selectedSessionIds.includes(session.id);
               const outcome = getSessionOutcome(session);
               const quality = getWorkoutQuality(session, maxHr);
+              const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
 
               return (
                 <div
@@ -164,15 +165,40 @@ export const HistoryList = ({
                     <span>{session.stats.avgCadence || 0} RPM</span>
                   </div>
 
+                  {hrrScore !== null && (
+                    <div className="mb-3 flex items-center justify-between rounded border border-emerald-400/15 bg-emerald-400/5 px-2 py-1.5 text-[9px] font-mono uppercase tracking-widest">
+                      <span className="flex items-center gap-1.5 text-emerald-300">
+                        <Heart size={10} fill="currentColor" />
+                        HRR
+                      </span>
+                      <span className="text-white">
+                        {hrrScore} BPM <span className="text-emerald-300/70">{session.stats.hrrClassification || ''}</span>
+                      </span>
+                    </div>
+                  )}
+
                   <div className="mt-auto flex justify-between items-center pt-3 border-t border-white/5">
                     <span className="text-[9px] text-hw-accent uppercase font-mono opacity-0 group-hover:opacity-100 transition-opacity">
                       {isSelectionMode ? (isSelected ? 'Deselect' : 'Select') : 'View Details ->'}
                     </span>
-                    {session.synced_to_google ? (
-                      <div className="flex text-[9px] text-green-500 font-mono uppercase tracking-widest items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded">
-                        Google Fit
-                      </div>
-                    ) : null}
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {session.synced_to_supabase ? (
+                        <div className="flex text-[9px] text-emerald-400 font-mono uppercase tracking-widest items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          <Cloud size={9} />
+                          Supabase
+                        </div>
+                      ) : (
+                        <div className="flex text-[9px] text-yellow-300 font-mono uppercase tracking-widest items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded">
+                          <CloudOff size={9} />
+                          Pending
+                        </div>
+                      )}
+                      {session.synced_to_google ? (
+                        <div className="flex text-[9px] text-green-500 font-mono uppercase tracking-widest items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded">
+                          Google Fit
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               );

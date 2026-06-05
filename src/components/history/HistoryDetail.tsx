@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, ChevronRight, Settings, Download, Route, Flame } from 'lucide-react';
+import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, ChevronRight, Settings, Download, Route, Flame, Cloud, CloudOff } from 'lucide-react';
 import { StackedWorkoutChart } from './StackedWorkoutChart';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { downloadTCX } from '../../lib/export-service';
@@ -161,6 +161,8 @@ export const HistoryDetail = ({
   const quality = getWorkoutQuality(session, maxHr);
   const zoneInsight = getZoneInsight(fullStats.zones);
   const autoInsights = generateSessionInsights({ session, fullStats, previousSession, previousFullStats, maxHr });
+  const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
+  const hrrClassification = session.stats?.hrrClassification || 'Not classified';
 
   return (
     <motion.div
@@ -186,6 +188,17 @@ export const HistoryDetail = ({
               <span className={`rounded border px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
                 {quality.label}
               </span>
+              {session.synced_to_supabase ? (
+                <span className="inline-flex items-center gap-1 rounded border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-emerald-300">
+                  <Cloud size={10} />
+                  Supabase synced
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded border border-yellow-400/25 bg-yellow-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-yellow-300">
+                  <CloudOff size={10} />
+                  Supabase pending
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 text-hw-muted text-xs font-mono uppercase tracking-widest mt-1">
               <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(session.date)}</span>
@@ -295,6 +308,28 @@ export const HistoryDetail = ({
                 <MiniMetric label="Move Min" value={fullStats.moveMinutes} unit="min" icon={<ChevronRight size={11} />} colorClass="text-purple-400" />
               </div>
             </div>
+
+            {hrrScore !== null && (
+              <div className="hardware-card border-emerald-400/20 bg-emerald-400/5 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3 border-b border-emerald-400/10 pb-3">
+                  <div>
+                    <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-emerald-300">Heart Rate Recovery</div>
+                    <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">2 minute post-ride recovery score</div>
+                  </div>
+                  <Heart size={16} className="text-emerald-300" fill="currentColor" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <MiniMetric label="HRR Score" value={hrrScore} unit="bpm" icon={<Heart size={11} />} colorClass="text-emerald-300" />
+                  <div className="md:col-span-2 rounded-lg border border-emerald-400/15 bg-black/20 p-3">
+                    <div className="mb-2 text-[9px] font-mono uppercase tracking-widest text-hw-muted">Classification</div>
+                    <div className="text-lg font-bold uppercase tracking-wide text-emerald-300">{hrrClassification}</div>
+                    <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.12em] text-white/40">
+                      Saved with this workout session
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="hardware-card border-hw-muted/20 p-4">
               <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/5 pb-3">

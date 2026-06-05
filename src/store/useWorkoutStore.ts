@@ -25,9 +25,15 @@ export interface WorkoutSession {
     maxPower: number;
     avgCadence: number;
     maxCadence: number;
+    hrrScore?: number;
+    hrrClassification?: string;
   };
   history: HistoryData[];
   synced_to_google?: boolean;
+  synced_to_supabase?: boolean;
+  supabase_id?: string;
+  supabase_synced_at?: string;
+  supabase_sync_error?: string;
 }
 
 interface WorkoutState {
@@ -38,12 +44,16 @@ interface WorkoutState {
   startCalories: number;
   history: HistoryData[];
   sessionHistory: WorkoutSession[];
+  hrrScore: number | null;
+  hrrClassification: string | null;
   
   // Actions
   toggleRecording: () => void;
   incrementElapsed: () => void;
   addHistoryPoint: (data: BluetoothData) => void;
+  setHrrResult: (score: number, classification: string) => void;
   saveSession: () => Promise<void>;
+  syncPendingSupabaseSessions: () => Promise<void>;
   discardSession: () => void;
   loadHistory: () => void;
   loadHistoryFromSupabase: () => Promise<void>;
@@ -78,6 +88,121 @@ const persistActiveSession = (state: {
   }
 };
 
+const persistSessionHistory = (sessions: WorkoutSession[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('velopulse_sessions', JSON.stringify(sessions));
+};
+
+const getSessionKey = (session: Pick<WorkoutSession, 'id' | 'sessionStartTime'>) =>
+  session.sessionStartTime ? `start:${session.sessionStartTime}` : `id:${session.id}`;
+
+const sortSessions = (sessions: WorkoutSession[]) =>
+  [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSessions: WorkoutSession[]) => {
+  const merged = new Map<string, WorkoutSession>();
+
+  for (const session of remoteSessions) {
+    merged.set(getSessionKey(session), session);
+  }
+
+  for (const session of localSessions) {
+    const key = getSessionKey(session);
+    const remote = merged.get(key);
+    if (!remote) {
+      merged.set(key, session);
+      continue;
+    }
+
+    merged.set(key, {
+      ...session,
+      ...remote,
+      synced_to_google: session.synced_to_google || remote.synced_to_google,
+      synced_to_supabase: true,
+      supabase_id: remote.supabase_id,
+      supabase_synced_at: remote.supabase_synced_at,
+      supabase_sync_error: undefined
+    });
+  }
+
+  return sortSessions(Array.from(merged.values())).slice(0, 50);
+};
+
+const buildSupabasePayload = (session: WorkoutSession) => ({
+  session_start_time: session.sessionStartTime,
+  duration: session.duration,
+  stats: session.stats,
+  history: session.history,
+  synced_to_google: Boolean(session.synced_to_google)
+});
+
+const syncSessionToSupabase = async (session: WorkoutSession): Promise<WorkoutSession> => {
+  const client = await getSupabaseClient();
+  if (!client) {
+    return {
+      ...session,
+      synced_to_supabase: false,
+      supabase_sync_error: 'Supabase config unavailable'
+    };
+  }
+
+  try {
+    const payload = buildSupabasePayload(session);
+    const { data: existingRows, error: lookupError } = await client
+      .from('workouts')
+      .select('id, created_at, synced_to_google')
+      .eq('session_start_time', session.sessionStartTime)
+      .limit(1);
+
+    if (lookupError) throw lookupError;
+
+    const existing = existingRows?.[0];
+    if (existing) {
+      const updatePayload = {
+        ...payload,
+        synced_to_google: Boolean(session.synced_to_google || existing.synced_to_google)
+      };
+      const { error: updateError } = await client
+        .from('workouts')
+        .update(updatePayload)
+        .eq('id', existing.id);
+
+      if (updateError) throw updateError;
+
+      return {
+        ...session,
+        synced_to_google: Boolean(session.synced_to_google || existing.synced_to_google),
+        synced_to_supabase: true,
+        supabase_id: existing.id,
+        supabase_synced_at: new Date().toISOString(),
+        supabase_sync_error: undefined
+      };
+    }
+
+    const { data, error } = await client
+      .from('workouts')
+      .insert([payload])
+      .select('id, created_at')
+      .single();
+
+    if (error) throw error;
+
+    return {
+      ...session,
+      synced_to_supabase: true,
+      supabase_id: data?.id,
+      supabase_synced_at: new Date().toISOString(),
+      supabase_sync_error: undefined
+    };
+  } catch (err: any) {
+    return {
+      ...session,
+      synced_to_supabase: false,
+      supabase_sync_error: err?.message || JSON.stringify(err) || 'Supabase sync failed'
+    };
+  }
+};
+
 export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   isRecording: false,
   elapsed: 0,
@@ -86,6 +211,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   startCalories: 0,
   history: [],
   sessionHistory: [],
+  hrrScore: null,
+  hrrClassification: null,
 
   toggleRecording: () => {
     const { isRecording } = get();
@@ -154,6 +281,10 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     });
   },
 
+  setHrrResult: (score, classification) => {
+    set({ hrrScore: score, hrrClassification: classification });
+  },
+
 
   saveSession: async () => {
     const { history, elapsed, sessionHistory, sessionStartTime } = get();
@@ -172,6 +303,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       maxPower: Math.max(...history.map(h => h.power)) || 0,
       avgCadence: Math.round(history.reduce((a, b) => a + b.cadence, 0) / history.length) || 0,
       maxCadence: Math.max(...history.map(h => h.cadence)) || 0,
+      hrrScore: get().hrrScore !== null ? get().hrrScore! : undefined,
+      hrrClassification: get().hrrClassification !== null ? get().hrrClassification! : undefined,
     };
 
     const newSession: WorkoutSession = {
@@ -181,34 +314,52 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       duration: elapsed,
       stats,
       history,
-      synced_to_google: false
+      synced_to_google: false,
+      synced_to_supabase: false
     };
 
     // Save to LocalStorage first
     const updatedHistory = [newSession, ...sessionHistory].slice(0, 50);
     set({ sessionHistory: updatedHistory });
-    localStorage.setItem('velopulse_sessions', JSON.stringify(updatedHistory));
+    persistSessionHistory(updatedHistory);
 
     // Save to Supabase (Background)
-    try {
-      const client = await getSupabaseClient();
-      if (!client) {
-        console.warn('[Supabase] Client not available. Skipping sync (config not set).');
-        return;
-      }
-      await client.from('workouts').insert([{
-        session_start_time: sessionStartTime,
-        duration: elapsed,
-        stats,
-        history,
-        synced_to_google: false
-      }]);
-    } catch (err: any) {
-      console.error('Failed to sync workout to Supabase:', err?.message || JSON.stringify(err) || err);
+    const syncedSession = await syncSessionToSupabase(newSession);
+    if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
+      console.warn('[Supabase] Workout sync pending:', syncedSession.supabase_sync_error);
     }
+
+    set((state) => {
+      const nextHistory = state.sessionHistory.map(session =>
+        session.id === syncedSession.id ? syncedSession : session
+      );
+      persistSessionHistory(nextHistory);
+      return { sessionHistory: nextHistory };
+    });
     
     // Clear current workout after saving
     get().discardSession();
+  },
+
+  syncPendingSupabaseSessions: async () => {
+    const pendingSessions = get().sessionHistory.filter(session => !session.synced_to_supabase);
+    if (pendingSessions.length === 0) return;
+
+    let nextHistory = get().sessionHistory;
+
+    for (const pendingSession of pendingSessions) {
+      const syncedSession = await syncSessionToSupabase(pendingSession);
+      nextHistory = nextHistory.map(session =>
+        getSessionKey(session) === getSessionKey(syncedSession) ? syncedSession : session
+      );
+
+      set({ sessionHistory: nextHistory });
+      persistSessionHistory(nextHistory);
+
+      if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
+        console.warn('[Supabase] Pending workout sync failed:', syncedSession.supabase_sync_error);
+      }
+    }
   },
 
   discardSession: () => {
@@ -216,7 +367,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       history: [],
       elapsed: 0,
       sessionStartTime: null,
-      isRecording: false
+      isRecording: false,
+      hrrScore: null,
+      hrrClassification: null
     });
     persistActiveSession({
       isRecording: false,
@@ -233,7 +386,15 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const saved = localStorage.getItem('velopulse_sessions');
     if (saved) {
       try {
-        set({ sessionHistory: JSON.parse(saved) });
+        const parsed = JSON.parse(saved);
+        const sessions = Array.isArray(parsed)
+          ? parsed.map((session: WorkoutSession) => ({
+              ...session,
+              synced_to_supabase: Boolean(session.synced_to_supabase || session.supabase_id)
+            }))
+          : [];
+        set({ sessionHistory: sessions });
+        persistSessionHistory(sessions);
       } catch (e) {
         console.error('Failed to load session history');
       }
@@ -287,10 +448,15 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           duration: item.duration,
           stats: item.stats,
           history: item.history,
-          synced_to_google: item.synced_to_google
+          synced_to_google: item.synced_to_google,
+          synced_to_supabase: true,
+          supabase_id: item.id,
+          supabase_synced_at: item.created_at,
+          supabase_sync_error: undefined
         }));
-        set({ sessionHistory: mappedSessions });
-        localStorage.setItem('velopulse_sessions', JSON.stringify(mappedSessions));
+        const mergedSessions = mergeSessionHistories(get().sessionHistory, mappedSessions);
+        set({ sessionHistory: mergedSessions });
+        persistSessionHistory(mergedSessions);
       }
     } catch (err: any) {
       console.error('Failed to fetch from Supabase:', err?.message || JSON.stringify(err) || err);
@@ -316,6 +482,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           s.sessionStartTime === startTime ? { ...s, synced_to_google: true } : s
         )
       }));
+      persistSessionHistory(get().sessionHistory);
     } catch (err: any) {
       console.error('Failed to update sync status in Supabase:', err?.message || JSON.stringify(err) || err);
     }

@@ -5,18 +5,19 @@ import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
 import { downloadCombinedTCX, downloadTCXZip } from '../lib/export-service';
-import { Download, Search, X } from 'lucide-react';
+import { Download, RefreshCw, Search, X } from 'lucide-react';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 
 interface WorkoutHistoryProps {
   sessions: any[];
   onClose: () => void;
   onSyncSession?: (session: any) => void;
+  onSyncSupabasePending?: () => Promise<void>;
   isGoogleConnected?: boolean;
   maxHr?: number;
 }
 
-export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConnected, maxHr = 190 }: WorkoutHistoryProps) => {
+export const WorkoutHistory = ({ sessions, onClose, onSyncSession, onSyncSupabasePending, isGoogleConnected, maxHr = 190 }: WorkoutHistoryProps) => {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'sessions' | 'summary'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
@@ -26,6 +27,7 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
   const [showTotals, setShowTotals] = useState(false);
   const [offsetDays, setOffsetDays] = useState(0);
   const [sessionSearch, setSessionSearch] = useState('');
+  const [isSupabaseRetrying, setIsSupabaseRetrying] = useState(false);
 
   // Batch selection states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -112,6 +114,21 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
     filteredSessions.filter(session => selectedSessionIds.includes(session.id)).length,
     [filteredSessions, selectedSessionIds]
   );
+
+  const pendingSupabaseCount = useMemo(() =>
+    sessions.filter(session => !session.synced_to_supabase).length,
+    [sessions]
+  );
+
+  const handleRetrySupabaseSync = async () => {
+    if (!onSyncSupabasePending) return;
+    setIsSupabaseRetrying(true);
+    try {
+      await onSyncSupabasePending();
+    } finally {
+      setIsSupabaseRetrying(false);
+    }
+  };
 
   const selectedSession = useMemo(() =>
     sessions.find(s => s.id === selectedSessionId),
@@ -204,8 +221,26 @@ export const WorkoutHistory = ({ sessions, onClose, onSyncSession, isGoogleConne
                           </button>
                         )}
                       </div>
-                      <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">
-                        Showing <span className="text-white">{filteredSessions.length}</span> of {sessions.length} sessions
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-hw-muted">
+                        <span>Showing <span className="text-white">{filteredSessions.length}</span> of {sessions.length} sessions</span>
+                        <span className={`rounded border px-2 py-1 ${
+                          pendingSupabaseCount > 0
+                            ? 'border-yellow-400/25 bg-yellow-400/5 text-yellow-300'
+                            : 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
+                        }`}>
+                          Supabase {pendingSupabaseCount > 0 ? `${pendingSupabaseCount} pending` : 'synced'}
+                        </span>
+                        {pendingSupabaseCount > 0 && onSyncSupabasePending && (
+                          <button
+                            onClick={handleRetrySupabaseSync}
+                            disabled={isSupabaseRetrying}
+                            title="Retry Supabase sync"
+                            aria-label="Retry Supabase sync"
+                            className="rounded border border-hw-accent/30 px-2 py-1 text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg disabled:opacity-40"
+                          >
+                            <RefreshCw size={10} className={isSupabaseRetrying ? 'animate-spin' : ''} />
+                          </button>
+                        )}
                       </div>
                     </div>
 

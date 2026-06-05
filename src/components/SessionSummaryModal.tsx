@@ -12,6 +12,8 @@ interface SessionSummaryModalProps {
     maxCadence: number;
     avgSpeed: number;
     maxSpeed: number;
+    hrrScore?: number | null;
+    hrrClassification?: string | null;
   };
   duration: string;
   calories: number;
@@ -47,7 +49,9 @@ export const SessionSummaryModal = ({
         avgPower: stats.avgPower,
         maxPower: stats.maxPower,
         avgCadence: stats.avgCadence,
-        maxCadence: stats.maxCadence
+        maxCadence: stats.maxCadence,
+        hrrScore: stats.hrrScore,
+        hrrClassification: stats.hrrClassification
       },
       history: history as any[]
     };
@@ -80,6 +84,26 @@ export const SessionSummaryModal = ({
             <DetailItem label="Avg Cadence" value={`${stats.avgCadence} RPM`} subValue={`Max: ${stats.maxCadence} RPM`} />
             <DetailItem label="Avg Speed" value={`${stats.avgSpeed} KM/H`} subValue={`Max: ${stats.maxSpeed} KM/H`} />
           </div>
+
+          {stats.hrrScore !== undefined && stats.hrrScore !== null && (
+            <div className="border-t border-white/5 pt-6">
+              <div className="hardware-card border-emerald-500/20 bg-emerald-500/5 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-full bg-emerald-500/10 text-emerald-400">
+                    <Heart size={20} fill="currentColor" className="animate-pulse" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[10px] text-hw-muted font-mono uppercase tracking-widest block">Heart Rate Recovery (2 Min)</span>
+                    <span className="text-sm font-extrabold text-emerald-400 uppercase">{stats.hrrClassification}</span>
+                  </div>
+                </div>
+                <div className="text-right font-mono">
+                  <span className="text-3xl font-black text-white">{stats.hrrScore}</span>
+                  <span className="text-xs text-white/50 ml-1">BPM drop</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col md:flex-row gap-4 pt-4">
             <button 
