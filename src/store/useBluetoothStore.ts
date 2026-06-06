@@ -37,6 +37,98 @@ interface BluetoothState {
   clearStaleData: () => void;
 }
 
+type BluetoothSetState = (
+  partial: Partial<BluetoothState> | ((state: BluetoothState) => Partial<BluetoothState> | BluetoothState)
+) => void;
+
+const parseFtmsIndoorBikeData = (
+  value: DataView,
+  state: BluetoothState,
+  now: number
+) => {
+  const flags = value.getUint16(0, true);
+  let offset = 2;
+  const updates: Partial<BluetoothData> = {};
+  const lastUpdate = { ...state.lastUpdate };
+  const trackerUpdates: Partial<Pick<BluetoothState, 'cumulativeDistance' | 'cumulativeCalories' | 'lastRawDistance' | 'lastRawCalories'>> = {};
+
+  if (!(flags & 0x0001)) {
+    updates.speed = value.getUint16(offset, true) / 100;
+    lastUpdate.speed = now;
+    offset += 2;
+  }
+  if (flags & 0x0002) offset += 2;
+  if (flags & 0x0004) {
+    updates.cadence = value.getUint16(offset, true) / 2;
+    lastUpdate.cadence = now;
+    offset += 2;
+  }
+  if (flags & 0x0008) offset += 2;
+  if (flags & 0x0010) {
+    const d1 = value.getUint8(offset);
+    const d2 = value.getUint8(offset + 1);
+    const d3 = value.getUint8(offset + 2);
+    const rawDistance = d1 + (d2 << 8) + (d3 << 16);
+
+    const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance)
+      ? rawDistance
+      : Math.max(0, rawDistance - state.lastRawDistance);
+
+    const newCumulative = state.cumulativeDistance + delta;
+
+    updates.distance = newCumulative;
+    trackerUpdates.cumulativeDistance = newCumulative;
+    trackerUpdates.lastRawDistance = rawDistance;
+
+    offset += 3;
+  }
+  if (flags & 0x0020) {
+    updates.resistance = value.getInt16(offset, true);
+    offset += 2;
+  }
+  if (flags & 0x0040) {
+    updates.power = value.getInt16(offset, true);
+    lastUpdate.power = now;
+    offset += 2;
+  }
+  if (flags & 0x0080) offset += 2;
+  if (flags & 0x0100) {
+    const rawCalories = value.getUint16(offset, true);
+
+    const delta = (state.lastRawCalories > 0 && rawCalories < state.lastRawCalories)
+      ? rawCalories
+      : Math.max(0, rawCalories - state.lastRawCalories);
+
+    const newCumulative = state.cumulativeCalories + delta;
+
+    updates.calories = newCumulative;
+    trackerUpdates.cumulativeCalories = newCumulative;
+    trackerUpdates.lastRawCalories = rawCalories;
+
+    offset += 5;
+  }
+
+  return { updates, lastUpdate, trackerUpdates };
+};
+
+const handleFtmsIndoorBikeNotification = (value: DataView, now: number, setState: BluetoothSetState) => {
+  setState((state) => {
+    const { updates, lastUpdate, trackerUpdates } = parseFtmsIndoorBikeData(value, state, now);
+
+    if (Object.keys(updates).length === 0 && Object.keys(trackerUpdates).length === 0) {
+      return state;
+    }
+
+    return {
+      ...trackerUpdates,
+      lastUpdate,
+      data: Object.keys(updates).length > 0
+        ? { ...state.data, ...updates }
+        : state.data
+    };
+  });
+};
+
 export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   hrConnected: false,
   bikeConnected: false,
@@ -183,75 +275,8 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
 
               characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
                 const value = event.target.value;
-                const flags = value.getUint16(0, true);
-                let offset = 2;
-                const updates: Partial<BluetoothData> = {};
                 const now = Date.now();
-                const state = get();
-                
-                if (!(flags & 0x0001)) {
-                  updates.speed = value.getUint16(offset, true) / 100;
-                  get().lastUpdate.speed = now;
-                  offset += 2;
-                }
-                if (flags & 0x0002) offset += 2;
-                if (flags & 0x0004) {
-                  updates.cadence = value.getUint16(offset, true) / 2;
-                  get().lastUpdate.cadence = now;
-                  offset += 2;
-                }
-                if (flags & 0x0008) offset += 2;
-                if (flags & 0x0010) {
-                  const d1 = value.getUint8(offset);
-                  const d2 = value.getUint8(offset + 1);
-                  const d3 = value.getUint8(offset + 2);
-                  const rawDistance = d1 + (d2 << 8) + (d3 << 16);
-                  
-                  const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance) 
-                    ? rawDistance 
-                    : Math.max(0, rawDistance - state.lastRawDistance);
-                  
-                  const newCumulative = state.cumulativeDistance + delta;
-                  
-                  updates.distance = newCumulative;
-                  set({ 
-                    cumulativeDistance: newCumulative, 
-                    lastRawDistance: rawDistance 
-                  });
-                  
-                  offset += 3;
-                }
-                if (flags & 0x0020) {
-                  updates.resistance = value.getInt16(offset, true);
-                  offset += 2;
-                }
-                if (flags & 0x0040) {
-                  updates.power = value.getInt16(offset, true);
-                  get().lastUpdate.power = now;
-                  offset += 2;
-                }
-                if (flags & 0x0080) offset += 2;
-                if (flags & 0x0100) {
-                  const rawCalories = value.getUint16(offset, true);
-                  
-                  const delta = (state.lastRawCalories > 0 && rawCalories < state.lastRawCalories)
-                    ? rawCalories
-                    : Math.max(0, rawCalories - state.lastRawCalories);
-                  
-                  const newCumulative = state.cumulativeCalories + delta;
-                  
-                  updates.calories = newCumulative;
-                  set({
-                    cumulativeCalories: newCumulative,
-                    lastRawCalories: rawCalories
-                  });
-                  
-                  offset += 5;
-                }
-
-                if (Object.keys(updates).length > 0) {
-                  set((s) => ({ data: { ...s.data, ...updates } }));
-                }
+                handleFtmsIndoorBikeNotification(value, now, set);
               });
             } catch (e) {
               addLog("FTMS not found on reconnect, trying CSC service...");
@@ -300,77 +325,8 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
 
         characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
           const value = event.target.value;
-          const flags = value.getUint16(0, true);
-          let offset = 2;
-          const updates: Partial<BluetoothData> = {};
           const now = Date.now();
-          const state = get();
-          
-          if (!(flags & 0x0001)) {
-            updates.speed = value.getUint16(offset, true) / 100;
-            get().lastUpdate.speed = now;
-            offset += 2;
-          }
-          if (flags & 0x0002) offset += 2;
-          if (flags & 0x0004) {
-            updates.cadence = value.getUint16(offset, true) / 2;
-            get().lastUpdate.cadence = now;
-            offset += 2;
-          }
-          if (flags & 0x0008) offset += 2;
-          if (flags & 0x0010) {
-            const d1 = value.getUint8(offset);
-            const d2 = value.getUint8(offset + 1);
-            const d3 = value.getUint8(offset + 2);
-            const rawDistance = d1 + (d2 << 8) + (d3 << 16);
-            
-            // Handle reset: if raw < last, then it reset. 
-            // Also handle initial state (lastRawDistance === 0)
-            const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance) 
-              ? rawDistance 
-              : Math.max(0, rawDistance - state.lastRawDistance);
-            
-            const newCumulative = state.cumulativeDistance + delta;
-            
-            updates.distance = newCumulative;
-            set({ 
-              cumulativeDistance: newCumulative, 
-              lastRawDistance: rawDistance 
-            });
-            
-            offset += 3;
-          }
-          if (flags & 0x0020) {
-            updates.resistance = value.getInt16(offset, true);
-            offset += 2;
-          }
-          if (flags & 0x0040) {
-            updates.power = value.getInt16(offset, true);
-            get().lastUpdate.power = now;
-            offset += 2;
-          }
-          if (flags & 0x0080) offset += 2;
-          if (flags & 0x0100) {
-            const rawCalories = value.getUint16(offset, true);
-            
-            const delta = (state.lastRawCalories > 0 && rawCalories < state.lastRawCalories)
-              ? rawCalories
-              : Math.max(0, rawCalories - state.lastRawCalories);
-            
-            const newCumulative = state.cumulativeCalories + delta;
-            
-            updates.calories = newCumulative;
-            set({
-              cumulativeCalories: newCumulative,
-              lastRawCalories: rawCalories
-            });
-            
-            offset += 5;
-          }
-
-          if (Object.keys(updates).length > 0) {
-            set((state) => ({ data: { ...state.data, ...updates } }));
-          }
+          handleFtmsIndoorBikeNotification(value, now, set);
         });
       } catch (e) {
         addLog("FTMS not found, trying CSC service...");

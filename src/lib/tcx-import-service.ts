@@ -35,14 +35,15 @@ const calculateStats = (history: HistoryData[]) => ({
 const parseActivity = (activity: Element, index: number): WorkoutSession | null => {
   const laps = getChildrenByLocalName(activity, 'Lap');
   const firstLap = laps[0];
+  const trackpoints = getChildrenByLocalName(activity, 'Trackpoint');
+  if (trackpoints.length === 0) return null;
+
   const activityId = getDirectChildText(activity, 'Id');
-  const startTimeText = firstLap?.getAttribute('StartTime') || activityId;
+  const firstPointTime = getDirectChildText(trackpoints[0], 'Time');
+  const startTimeText = firstLap?.getAttribute('StartTime') || activityId || firstPointTime;
   const startTime = Date.parse(startTimeText);
 
   if (!Number.isFinite(startTime)) return null;
-
-  const trackpoints = getChildrenByLocalName(activity, 'Trackpoint');
-  if (trackpoints.length === 0) return null;
 
   const lapCalories = toNumber(firstLap ? getDirectChildText(firstLap, 'Calories') : '0');
   const history = trackpoints.map((trackpoint, pointIndex) => {
@@ -73,10 +74,10 @@ const parseActivity = (activity: Element, index: number): WorkoutSession | null 
   }));
 
   const explicitDuration = toNumber(firstLap ? getDirectChildText(firstLap, 'TotalTimeSeconds') : '0');
-  const firstPointTime = Date.parse(getDirectChildText(trackpoints[0], 'Time'));
+  const firstPointTimestamp = Date.parse(getDirectChildText(trackpoints[0], 'Time'));
   const lastPointTime = Date.parse(getDirectChildText(trackpoints[trackpoints.length - 1], 'Time'));
-  const inferredDuration = Number.isFinite(firstPointTime) && Number.isFinite(lastPointTime)
-    ? Math.max(1, Math.round((lastPointTime - firstPointTime) / 1000))
+  const inferredDuration = Number.isFinite(firstPointTimestamp) && Number.isFinite(lastPointTime)
+    ? Math.max(1, Math.round((lastPointTime - firstPointTimestamp) / 1000))
     : historyWithCalories.length;
 
   return {

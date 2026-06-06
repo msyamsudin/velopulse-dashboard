@@ -279,6 +279,20 @@ const persistSessionHistory = (sessions: WorkoutSession[]) => {
 const getSessionKey = (session: Pick<WorkoutSession, 'id' | 'sessionStartTime'>) =>
   session.sessionStartTime ? `start:${session.sessionStartTime}` : `id:${session.id}`;
 
+const getSessionStartTimestamp = (session: Pick<WorkoutSession, 'sessionStartTime' | 'date'>) => {
+  if (Number.isFinite(session.sessionStartTime) && session.sessionStartTime > 0) {
+    return session.sessionStartTime;
+  }
+
+  const parsedDate = Date.parse(session.date);
+  return Number.isFinite(parsedDate) ? parsedDate : 0;
+};
+
+const getWorkoutDateISOString = (session: Pick<WorkoutSession, 'sessionStartTime' | 'date'>) => {
+  const timestamp = getSessionStartTimestamp(session);
+  return timestamp > 0 ? new Date(timestamp).toISOString() : session.date;
+};
+
 const isPotentialDuplicateSession = (a: WorkoutSession, b: WorkoutSession) => {
   const startDiffSeconds = Math.abs(a.sessionStartTime - b.sessionStartTime) / 1000;
   const durationDiffSeconds = Math.abs(a.duration - b.duration);
@@ -290,7 +304,7 @@ const isPotentialDuplicateSession = (a: WorkoutSession, b: WorkoutSession) => {
 };
 
 const sortSessions = (sessions: WorkoutSession[]) =>
-  [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  [...sessions].sort((a, b) => getSessionStartTimestamp(b) - getSessionStartTimestamp(a));
 
 const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSessions: WorkoutSession[]) => {
   const merged = new Map<string, WorkoutSession>();
@@ -321,19 +335,23 @@ const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSessions: 
   return sortSessions(Array.from(merged.values()));
 };
 
-const mapSupabaseWorkout = (item: any): WorkoutSession => ({
-  id: item.id,
-  sessionStartTime: item.session_start_time,
-  date: item.created_at,
-  duration: item.duration,
-  stats: item.stats,
-  history: item.history,
-  synced_to_google: item.synced_to_google,
-  synced_to_supabase: true,
-  supabase_id: item.id,
-  supabase_synced_at: item.created_at,
-  supabase_sync_error: undefined
-});
+const mapSupabaseWorkout = (item: any): WorkoutSession => {
+  const sessionStartTime = Number(item.session_start_time) || Date.parse(item.created_at) || 0;
+
+  return {
+    id: item.id,
+    sessionStartTime,
+    date: sessionStartTime > 0 ? new Date(sessionStartTime).toISOString() : item.created_at,
+    duration: item.duration,
+    stats: item.stats,
+    history: item.history,
+    synced_to_google: item.synced_to_google,
+    synced_to_supabase: true,
+    supabase_id: item.id,
+    supabase_synced_at: item.created_at,
+    supabase_sync_error: undefined
+  };
+};
 
 const findSupabaseDuplicate = async (session: WorkoutSession) => {
   const client = await getSupabaseClient();
@@ -571,7 +589,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const newSession: WorkoutSession = {
       id: `session_${Date.now()}`,
       sessionStartTime,
-      date: new Date().toISOString(),
+      date: new Date(sessionStartTime).toISOString(),
       duration: elapsed,
       stats,
       history,
@@ -720,6 +738,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         const sessions = Array.isArray(parsed)
           ? parsed.map((session: WorkoutSession) => ({
               ...session,
+              date: getWorkoutDateISOString(session),
               synced_to_supabase: Boolean(session.synced_to_supabase || session.supabase_id)
             }))
           : [];

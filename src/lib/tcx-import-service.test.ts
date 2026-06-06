@@ -48,4 +48,32 @@ describe('parseTCXWorkoutSessions', () => {
       maxCadence: 90,
     });
   });
+
+  it('uses the first trackpoint time when activity and lap start times are missing', () => {
+    const tcx = `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activities>
+    <Activity Sport="Biking">
+      <Lap>
+        <Track>
+          <Trackpoint>
+            <Time>2026-06-04T12:00:00.000Z</Time>
+            <DistanceMeters>0</DistanceMeters>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2026-06-04T12:00:01.000Z</Time>
+            <DistanceMeters>6</DistanceMeters>
+          </Trackpoint>
+        </Track>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>`;
+
+    const sessions = parseTCXWorkoutSessions(tcx);
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].sessionStartTime).toBe(Date.parse('2026-06-04T12:00:00.000Z'));
+    expect(sessions[0].date).toBe('2026-06-04T12:00:00.000Z');
+  });
 });
