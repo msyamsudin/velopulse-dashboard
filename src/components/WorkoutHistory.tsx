@@ -86,8 +86,13 @@ export const WorkoutHistory = ({
     setOffsetDays(0);
   }, [summaryRange]);
 
+  const summaryInputSessions = useMemo(
+    () => viewMode === 'summary' ? sessions : [],
+    [viewMode, sessions]
+  );
+
   const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, weeklyDailyData } = useWorkoutHistoryData({
-    sessions,
+    sessions: summaryInputSessions,
     maxHr,
     summaryPeriod,
     summaryRange,

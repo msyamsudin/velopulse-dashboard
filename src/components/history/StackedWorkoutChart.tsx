@@ -50,7 +50,7 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
     // Assuming data points are roughly 1 second apart as per incrementElapsed/addHistoryPoint logic
     return data.map((p, index) => ({
       ...p,
-      relativeTime: formatDuration(index), // formatDuration(seconds) -> "00:00"
+      relativeTime: p.relativeTime || formatDuration(index), // formatDuration(seconds) -> "00:00"
     }));
   }, [data]);
 
@@ -103,6 +103,32 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
     },
 
   ];
+
+  const trackRanges = useMemo(() => {
+    const ranges: Record<string, { min: number; max: number }> = {};
+
+    for (const track of tracks) {
+      ranges[track.dataKey] = { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY };
+    }
+
+    for (const point of chartData) {
+      for (const track of tracks) {
+        const value = point[track.dataKey] || 0;
+        const current = ranges[track.dataKey];
+        current.min = Math.min(current.min, value);
+        current.max = Math.max(current.max, value);
+      }
+    }
+
+    for (const track of tracks) {
+      const current = ranges[track.dataKey];
+      if (!Number.isFinite(current.min) || !Number.isFinite(current.max)) {
+        ranges[track.dataKey] = { min: 0, max: 0 };
+      }
+    }
+
+    return ranges;
+  }, [chartData]);
 
   return (
     <div 
@@ -207,10 +233,10 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
 
               {/* Optional: Track-specific Y-axis labels floating in the chart */}
               <div className="absolute top-2 left-2 text-[8px] font-mono text-hw-muted/40 pointer-events-none">
-                {Math.max(...chartData.map(d => d[track.dataKey] || 0)).toFixed(1)}
+                {(trackRanges[track.dataKey]?.max || 0).toFixed(1)}
               </div>
               <div className="absolute bottom-2 left-2 text-[8px] font-mono text-hw-muted/40 pointer-events-none">
-                {Math.min(...chartData.map(d => d[track.dataKey] || 0)).toFixed(1)}
+                {(trackRanges[track.dataKey]?.min || 0).toFixed(1)}
               </div>
             </div>
 

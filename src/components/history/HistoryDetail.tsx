@@ -21,6 +21,36 @@ interface HistoryDetailProps {
 }
 
 const toNumber = (value: any) => Number(value || 0);
+const MAX_DETAIL_CHART_POINTS = 600;
+
+const sampleHistoryForChart = (data: any[]) => {
+  if (!data || data.length === 0) return [];
+  if (data.length <= MAX_DETAIL_CHART_POINTS) {
+    return data.map((point, index) => ({
+      ...point,
+      relativeTime: formatDuration(index),
+    }));
+  }
+
+  const factor = data.length / MAX_DETAIL_CHART_POINTS;
+  const result: any[] = [];
+
+  for (let i = 0; i < MAX_DETAIL_CHART_POINTS; i++) {
+    const sourceIndex = Math.floor(i * factor);
+    result.push({
+      ...data[sourceIndex],
+      relativeTime: formatDuration(sourceIndex),
+    });
+  }
+
+  const lastIndex = data.length - 1;
+  result[result.length - 1] = {
+    ...data[lastIndex],
+    relativeTime: formatDuration(lastIndex),
+  };
+
+  return result;
+};
 
 const DeltaPill = ({ delta, unit = '', decimals = 0 }: { delta: ReturnType<typeof getMetricDelta>; unit?: string; decimals?: number }) => {
   if (!delta) return <span className="text-[9px] font-mono uppercase text-white/30">No baseline</span>;
@@ -82,10 +112,7 @@ const MiniMetric = ({ label, value, unit, icon, colorClass }: { label: string; v
 );
 
 const OverviewChart = ({ data }: { data: any[] }) => {
-  const chartData = useMemo(() => data.map((point, index) => ({
-    ...point,
-    relativeTime: formatDuration(index),
-  })), [data]);
+  const chartData = useMemo(() => sampleHistoryForChart(data), [data]);
 
   return (
     <div
@@ -148,6 +175,10 @@ export const HistoryDetail = ({
   const [isDetailReady, setIsDetailReady] = useState(false);
   const [showZoneBpm, setShowZoneBpm] = useState(false);
   const [chartMode, setChartMode] = useState<'overview' | 'telemetry'>('overview');
+  const chartHistory = useMemo(
+    () => sampleHistoryForChart(session?.history || []),
+    [session?.history]
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setIsDetailReady(true), 350);
@@ -386,7 +417,7 @@ export const HistoryDetail = ({
                   <OverviewChart data={session.history} />
                 ) : (
                   <StackedWorkoutChart
-                    data={session.history}
+                    data={chartHistory}
                     stats={{
                       avgHr: session.stats.avgHr,
                       maxHr: session.stats.maxHr,

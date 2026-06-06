@@ -36,6 +36,7 @@ const getPowerZones = (ftp: number) =>
 
 // Preserve original chart colors mapped by zone index
 const HR_ZONE_CHART_COLORS = ['#8e929918', '#22c55e18', '#facc1518', '#f9731618', '#ef444418'];
+const MAX_HISTORY_CHART_POINTS = 600;
 
 // HR Zones — as absolute BPM ranges
 const getHrZones = (maxHr: number) => {
@@ -69,9 +70,11 @@ export const PerformanceChart = ({
   const [windowSeconds, setWindowSeconds] = useState(30);
 
   // Mode Live: last N seconds (sliding window @ 1Hz)
-  // Mode History: show all points (removed downsampling to 100 points as per user request)
+  // Mode History: cap rendered points so long workouts do not overload Recharts.
   const chartData = useMemo(() => {
-    const raw = mode === 'history' ? data : data.slice(-windowSeconds);
+    const raw = mode === 'history'
+      ? downsample(data, MAX_HISTORY_CHART_POINTS)
+      : data.slice(-windowSeconds);
     return raw.map(p => ({
       ...p,
       distance: p.distance ? Number((p.distance / 1000).toFixed(3)) : 0,
