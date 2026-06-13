@@ -13,8 +13,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'VeloPulse Pro | Fitness Telemetry',
-  description: 'Advanced real-time cycling and fitness dashboard',
+  title: 'VeloPulse | Training Cockpit',
+  description: 'Indoor cycling telemetry and workout review',
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetBrainsMono.variable} bg-hw-bg text-white min-h-screen antialiased`}>
+      <body className={`${inter.variable} ${jetBrainsMono.variable} min-h-dvh bg-vp-bg text-vp-text antialiased`}>
         {children}
       </body>
     </html>

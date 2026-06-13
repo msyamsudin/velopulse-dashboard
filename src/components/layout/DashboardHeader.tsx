@@ -1,4 +1,5 @@
-import { Activity, RefreshCcw, LogOut, Settings } from 'lucide-react';
+import { Activity, Bug, History, LogOut, RefreshCcw, Settings } from 'lucide-react';
+import { IconButton, StatusPill } from '../ui';
 
 interface DashboardHeaderProps {
   isGoogleConnected: boolean;
@@ -22,72 +23,71 @@ export const DashboardHeader = ({
   setShowSettings
 }: DashboardHeaderProps) => {
   return (
-    <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-      <div className="flex items-center gap-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Activity className="text-hw-accent" />
-            VELOPULSE <span className="text-hw-muted font-light">PRO</span>
+    <header className="mb-5 flex shrink-0 flex-col gap-4 border-b border-vp-border pb-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-vp-accent/25 bg-vp-accent/8 text-vp-accent">
+          <Activity size={20} />
+        </div>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-semibold tracking-normal text-vp-text md:text-3xl">
+            VeloPulse
           </h1>
-          <p className="text-hw-muted text-xs font-mono uppercase tracking-widest mt-1">
-            Fitness Telemetry
+          <p className="vp-label mt-1">
+            Training cockpit
           </p>
         </div>
-
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 md:justify-end">
         {isGoogleConnected ? (
-          <div className="flex items-center gap-1">
-            <div className="px-3 py-1.5 rounded-l-md text-[10px] font-mono uppercase tracking-widest border border-hw-accent/30 text-hw-accent flex items-center gap-2 bg-hw-accent/5">
-              <div className="w-1.5 h-1.5 rounded-full bg-hw-accent" />
-              Google Fit
-            </div>
-            <button 
+          <div className="flex items-center gap-1 rounded-lg border border-vp-accent/25 bg-vp-accent/5 p-1">
+            <StatusPill label="Google Fit" tone="ready" compact />
+            <IconButton
               onClick={handleConnectGoogle}
-              title="Reconnect (Updates Permissions)"
-              className="px-2 py-1.5 border-y border-hw-accent/30 text-hw-accent hover:bg-hw-accent/10 transition-colors"
-            >
-              <RefreshCcw size={12} />
-            </button>
-            <button 
+              label="Reconnect Google Fit"
+              icon={<RefreshCcw size={13} />}
+              tone="primary"
+              className="h-7 w-7"
+            />
+            <IconButton
               onClick={handleDisconnectGoogle}
-              title="Disconnect"
-              className="px-2 py-1.5 rounded-r-md border border-hw-accent/30 text-hw-accent hover:bg-red-500/20 hover:text-red-500 transition-colors"
-            >
-              <LogOut size={12} />
-            </button>
+              label="Disconnect Google Fit"
+              icon={<LogOut size={13} />}
+              tone="danger"
+              className="h-7 w-7"
+            />
           </div>
         ) : (
           <button 
             onClick={handleConnectGoogle}
-            className="px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest border border-hw-muted/30 text-hw-muted hover:border-hw-muted hover:text-white transition-colors flex items-center gap-2"
+            className="vp-button vp-focus-ring"
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-hw-muted" />
+            <span className="h-1.5 w-1.5 rounded-full bg-vp-muted" />
             Connect Google Fit
           </button>
         )}
         <button 
           onClick={() => setShowHistory(!showHistory)}
-          className={`px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest border transition-colors ${
-            showHistory ? 'bg-hw-accent text-hw-bg border-hw-accent' : 'border-hw-muted/30 text-hw-muted hover:border-hw-muted'
+          className={`vp-button vp-focus-ring ${
+            showHistory ? 'vp-button-primary' : ''
           }`}
         >
+          <History size={13} />
           History
         </button>
-        <button 
+        <IconButton
           onClick={() => setShowSettings(true)}
-          className="p-2 rounded-md border border-hw-muted/30 text-hw-muted hover:border-hw-muted hover:text-white transition-colors"
-        >
-          <Settings size={14} />
-        </button>
+          label="Open settings"
+          icon={<Settings size={15} />}
+        />
         <button 
           onClick={() => setShowDebug(!showDebug)}
-          className={`px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest border transition-colors ${
-            showDebug ? 'bg-yellow-500 text-hw-bg border-yellow-500' : 'border-hw-muted/30 text-hw-muted hover:border-hw-muted'
+          className={`vp-button vp-focus-ring ${
+            showDebug ? 'border-vp-warning bg-vp-warning text-vp-bg hover:bg-vp-warning/90 hover:text-vp-bg' : ''
           }`}
         >
-          Debug Console
+          <Bug size={13} />
+          Debug
         </button>
       </div>
     </header>

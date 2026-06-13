@@ -121,6 +121,8 @@ export default function App() {
   const isTelemetrySurface = primarySurface === 'telemetry';
   const isCompactSurface = isRideSurface || isTelemetrySurface;
   const showChrome = appMode === 'ready';
+  const shellPadding = isCompactSurface ? 'p-2 md:p-4' : 'p-3 md:p-6 lg:p-8';
+  const contentWidth = isCompactSurface ? 'max-w-none' : 'max-w-7xl';
 
   // Sync session data with BLE data
   useEffect(() => {
@@ -248,7 +250,8 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen flex flex-col transition-all duration-700 ease-in-out ${isCompactSurface ? 'p-2 md:p-4' : 'p-4 md:p-8 max-w-7xl mx-auto'} overflow-hidden no-scrollbar`}>
+    <div className={`h-dvh overflow-hidden bg-vp-bg ${shellPadding}`}>
+      <div className={`mx-auto flex h-full w-full ${contentWidth} flex-col overflow-hidden transition-all duration-500 ease-out`}>
       <AnimatePresence mode="wait">
         {showChrome && (
           <motion.div
@@ -503,6 +506,7 @@ export default function App() {
           }
         }}
       />
+      </div>
     </div>
   );
 }
