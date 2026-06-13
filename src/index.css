@@ -5,46 +5,98 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
 
   --color-hw-bg: #030406;
-  --color-hw-card: rgba(6, 24, 18, 0.1);
-  --color-hw-accent: #00ffaa;
+  --color-hw-card: rgba(18, 22, 26, 0.82);
+  --color-hw-accent: #35f0bd;
   --color-hw-text: #ffffff;
-  --color-hw-muted: #4a5c56;
-  --color-hw-border: rgba(0, 255, 170, 0.05);
+  --color-hw-muted: #7d8a91;
+  --color-hw-border: rgba(255, 255, 255, 0.08);
+
+  --color-vp-bg: #05070a;
+  --color-vp-surface: #0d1116;
+  --color-vp-surface-raised: #131920;
+  --color-vp-border: rgba(255, 255, 255, 0.08);
+  --color-vp-border-strong: rgba(255, 255, 255, 0.14);
+  --color-vp-text: #f4f7f8;
+  --color-vp-muted: #89939b;
+  --color-vp-dim: #56616a;
+  --color-vp-accent: #35f0bd;
+  --color-vp-danger: #f05252;
+  --color-vp-warning: #f5c542;
+  --color-vp-info: #5da8ff;
+  --color-vp-hr: #f05252;
+  --color-vp-power: #f5c542;
+  --color-vp-cadence: #35f0bd;
+  --color-vp-speed: #5da8ff;
+  --color-vp-distance: #a98cff;
+  --color-vp-calories: #f472b6;
+  --color-vp-resistance: #fb923c;
 }
 
 @layer base {
   body {
-    @apply bg-hw-bg text-hw-text font-sans antialiased selection:bg-hw-accent selection:text-hw-bg;
+    @apply bg-vp-bg text-vp-text font-sans antialiased selection:bg-vp-accent selection:text-vp-bg;
   }
 }
 
 .hardware-card {
-  @apply rounded-2xl border border-hw-border p-6 transition-colors duration-200 relative overflow-hidden;
-  background-color: rgba(6, 24, 18, 0.16);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+  @apply rounded-lg border border-hw-border p-6 transition-colors duration-200 relative overflow-hidden;
+  background: linear-gradient(180deg, rgba(19, 25, 32, 0.92), rgba(10, 14, 18, 0.92));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
 }
 
 .hardware-card:hover {
-  @apply border-hw-accent/20;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
+  @apply border-white/15;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
 
 .stat-value {
-  @apply font-mono text-5xl font-bold tracking-tighter;
+  @apply font-mono text-5xl font-bold tracking-normal tabular-nums;
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.06));
 }
 
 .stat-label {
-  @apply font-mono text-[10px] uppercase tracking-[0.2em] text-hw-muted mb-2 block;
+  @apply font-mono text-[10px] uppercase tracking-[0.16em] text-hw-muted mb-2 block;
 }
 
 .glass-button {
-  @apply relative px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-colors duration-200 border border-white/5 overflow-hidden bg-white/5;
+  @apply relative px-6 py-3 rounded-lg font-bold uppercase tracking-widest text-[10px] transition-colors duration-200 border border-white/10 overflow-hidden bg-white/5;
 }
 
 .glass-button:hover {
-  @apply border-hw-accent/30 bg-hw-accent/5 scale-105;
-  box-shadow: 0 0 20px rgba(0, 255, 170, 0.1);
+  @apply border-vp-accent/35 bg-vp-accent/8;
+  box-shadow: 0 0 20px rgba(53, 240, 189, 0.08);
+}
+
+.vp-panel {
+  @apply relative overflow-hidden rounded-lg border border-vp-border bg-vp-surface p-4 shadow-[0_10px_26px_rgba(0,0,0,0.28)];
+}
+
+.vp-panel-raised {
+  @apply relative overflow-hidden rounded-lg border border-vp-border-strong bg-vp-surface-raised p-4 shadow-[0_14px_34px_rgba(0,0,0,0.34)];
+}
+
+.vp-label {
+  @apply font-mono text-[10px] uppercase tracking-[0.16em] text-vp-muted;
+}
+
+.vp-value {
+  @apply font-mono font-black leading-none tracking-normal tabular-nums text-vp-text;
+}
+
+.vp-button {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-vp-border bg-white/[0.04] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-vp-muted transition-colors hover:border-vp-border-strong hover:text-vp-text disabled:pointer-events-none disabled:opacity-40;
+}
+
+.vp-button-primary {
+  @apply border-vp-accent bg-vp-accent text-vp-bg hover:border-vp-accent hover:bg-vp-accent/90 hover:text-vp-bg;
+}
+
+.vp-button-danger {
+  @apply border-vp-danger/35 bg-vp-danger/10 text-vp-danger hover:border-vp-danger/60 hover:bg-vp-danger/15 hover:text-red-200;
+}
+
+.vp-focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vp-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-vp-bg;
 }
 
 .custom-scrollbar::-webkit-scrollbar {

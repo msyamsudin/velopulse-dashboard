@@ -99,6 +99,24 @@ interface WorkoutState {
 
 const SUPABASE_HISTORY_PAGE_SIZE = 50;
 const ACTIVE_SESSION_PERSIST_INTERVAL_MS = 5000;
+const ACTIVE_SESSION_STORAGE_KEY = 'velopulse_active_session';
+const SESSION_HISTORY_STORAGE_KEY = 'velopulse_sessions';
+const WORKOUT_INDEXED_DB_NAME = 'velopulse_workouts';
+const WORKOUT_INDEXED_DB_VERSION = 1;
+const WORKOUT_INDEXED_DB_STORE = 'workout_state';
+
+const ACTIVE_SESSION_HISTORY_POINT_LIMITS = [1800, 900, 300, 60];
+const SESSION_HISTORY_STORAGE_ATTEMPTS = [
+  { maxSessions: 75, maxHistoryPoints: 600 },
+  { maxSessions: 75, maxHistoryPoints: 300 },
+  { maxSessions: 50, maxHistoryPoints: 300 },
+  { maxSessions: 50, maxHistoryPoints: 150 },
+  { maxSessions: 25, maxHistoryPoints: 150 },
+  { maxSessions: 25, maxHistoryPoints: 60 },
+  { maxSessions: 10, maxHistoryPoints: 60 },
+  { maxSessions: 10, maxHistoryPoints: 20 },
+  { maxSessions: 5, maxHistoryPoints: 20 }
+];
 
 const EMPTY_LIVE_STATS: LiveWorkoutStats = {
   avgHr: 0,
@@ -185,24 +203,272 @@ let pendingActiveSessionSnapshot: ActiveSessionSnapshot | null = null;
 let activeSessionPersistTimer: ReturnType<typeof setTimeout> | null = null;
 let lastActiveSessionPersistAt = 0;
 let hasActiveSessionFlushListener = false;
+let warnedActiveSessionStorageQuota = false;
+let warnedSessionHistoryStorageQuota = false;
+let workoutDatabasePromise: Promise<IDBDatabase | null> | null = null;
+let activeSessionIndexedDbQueue: Promise<void> = Promise.resolve();
+let sessionHistoryIndexedDbQueue: Promise<void> = Promise.resolve();
+
+const isStorageQuotaError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const candidate = error as { name?: string; code?: number };
+  return (
+    candidate.name === 'QuotaExceededError' ||
+    candidate.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    candidate.code === 22 ||
+    candidate.code === 1014
+  );
+};
+
+const sampleHistoryPoints = (history: HistoryData[], maxPoints: number) => {
+  if (history.length <= maxPoints) return history;
+  if (maxPoints <= 0) return [];
+  if (maxPoints === 1) return [history[history.length - 1]];
+
+  const sampled: HistoryData[] = [];
+  const lastIndex = history.length - 1;
+  let previousIndex = -1;
+
+  for (let i = 0; i < maxPoints; i += 1) {
+    const nextIndex = Math.round((i * lastIndex) / (maxPoints - 1));
+    if (nextIndex !== previousIndex) {
+      sampled.push(history[nextIndex]);
+      previousIndex = nextIndex;
+    }
+  }
+
+  return sampled;
+};
+
+const buildActiveSessionStorageSnapshot = (
+  state: ActiveSessionSnapshot,
+  maxHistoryPoints = state.history.length
+) => ({
+  isRecording: state.isRecording,
+  elapsed: state.elapsed,
+  sessionStartTime: state.sessionStartTime,
+  startDistance: state.startDistance,
+  startCalories: state.startCalories,
+  history: sampleHistoryPoints(state.history, maxHistoryPoints)
+});
+
+const compactSessionsForStorage = (
+  sessions: WorkoutSession[],
+  maxSessions: number,
+  maxHistoryPoints: number
+) =>
+  sessions.slice(0, maxSessions).map(session => ({
+    ...session,
+    history: sampleHistoryPoints(session.history || [], maxHistoryPoints)
+  }));
+
+const trySetLocalStorageItem = (
+  key: string,
+  value: string,
+  options: { removeExisting?: boolean } = {}
+) => {
+  try {
+    if (options.removeExisting) {
+      localStorage.removeItem(key);
+    }
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    if (!isStorageQuotaError(error)) {
+      console.warn(`Failed to persist ${key} to localStorage:`, error);
+    }
+    return false;
+  }
+};
+
+const compactStoredSessionHistoryForQuota = () => {
+  try {
+    const saved = localStorage.getItem(SESSION_HISTORY_STORAGE_KEY);
+    if (!saved) return false;
+
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return false;
+
+    for (const attempt of SESSION_HISTORY_STORAGE_ATTEMPTS) {
+      const compacted = compactSessionsForStorage(
+        parsed,
+        attempt.maxSessions,
+        attempt.maxHistoryPoints
+      );
+      if (
+        trySetLocalStorageItem(
+          SESSION_HISTORY_STORAGE_KEY,
+          JSON.stringify(compacted),
+          { removeExisting: true }
+        )
+      ) {
+        return true;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to compact local workout history after storage quota error:', error);
+  }
+
+  try {
+    localStorage.removeItem(SESSION_HISTORY_STORAGE_KEY);
+  } catch {
+    // Ignore cleanup failures; the active session fallback below will still fail gracefully.
+  }
+  return true;
+};
+
+const getWorkoutDatabase = () => {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) {
+    return Promise.resolve(null);
+  }
+
+  if (workoutDatabasePromise) return workoutDatabasePromise;
+
+  workoutDatabasePromise = new Promise<IDBDatabase | null>((resolve) => {
+    const request = indexedDB.open(WORKOUT_INDEXED_DB_NAME, WORKOUT_INDEXED_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(WORKOUT_INDEXED_DB_STORE)) {
+        db.createObjectStore(WORKOUT_INDEXED_DB_STORE);
+      }
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+
+    request.onerror = () => {
+      console.warn('Failed to open IndexedDB workout storage:', request.error);
+      workoutDatabasePromise = null;
+      resolve(null);
+    };
+  });
+
+  return workoutDatabasePromise;
+};
+
+const runWorkoutStorageTransaction = async <T>(
+  mode: IDBTransactionMode,
+  action: (store: IDBObjectStore) => IDBRequest<T> | void
+) => {
+  const db = await getWorkoutDatabase();
+  if (!db) return null;
+
+  return new Promise<T | null>((resolve, reject) => {
+    const transaction = db.transaction(WORKOUT_INDEXED_DB_STORE, mode);
+    const store = transaction.objectStore(WORKOUT_INDEXED_DB_STORE);
+    const request = action(store);
+    let result: T | null = null;
+
+    if (request) {
+      request.onsuccess = () => {
+        result = request.result;
+      };
+      request.onerror = () => {
+        reject(request.error);
+      };
+    }
+
+    transaction.oncomplete = () => resolve(result);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+};
+
+const getWorkoutStorageValue = async <T>(key: string) => {
+  try {
+    return await runWorkoutStorageTransaction<T>('readonly', store => store.get(key));
+  } catch (error) {
+    console.warn(`Failed to read ${key} from IndexedDB:`, error);
+    return null;
+  }
+};
+
+const setWorkoutStorageValue = async <T>(key: string, value: T) => {
+  try {
+    await runWorkoutStorageTransaction<IDBValidKey>('readwrite', store => store.put(value, key));
+  } catch (error) {
+    console.warn(`Failed to persist ${key} to IndexedDB:`, error);
+  }
+};
+
+const removeWorkoutStorageValue = async (key: string) => {
+  try {
+    await runWorkoutStorageTransaction<undefined>('readwrite', store => store.delete(key));
+  } catch (error) {
+    console.warn(`Failed to remove ${key} from IndexedDB:`, error);
+  }
+};
+
+const persistActiveSessionToIndexedDb = (state: ActiveSessionSnapshot) => {
+  activeSessionIndexedDbQueue = activeSessionIndexedDbQueue
+    .catch(() => undefined)
+    .then(() => {
+      if (state.sessionStartTime === null) {
+        return removeWorkoutStorageValue(ACTIVE_SESSION_STORAGE_KEY);
+      }
+
+      return setWorkoutStorageValue(
+        ACTIVE_SESSION_STORAGE_KEY,
+        buildActiveSessionStorageSnapshot(state)
+      );
+    });
+};
+
+const persistSessionHistoryToIndexedDb = (sessions: WorkoutSession[]) => {
+  sessionHistoryIndexedDbQueue = sessionHistoryIndexedDbQueue
+    .catch(() => undefined)
+    .then(() => setWorkoutStorageValue(SESSION_HISTORY_STORAGE_KEY, sessions));
+};
 
 const writeActiveSession = (state: ActiveSessionSnapshot) => {
   if (typeof window === 'undefined') return;
+  persistActiveSessionToIndexedDb(state);
+
   try {
     if (state.sessionStartTime === null) {
-      localStorage.removeItem('velopulse_active_session');
+      localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
     } else {
-      localStorage.setItem('velopulse_active_session', JSON.stringify({
-        isRecording: state.isRecording,
-        elapsed: state.elapsed,
-        sessionStartTime: state.sessionStartTime,
-        startDistance: state.startDistance,
-        startCalories: state.startCalories,
-        history: state.history
-      }));
+      const historyLimits = [
+        state.history.length,
+        ...ACTIVE_SESSION_HISTORY_POINT_LIMITS
+      ].filter((limit, index, limits) =>
+        limit >= 0 && limit <= state.history.length && limits.indexOf(limit) === index
+      );
+
+      let triedCompactingHistory = false;
+      for (const limit of historyLimits) {
+        const snapshot = buildActiveSessionStorageSnapshot(state, limit);
+        const serialized = JSON.stringify(snapshot);
+
+        if (trySetLocalStorageItem(ACTIVE_SESSION_STORAGE_KEY, serialized)) {
+          warnedActiveSessionStorageQuota = false;
+          return;
+        }
+
+        if (!triedCompactingHistory && compactStoredSessionHistoryForQuota()) {
+          triedCompactingHistory = true;
+          if (trySetLocalStorageItem(ACTIVE_SESSION_STORAGE_KEY, serialized)) {
+            warnedActiveSessionStorageQuota = false;
+            return;
+          }
+        }
+      }
+
+      localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+      if (!warnedActiveSessionStorageQuota) {
+        console.warn(
+          'Active workout recovery data exceeded browser storage quota and was not persisted. The in-memory workout is still recording.'
+        );
+        warnedActiveSessionStorageQuota = true;
+      }
     }
   } catch (e) {
-    console.error('Failed to persist active session to localStorage:', e);
+    console.warn('Failed to persist active session to localStorage:', e);
   }
 };
 
@@ -269,10 +535,48 @@ const persistActiveSession = (
 
 const persistSessionHistory = (sessions: WorkoutSession[]) => {
   if (typeof window === 'undefined') return;
+  persistSessionHistoryToIndexedDb(sessions);
+
+  if (trySetLocalStorageItem(SESSION_HISTORY_STORAGE_KEY, JSON.stringify(sessions))) {
+    warnedSessionHistoryStorageQuota = false;
+    return;
+  }
+
+  for (const attempt of SESSION_HISTORY_STORAGE_ATTEMPTS) {
+    const compacted = compactSessionsForStorage(
+      sessions,
+      attempt.maxSessions,
+      attempt.maxHistoryPoints
+    );
+
+    if (
+      trySetLocalStorageItem(
+        SESSION_HISTORY_STORAGE_KEY,
+        JSON.stringify(compacted),
+        { removeExisting: true }
+      )
+    ) {
+      if (!warnedSessionHistoryStorageQuota) {
+        console.warn(
+          `Workout history exceeded browser storage quota. Persisted the latest ${compacted.length} sessions locally with sampled history points.`
+        );
+        warnedSessionHistoryStorageQuota = true;
+      }
+      return;
+    }
+  }
+
   try {
-    localStorage.setItem('velopulse_sessions', JSON.stringify(sessions));
-  } catch (e) {
-    console.error('Failed to persist session history to localStorage:', e);
+    localStorage.removeItem(SESSION_HISTORY_STORAGE_KEY);
+  } catch {
+    // Ignore cleanup failures; the in-memory history remains available until reload.
+  }
+
+  if (!warnedSessionHistoryStorageQuota) {
+    console.warn(
+      'Workout history exceeded browser storage quota and could not be persisted locally. The in-memory history remains available until reload.'
+    );
+    warnedSessionHistoryStorageQuota = true;
   }
 };
 
@@ -597,7 +901,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       synced_to_supabase: false
     };
 
-    // Save to LocalStorage first
+    // Persist full local data through IndexedDB; localStorage keeps only a compact fallback.
     const updatedHistory = [newSession, ...sessionHistory];
     set({ sessionHistory: updatedHistory });
     persistSessionHistory(updatedHistory);
@@ -730,50 +1034,93 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   },
 
   loadHistory: () => {
-    // 1. Load general workout session history
-    const saved = localStorage.getItem('velopulse_sessions');
-    if (saved) {
-      try {
+    const applySessions = (sessions: WorkoutSession[]) => {
+      const normalizedSessions = sessions.map((session: WorkoutSession) => ({
+        ...session,
+        date: getWorkoutDateISOString(session),
+        synced_to_supabase: Boolean(session.synced_to_supabase || session.supabase_id)
+      }));
+
+      set({ sessionHistory: normalizedSessions });
+      return normalizedSessions;
+    };
+
+    const applyActiveSession = (activeSession: ActiveSessionSnapshot) => {
+      if (!activeSession.sessionStartTime) return;
+
+      console.log('[Recovery] Restoring active session from local storage:', activeSession);
+      const restoredHistory = activeSession.history || [];
+      const restoredLiveStats = calculateLiveStats(restoredHistory);
+      set({
+        isRecording: activeSession.isRecording || false,
+        elapsed: activeSession.elapsed || 0,
+        sessionStartTime: activeSession.sessionStartTime,
+        startDistance: activeSession.startDistance || 0,
+        startCalories: activeSession.startCalories || 0,
+        history: restoredHistory,
+        liveStats: restoredLiveStats.stats,
+        liveStatsTotals: restoredLiveStats.totals
+      });
+    };
+
+    let localSessions: WorkoutSession[] = [];
+    let localActiveSession: ActiveSessionSnapshot | null = null;
+
+    // 1. Load compact localStorage fallback immediately for first paint and legacy data.
+    try {
+      const saved = localStorage.getItem(SESSION_HISTORY_STORAGE_KEY);
+      if (saved) {
         const parsed = JSON.parse(saved);
-        const sessions = Array.isArray(parsed)
-          ? parsed.map((session: WorkoutSession) => ({
-              ...session,
-              date: getWorkoutDateISOString(session),
-              synced_to_supabase: Boolean(session.synced_to_supabase || session.supabase_id)
-            }))
-          : [];
-        set({ sessionHistory: sessions });
-        persistSessionHistory(sessions);
-      } catch (e) {
-        console.error('Failed to load session history');
+        localSessions = Array.isArray(parsed) ? applySessions(parsed) : [];
       }
+    } catch (e) {
+      console.warn('Failed to load session history from localStorage:', e);
     }
 
-    // 2. Recover active workout session if it exists from a previous crash/reload
-    if (typeof window !== 'undefined') {
-      try {
-        const activeSession = localStorage.getItem('velopulse_active_session');
-        if (activeSession) {
-          const parsed = JSON.parse(activeSession);
-          if (parsed && parsed.sessionStartTime) {
-            console.log('[Recovery] Restoring active session from crash/reload:', parsed);
-            const restoredHistory = parsed.history || [];
-            const restoredLiveStats = calculateLiveStats(restoredHistory);
-            set({
-              isRecording: parsed.isRecording || false,
-              elapsed: parsed.elapsed || 0,
-              sessionStartTime: parsed.sessionStartTime,
-              startDistance: parsed.startDistance || 0,
-              startCalories: parsed.startCalories || 0,
-              history: restoredHistory,
-              liveStats: restoredLiveStats.stats,
-              liveStatsTotals: restoredLiveStats.totals
-            });
-          }
+    try {
+      const activeSession = localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+      if (activeSession) {
+        const parsed = JSON.parse(activeSession);
+        if (parsed && parsed.sessionStartTime) {
+          localActiveSession = parsed;
+          applyActiveSession(parsed);
         }
-      } catch (e) {
-        console.error('Failed to recover active session:', e);
       }
+    } catch (e) {
+      console.warn('Failed to recover active session from localStorage:', e);
+    }
+
+    // 2. Replace the compact fallback with full IndexedDB data when available.
+    if (typeof window !== 'undefined') {
+      getWorkoutStorageValue<WorkoutSession[]>(SESSION_HISTORY_STORAGE_KEY)
+        .then(indexedDbSessions => {
+          if (Array.isArray(indexedDbSessions)) {
+            applySessions(indexedDbSessions);
+            return;
+          }
+
+          if (localSessions.length > 0) {
+            persistSessionHistoryToIndexedDb(localSessions);
+          }
+        })
+        .catch(error => {
+          console.warn('Failed to load session history from IndexedDB:', error);
+        });
+
+      getWorkoutStorageValue<ActiveSessionSnapshot>(ACTIVE_SESSION_STORAGE_KEY)
+        .then(indexedDbActiveSession => {
+          if (indexedDbActiveSession?.sessionStartTime) {
+            applyActiveSession(indexedDbActiveSession);
+            return;
+          }
+
+          if (localActiveSession?.sessionStartTime) {
+            persistActiveSessionToIndexedDb(localActiveSession);
+          }
+        })
+        .catch(error => {
+          console.warn('Failed to recover active session from IndexedDB:', error);
+        });
     }
   },
 
