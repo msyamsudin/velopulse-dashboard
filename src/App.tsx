@@ -53,6 +53,9 @@ const SessionSummaryModal = dynamic(
   { ssr: false }
 );
 
+type PrimarySurface = 'ready' | 'ride' | 'telemetry';
+type AppMode = 'setup' | 'ready' | 'ride' | 'telemetry' | 'review';
+
 export default function App() {
   const hrr = useHeartRateRecovery();
   const isRecording = useWorkoutStore(state => state.isRecording);
@@ -102,6 +105,22 @@ export default function App() {
   const [wasRecording, setWasRecording] = useState(false);
   const [hasRequestedRemoteHistory, setHasRequestedRemoteHistory] = useState(false);
   const chartAvailable = workoutHistory.length > 0;
+  const requiresSetup = (sysConfigCheck && !sysConfigCheck.configured) || profileStatus === 'new';
+  const primarySurface: PrimarySurface = viewMode === 'telemetry'
+    ? 'telemetry'
+    : isRecording
+      ? 'ride'
+      : 'ready';
+  const appMode: AppMode = requiresSetup
+    ? 'setup'
+    : showHistory
+      ? 'review'
+      : primarySurface;
+  const isReadySurface = primarySurface === 'ready';
+  const isRideSurface = primarySurface === 'ride';
+  const isTelemetrySurface = primarySurface === 'telemetry';
+  const isCompactSurface = isRideSurface || isTelemetrySurface;
+  const showChrome = appMode === 'ready';
 
   // Sync session data with BLE data
   useEffect(() => {
@@ -205,7 +224,7 @@ export default function App() {
 
   const hrZone = getHrZone(currentData.hr);
 
-  if ((sysConfigCheck && !sysConfigCheck.configured) || profileStatus === 'new') {
+  if (requiresSetup) {
     return (
       <>
         <SetupLanding
@@ -229,9 +248,9 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen flex flex-col transition-all duration-700 ease-in-out ${isRecording || viewMode === 'telemetry' ? 'p-2 md:p-4' : 'p-4 md:p-8 max-w-7xl mx-auto'} overflow-hidden no-scrollbar`}>
+    <div className={`h-screen flex flex-col transition-all duration-700 ease-in-out ${isCompactSurface ? 'p-2 md:p-4' : 'p-4 md:p-8 max-w-7xl mx-auto'} overflow-hidden no-scrollbar`}>
       <AnimatePresence mode="wait">
-        {!isRecording && viewMode === 'grid' && (
+        {showChrome && (
           <motion.div
             key="header"
             initial={{ opacity: 0, y: -20 }}
@@ -316,16 +335,16 @@ export default function App() {
 
       <div className="flex-1 overflow-hidden no-scrollbar">
         <AnimatePresence mode="wait">
-          {viewMode === 'grid' && (
+          {!isTelemetrySurface && (
             <motion.div
-              key="grid-view"
+              key={isRideSurface ? 'ride-view' : 'ready-view'}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
               className="h-full flex flex-col space-y-6 overflow-y-auto no-scrollbar px-4 pb-8"
             >
-              {!isRecording && (
+              {isReadySurface && (
                 <div className="grid grid-cols-1 gap-4 shrink-0">
                   <motion.div
                     key="device-panel"
@@ -344,7 +363,7 @@ export default function App() {
                 </div>
               )}
 
-              {!isRecording && workoutHistory.length > 0 && isGoogleConnected && (
+              {isReadySurface && workoutHistory.length > 0 && isGoogleConnected && (
                 <SyncActionBar
                   onSync={handleSyncGoogle}
                   isPending={syncMutation.isPending}
@@ -354,7 +373,7 @@ export default function App() {
               )}
 
               <div className="flex-1 min-h-0">
-                {isRecording ? (
+                {isRideSurface ? (
                   <RecordingCockpit
                     currentData={currentData}
                     liveStats={liveStats}
@@ -392,7 +411,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {viewMode === 'telemetry' && (
+          {isTelemetrySurface && (
             <motion.div
               key="telemetry-view"
               initial={{ opacity: 0, y: 10 }}
@@ -417,7 +436,7 @@ export default function App() {
 
       {/* Stealth Floating Stop Button */}
       <AnimatePresence>
-        {isRecording && (
+        {isRideSurface && (
           <motion.button
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -452,7 +471,7 @@ export default function App() {
       {/* PerformanceChart is now inside the viewMode conditional block above */}
 
       <AnimatePresence>
-        {!isRecording && viewMode === 'grid' && (
+        {showChrome && (
           <motion.div
             key="footer"
             initial={{ opacity: 0 }}
