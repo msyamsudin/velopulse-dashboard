@@ -204,7 +204,7 @@ let activeSessionPersistTimer: ReturnType<typeof setTimeout> | null = null;
 let lastActiveSessionPersistAt = 0;
 let hasActiveSessionFlushListener = false;
 let warnedActiveSessionStorageQuota = false;
-let warnedSessionHistoryStorageQuota = false;
+let warnedSessionHistoryFallbackStorageFailure = false;
 let workoutDatabasePromise: Promise<IDBDatabase | null> | null = null;
 let activeSessionIndexedDbQueue: Promise<void> = Promise.resolve();
 let sessionHistoryIndexedDbQueue: Promise<void> = Promise.resolve();
@@ -537,33 +537,16 @@ const persistSessionHistory = (sessions: WorkoutSession[]) => {
   if (typeof window === 'undefined') return;
   persistSessionHistoryToIndexedDb(sessions);
 
-  if (trySetLocalStorageItem(SESSION_HISTORY_STORAGE_KEY, JSON.stringify(sessions))) {
-    warnedSessionHistoryStorageQuota = false;
+  const localStorageFallback = compactSessionsForStorage(sessions, 10, 20);
+  if (
+    trySetLocalStorageItem(
+      SESSION_HISTORY_STORAGE_KEY,
+      JSON.stringify(localStorageFallback),
+      { removeExisting: true }
+    )
+  ) {
+    warnedSessionHistoryFallbackStorageFailure = false;
     return;
-  }
-
-  for (const attempt of SESSION_HISTORY_STORAGE_ATTEMPTS) {
-    const compacted = compactSessionsForStorage(
-      sessions,
-      attempt.maxSessions,
-      attempt.maxHistoryPoints
-    );
-
-    if (
-      trySetLocalStorageItem(
-        SESSION_HISTORY_STORAGE_KEY,
-        JSON.stringify(compacted),
-        { removeExisting: true }
-      )
-    ) {
-      if (!warnedSessionHistoryStorageQuota) {
-        console.warn(
-          `Workout history exceeded browser storage quota. Persisted the latest ${compacted.length} sessions locally with sampled history points.`
-        );
-        warnedSessionHistoryStorageQuota = true;
-      }
-      return;
-    }
   }
 
   try {
@@ -572,11 +555,11 @@ const persistSessionHistory = (sessions: WorkoutSession[]) => {
     // Ignore cleanup failures; the in-memory history remains available until reload.
   }
 
-  if (!warnedSessionHistoryStorageQuota) {
+  if (!warnedSessionHistoryFallbackStorageFailure) {
     console.warn(
-      'Workout history exceeded browser storage quota and could not be persisted locally. The in-memory history remains available until reload.'
+      'Compact workout history fallback could not be persisted to localStorage. Full history is still stored in IndexedDB when available.'
     );
-    warnedSessionHistoryStorageQuota = true;
+    warnedSessionHistoryFallbackStorageFailure = true;
   }
 };
 
