@@ -11,4 +11,5 @@ coverage/
 .app-data/
 src/data/
 scratch/
+docs/
 next-env.d.ts
