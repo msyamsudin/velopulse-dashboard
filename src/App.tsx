@@ -444,12 +444,10 @@ export default function App() {
             whileHover={{
               width: 128,
               height: 40,
-              backgroundColor: '#ef4444',
-              borderRadius: '12px'
+              borderRadius: '8px'
             }}
-            whileTap={{ scale: 0.9 }}
             onClick={toggleRecording}
-            className="fixed top-6 right-6 z-100 group flex items-center justify-center bg-white/5 backdrop-blur-sm rounded-full transition-all duration-300 ease-out overflow-hidden h-8 w-8 shadow-2xl border border-white/10 hover:border-red-500/50"
+            className="vp-focus-ring fixed top-6 right-6 z-100 group flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-vp-danger/30 bg-vp-danger/10 text-vp-danger shadow-2xl backdrop-blur-sm transition-colors hover:border-vp-danger/60 hover:bg-vp-danger hover:text-white"
           >
             {/* The Stealth Dot (Normal state) */}
             <div className="group-hover:hidden relative w-2 h-2">

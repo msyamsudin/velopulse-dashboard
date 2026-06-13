@@ -61,7 +61,7 @@ export const SystemTab = ({
                   const uri = `${sysConfig.APP_URL || 'http://localhost:3000'}/api/auth/callback`;
                   navigator.clipboard.writeText(uri);
                 }}
-                className="rounded bg-vp-accent/10 px-2 py-1 text-[9px] font-mono text-vp-accent transition-colors hover:bg-vp-accent/20"
+                className="vp-focus-ring rounded bg-vp-accent/10 px-2 py-1 text-[9px] font-mono text-vp-accent transition-colors hover:bg-vp-accent/20"
               >
                 COPY URI
               </button>
