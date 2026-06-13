@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { downsample } from '../lib/chart-utils';
 import { HR_ZONES, POWER_ZONES, getSafeMaxHr } from '@/lib/constants';
-import { IconButton, SegmentedControl, StatusPill } from './ui';
+import { EmptyState, IconButton, SegmentedControl, StatusPill } from './ui';
 
 interface PerformanceChartProps {
   data: any[];
@@ -316,14 +316,13 @@ export const PerformanceChart = ({
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex h-full w-full items-center justify-center rounded-lg border border-dashed border-vp-border bg-white/[0.02]">
-            <div className="text-center">
-              <Activity size={20} className="mx-auto mb-3 text-vp-muted" />
-              <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-vp-muted">
-                Waiting for session telemetry
-              </div>
-            </div>
-          </div>
+          <EmptyState
+            title="Waiting for telemetry"
+            detail="Start recording to populate the live chart"
+            icon={<Activity size={20} />}
+            className="h-full"
+            pulse
+          />
         )}
       </div>
     </div>

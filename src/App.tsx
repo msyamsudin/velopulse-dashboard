@@ -24,13 +24,10 @@ import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
 import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
 import { useHeartRateRecovery } from './hooks/useHeartRateRecovery';
 import { HrrModal } from './components/dashboard/HrrModal';
+import { EmptyState } from './components/ui';
 
 const DeferredPanelLoader = () => (
-  <div className="hardware-card h-full min-h-40 flex items-center justify-center">
-    <div className="text-[10px] font-mono text-hw-muted uppercase tracking-[0.2em]">
-      Loading...
-    </div>
-  </div>
+  <EmptyState title="Loading panel" detail="Preparing telemetry view" pulse className="h-full min-h-40" />
 );
 
 const PerformanceChart = dynamic(

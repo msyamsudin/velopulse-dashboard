@@ -1,4 +1,6 @@
 import { motion } from 'motion/react';
+import { CheckCircle, RefreshCw, UploadCloud, XCircle } from 'lucide-react';
+import { InlineNotice } from '../ui';
 
 interface SyncActionBarProps {
   onSync: () => void;
@@ -8,30 +10,40 @@ interface SyncActionBarProps {
 }
 
 export const SyncActionBar = ({ onSync, isPending, isSuccess, isError }: SyncActionBarProps) => {
+  const noticeTone = isSuccess ? 'success' : isError ? 'danger' : 'info';
+  const noticeIcon = isSuccess
+    ? <CheckCircle size={13} />
+    : isError
+      ? <XCircle size={13} />
+      : <UploadCloud size={13} />;
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="hardware-card bg-hw-accent/5 border-hw-accent/20 flex flex-col md:flex-row items-center justify-between gap-4 p-6 mb-6"
+      className="mb-5 rounded-lg border border-vp-border bg-white/[0.03] p-4"
     >
-      <div>
-        <h3 className="text-hw-accent font-bold uppercase tracking-widest text-sm">Workout Completed</h3>
-        <p className="text-hw-muted text-xs mt-1">Ready to sync your session data to Google Fit?</p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <InlineNotice tone={noticeTone} icon={noticeIcon} className="md:flex-1">
+          {isSuccess
+            ? 'Workout synced to Google Fit'
+            : isError
+              ? 'Sync failed. Try again when the connection is ready'
+              : 'Workout complete. Session data is ready to sync'}
+        </InlineNotice>
+        <button
+          onClick={onSync}
+          disabled={isPending || isSuccess}
+          className={`vp-focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+            isError
+              ? 'border border-vp-danger/35 bg-vp-danger/10 text-vp-danger hover:bg-vp-danger/15'
+              : 'bg-vp-accent text-vp-bg hover:bg-vp-accent/90'
+          }`}
+        >
+          <RefreshCw size={13} className={isPending ? 'animate-spin' : ''} />
+          {isPending ? 'Syncing' : isSuccess ? 'Synced' : isError ? 'Retry Sync' : 'Sync Google Fit'}
+        </button>
       </div>
-      <button 
-        onClick={onSync}
-        disabled={isPending || isSuccess}
-        className={`px-6 py-2.5 rounded-md text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
-          isSuccess ? 'bg-green-500 text-white' : 
-          isError ? 'bg-red-500 text-white' :
-          'bg-hw-accent text-hw-bg hover:scale-105 active:scale-95'
-        }`}
-      >
-        {isPending ? 'Syncing...' : 
-         isSuccess ? 'Synced to Google Fit!' :
-         isError ? 'Sync Failed - Try Again' :
-         'Sync to Google Fit'}
-      </button>
     </motion.div>
   );
 };

@@ -1,7 +1,7 @@
 import { Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff } from 'lucide-react';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
-import { StatusPill } from '../ui';
+import { EmptyState, StatusPill } from '../ui';
 
 interface HistoryListProps {
   sessions: any[];
@@ -56,9 +56,12 @@ export const HistoryList = ({
 
   if (sessions.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-vp-border py-20 text-center font-mono text-xs uppercase tracking-widest text-vp-muted">
-        No matching sessions
-      </div>
+      <EmptyState
+        title="No matching sessions"
+        detail="Try a different search or import workouts"
+        icon={<Calendar size={20} />}
+        className="py-20"
+      />
     );
   }
 

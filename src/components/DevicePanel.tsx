@@ -1,4 +1,5 @@
 import { Heart, Bike, ChevronRight } from 'lucide-react';
+import { InlineNotice } from './ui';
 
 interface DevicePanelProps {
   hrConnected: boolean;
@@ -69,9 +70,9 @@ export const DevicePanel = ({
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-mono">
-            ERROR: {error}
-          </div>
+          <InlineNotice tone="danger">
+            Error: {error}
+          </InlineNotice>
         )}
       </div>
     </div>

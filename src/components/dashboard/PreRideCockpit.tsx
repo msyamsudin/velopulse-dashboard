@@ -15,7 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { MetricCard, Panel, StatusPill } from '../ui';
+import { EmptyState, MetricCard, Panel, StatusPill } from '../ui';
 
 interface PreRideCockpitProps {
   currentData: any;
@@ -251,15 +251,11 @@ export const PreRideCockpit = ({
               <SummaryMetric label="Avg Power" value={`${lastSession.stats?.avgPower || '--'} W`} tone="text-vp-power" />
             </div>
           ) : (
-            <div className="flex min-h-36 items-center justify-center rounded-lg border border-dashed border-vp-border bg-white/[0.015] text-center">
-              <div>
-                <Check size={18} className="mx-auto mb-3 text-vp-accent" />
-                <div className="text-xs font-semibold text-vp-text">First session ready</div>
-                <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-vp-muted">
-                  Your summary will appear here after saving a workout
-                </div>
-              </div>
-            </div>
+            <EmptyState
+              title="First session ready"
+              detail="Your summary appears here after saving a workout"
+              icon={<Check size={18} />}
+            />
           )}
         </Panel>
       </div>
