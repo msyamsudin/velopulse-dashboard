@@ -3,7 +3,8 @@ import type { CSSProperties, ReactNode } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
 import { HrZoneBar } from '../HrZoneBar';
 import { PowerGauge } from '../PowerGauge';
-import { DistanceVisual } from '../DistanceVisual';
+import { CadenceGauge } from '../CadenceGauge';
+import { StatusPill } from '../ui';
 
 interface RecordingCockpitProps {
   currentData: any;
@@ -66,27 +67,27 @@ const MainMetric = ({
   accentStyle
 }: MainMetricProps) => (
   <section
-    className={`hardware-card h-full min-h-[240px] flex flex-col ${isWaiting ? 'opacity-75' : ''}`}
+    className={`vp-panel-raised h-full min-h-[240px] flex flex-col ${isWaiting ? 'opacity-75' : ''}`}
     style={accentStyle}
   >
     <div className="flex items-start justify-between gap-4">
-      <div className="stat-label flex items-center gap-2 mb-0">
+      <div className="vp-label flex items-center gap-2">
         <span className={colorClass}>{icon}</span>
         {label}
       </div>
       <div className="text-right">
-        <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-hw-muted">{subLabel}</div>
+        <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted">{subLabel}</div>
         <div className={`text-sm font-bold font-mono ${colorClass}`}>{subValue}</div>
       </div>
     </div>
 
     <div className="flex-1 flex flex-col justify-center gap-5">
-      <div className={`font-mono text-[clamp(3.25rem,8vw,6.5rem)] leading-none font-black ${colorClass}`}>
+      <div className={`font-mono text-[clamp(3.25rem,8vw,6.5rem)] leading-none font-black tracking-normal tabular-nums ${colorClass}`}>
         {value}
-        {unit && <span className="ml-3 text-lg font-normal text-white/45 align-middle">{unit}</span>}
+        {unit && <span className="ml-3 text-lg font-normal text-vp-muted align-middle">{unit}</span>}
       </div>
       {isWaiting && (
-        <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-hw-muted">
+        <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-vp-muted">
           Waiting signal
         </div>
       )}
@@ -105,21 +106,21 @@ const StripMetric = ({
   detail,
   isWaiting = false
 }: StripMetricProps) => (
-  <section className={`hardware-card min-h-[118px] flex flex-col justify-between ${isWaiting ? 'opacity-70' : ''}`}>
+  <section className={`vp-panel min-h-[118px] flex flex-col justify-between ${isWaiting ? 'opacity-70' : ''}`}>
     <div className="flex items-center justify-between gap-3">
-      <div className="stat-label flex items-center gap-2 mb-0">
+      <div className="vp-label flex items-center gap-2">
         <span className={colorClass}>{icon}</span>
         {label}
       </div>
-      <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-hw-muted">{detail}</span>
+      <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted">{detail}</span>
     </div>
 
     <div className="flex items-end justify-between gap-4">
-      <div className={`font-mono text-3xl md:text-4xl font-black leading-none ${colorClass}`}>
+      <div className={`font-mono text-3xl md:text-4xl font-black leading-none tracking-normal tabular-nums ${colorClass}`}>
         {value}
-        {unit && <span className="ml-2 text-xs font-normal text-white/45">{unit}</span>}
+        {unit && <span className="ml-2 text-xs font-normal text-vp-muted">{unit}</span>}
       </div>
-      <div className="w-20 md:w-28 h-1.5 rounded-full bg-hw-muted/15 overflow-hidden">
+      <div className="w-20 md:w-28 h-1.5 rounded-full bg-vp-muted/15 overflow-hidden">
         <div className={`h-full rounded-full bg-current ${colorClass}`} style={{ width: `${clampPct(progress)}%` }} />
       </div>
     </div>
@@ -135,18 +136,11 @@ const SignalPill = ({
   connected: boolean;
   icon: ReactNode;
 }) => (
-  <div
-    className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 ${
-      connected
-        ? 'border-hw-accent/25 bg-hw-accent/5 text-hw-accent'
-        : 'border-hw-muted/20 bg-white/[0.02] text-hw-muted'
-    }`}
-  >
-    {icon}
-    <span className="text-[9px] font-mono uppercase tracking-[0.14em]">
-      {label} {connected ? 'online' : 'offline'}
-    </span>
-  </div>
+  <StatusPill
+    label={`${label} ${connected ? 'online' : 'offline'}`}
+    tone={connected ? 'ready' : 'neutral'}
+    icon={icon}
+  />
 );
 
 export const RecordingCockpit = ({
@@ -173,7 +167,7 @@ export const RecordingCockpit = ({
   const activeHrZoneIndex = getActiveHrZoneIndex(currentData.hr, userProfile.maxHr);
   const activeHrZone = activeHrZoneIndex >= 0 ? HR_ZONES[activeHrZoneIndex] : null;
   const hrZoneLabel = activeHrZone?.label || 'IDLE';
-  const hrZoneColor = activeHrZone?.color || 'text-hw-muted';
+  const hrZoneColor = activeHrZone?.color || 'text-vp-muted';
   const hrCardAura = activeHrZoneIndex >= 0 ? HR_CARD_AURAS[activeHrZoneIndex] : null;
   const hrCardStyle = hrCardAura
     ? {
@@ -185,17 +179,15 @@ export const RecordingCockpit = ({
   const hrrInProgress = hrrStatus === 'buffer' || hrrStatus === 'measuring';
 
   return (
-    <div className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-2 md:px-4 pb-4">
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-white/10 opacity-40" />
-
-      <div className="relative shrink-0 flex flex-col gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-1 md:px-2 pb-4">
+      <div className="relative shrink-0 flex flex-col gap-3 rounded-lg border border-vp-border bg-white/[0.03] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-2 w-2 rounded-full bg-hw-accent shadow-[0_0_10px_rgba(0,255,170,0.45)]" />
+          <div className="h-2.5 w-2.5 rounded-full bg-vp-accent shadow-[0_0_12px_rgba(53,240,189,0.45)]" />
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-hw-muted">Recording</div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <div className="vp-label">Recording</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-vp-text">
               <span>Ride cockpit</span>
-              <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-hw-muted">
+              <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted">
                 Live
               </span>
             </div>
@@ -209,31 +201,27 @@ export const RecordingCockpit = ({
             <button
               onClick={onOpenChart}
               disabled={!chartAvailable}
-              className="flex items-center gap-2 rounded-md border border-hw-accent/25 bg-hw-accent/8 px-2.5 py-1.5 text-hw-accent transition-colors hover:border-hw-accent/45 hover:bg-hw-accent/15 disabled:pointer-events-none disabled:border-hw-muted/15 disabled:bg-white/[0.02] disabled:text-hw-muted/45"
+              className="vp-button vp-focus-ring border-vp-accent/25 bg-vp-accent/8 text-vp-accent hover:border-vp-accent/45 hover:bg-vp-accent/15 disabled:border-vp-border disabled:bg-white/[0.02] disabled:text-vp-dim"
               title={chartAvailable ? 'Open live telemetry chart' : 'Chart available after telemetry is recorded'}
             >
               <Activity size={12} />
-              <span className="text-[9px] font-mono uppercase tracking-[0.14em]">
-                Chart
-              </span>
+              Chart
             </button>
           )}
           <button
             onClick={onStartHrr}
             disabled={!canStartHrr || hrrInProgress}
-            className="flex items-center gap-2 rounded-md border border-red-400/25 bg-red-400/8 px-2.5 py-1.5 text-red-300 transition-colors hover:border-red-300/45 hover:bg-red-400/15 disabled:pointer-events-none disabled:opacity-35"
+            className="vp-button vp-button-danger vp-focus-ring disabled:opacity-35"
             title={canStartHrr ? 'Mulai ukur HRR' : 'HRR tersedia saat recording, HR online, bike online, dan sepeda idle'}
           >
             <Heart size={12} />
-            <span className="text-[9px] font-mono uppercase tracking-[0.14em]">
-              {hrrInProgress ? 'HRR running' : 'Ukur HRR'}
-            </span>
+            {hrrInProgress ? 'HRR running' : 'Ukur HRR'}
           </button>
-          <div className={`flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 ${hrZoneColor}`}>
+          <div className={`flex items-center gap-2 rounded-md border border-vp-border bg-white/[0.03] px-2.5 py-1.5 ${hrZoneColor}`}>
             <Radio size={12} />
             <span className="text-[9px] font-mono uppercase tracking-[0.14em]">Zone {hrZoneLabel}</span>
           </div>
-          <div className="ml-auto flex items-center gap-3 text-hw-accent lg:ml-3">
+          <div className="ml-auto flex items-center gap-3 text-vp-accent lg:ml-3">
             <Timer size={18} />
             <div className="font-mono text-3xl md:text-4xl font-black leading-none tabular-nums">
               {workout.formatTime(workout.elapsed)}
@@ -267,15 +255,15 @@ export const RecordingCockpit = ({
           isWaiting={!power}
         />
         <MainMetric
-          label="Distance"
-          value={distanceKm}
-          unit="KM"
-          icon={<ChevronRight size={14} />}
-          colorClass="text-purple-300"
-          subLabel="Speed"
-          subValue={speed > 0 ? `${speed.toFixed(1)} KM/H` : 'Waiting'}
-          visual={<DistanceVisual distanceMeters={currentData.distance || 0} currentSpeedKmh={speed} />}
-          isWaiting={!currentData.distance}
+          label="Cadence"
+          value={cadence || '--'}
+          unit="RPM"
+          icon={<Bike size={14} />}
+          colorClass="text-vp-cadence"
+          subLabel="Max"
+          subValue={`${liveStats.maxCadence || 0} RPM`}
+          visual={<CadenceGauge value={cadence} max={liveStats.maxCadence || 0} />}
+          isWaiting={!cadence}
         />
       </div>
 
@@ -291,14 +279,14 @@ export const RecordingCockpit = ({
           isWaiting={!speed}
         />
         <StripMetric
-          label="Cadence"
-          value={cadence || '--'}
-          unit="RPM"
-          icon={<Bike size={13} />}
-          colorClass="text-hw-accent"
-          progress={(cadence / 120) * 100}
-          detail={cadence ? `max ${liveStats.maxCadence || 0}` : 'waiting'}
-          isWaiting={!cadence}
+          label="Distance"
+          value={distanceKm}
+          unit="KM"
+          icon={<ChevronRight size={13} />}
+          colorClass="text-vp-distance"
+          progress={currentData.distance ? ((currentData.distance / 1000) % 10) * 10 : 0}
+          detail={speed > 0 ? `${speed.toFixed(1)} km/h` : 'waiting'}
+          isWaiting={!currentData.distance}
         />
         <StripMetric
           label="Calories"
