@@ -10,6 +10,7 @@ import { validateGoogleConfig, validateSupabaseConfig } from '@/lib/config-valid
 import { ProfileTab } from './settings/ProfileTab';
 import { SystemTab } from './settings/SystemTab';
 import { MasterLock } from './settings/MasterLock';
+import { IconButton, SegmentedControl } from './ui';
 
 interface UserProfile {
   age: number;
@@ -142,40 +143,39 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
   };
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-vp-bg/85 p-4 backdrop-blur-xl">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="hardware-card border-hw-accent/20 bg-hw-bg max-w-xl w-full shadow-2xl relative p-0 overflow-hidden"
+        className="vp-panel-raised relative max-h-[92dvh] w-full max-w-2xl overflow-hidden p-0 shadow-2xl"
       >
-        <button 
+        <IconButton
           onClick={onClose}
-          className="absolute right-6 top-6 z-10 text-hw-muted hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
+          className="absolute right-4 top-4 z-10"
+          label="Close settings"
+          icon={<X size={17} />}
+        />
 
-        {/* Tabs */}
-        <div className="flex border-b border-white/5">
-          <button 
-            onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-4 text-[10px] font-mono uppercase tracking-widest transition-all ${activeTab === 'profile' ? 'bg-hw-accent/10 text-hw-accent border-b-2 border-hw-accent' : 'text-hw-muted hover:text-white'}`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <User size={14} /> User Profile
+        <div className="border-b border-vp-border p-5 pr-16">
+          <div className="vp-label">Settings</div>
+          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-normal text-vp-text">Configuration</h2>
+              <p className="mt-1 text-sm text-vp-muted">Profile calibration and integration settings.</p>
             </div>
-          </button>
-          <button 
-            onClick={() => setActiveTab('system')}
-            className={`flex-1 py-4 text-[10px] font-mono uppercase tracking-widest transition-all ${activeTab === 'system' ? 'bg-hw-accent/10 text-hw-accent border-b-2 border-hw-accent' : 'text-hw-muted hover:text-white'}`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <Settings size={14} /> System Config
-            </div>
-          </button>
+            <SegmentedControl
+              ariaLabel="Settings tab"
+              value={activeTab}
+              options={[
+                { label: <span className="inline-flex items-center gap-2"><User size={13} /> Profile</span>, value: 'profile' },
+                { label: <span className="inline-flex items-center gap-2"><Settings size={13} /> System</span>, value: 'system' },
+              ]}
+              onChange={(value) => setActiveTab(value as 'profile' | 'system')}
+            />
+          </div>
         </div>
 
-        <div className="p-8">
+        <div className="max-h-[calc(92dvh-132px)] overflow-y-auto p-5 custom-scrollbar md:p-7">
           <AnimatePresence mode="wait">
             {activeTab === 'profile' ? (
               <ProfileTab 

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
-import { User, Target, Zap, Save } from 'lucide-react';
-import { DEFAULT_PROFILE, calculateMaxHr } from '@/lib/constants';
+import { Save, Target, User, Zap } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { calculateMaxHr } from '@/lib/constants';
 
 interface UserProfile {
   age: number;
@@ -16,80 +17,96 @@ interface ProfileTabProps {
   saveStatus: string;
 }
 
+interface NumberFieldProps {
+  label: string;
+  value: number;
+  icon: ReactNode;
+  readOnly?: boolean;
+  suffix?: string;
+  onChange?: (value: number) => void;
+}
+
+const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }: NumberFieldProps) => (
+  <div className="space-y-2">
+    <label className="vp-label flex items-center gap-2">
+      {icon}
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        type="number"
+        value={value ?? ''}
+        readOnly={readOnly}
+        onChange={(e) => onChange?.(parseInt(e.target.value) || 0)}
+        className={`vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 pr-16 font-mono text-vp-text outline-none transition-colors focus:border-vp-accent/50 ${readOnly ? 'opacity-70' : ''}`}
+      />
+      {suffix && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-vp-bg px-1.5 text-[8px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+          {suffix}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
 export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileTabProps) => {
   return (
-    <motion.div 
+    <motion.div
       key="profile"
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 10 }}
       className="space-y-6"
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-              <User size={12} className="text-hw-accent" /> Age
-            </label>
-            <input 
-              type="number" 
-              value={profile.age ?? ''}
-              onChange={(e) => {
-                const age = parseInt(e.target.value) || 0;
-                setProfile({...profile, age, maxHr: calculateMaxHr(age)});
-              }}
-              className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono focus:border-hw-accent/50 outline-none transition-colors"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-              <Target size={12} className="text-red-500" /> Max Heart Rate (BPM)
-            </label>
-            <div className="relative">
-              <input 
-                type="number" 
-                value={profile.maxHr ?? ''}
-                readOnly
-                className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono focus:border-hw-accent/50 outline-none transition-colors opacity-70"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono text-hw-muted uppercase bg-hw-bg px-1">
-                Auto-Calc
-              </div>
-            </div>
-          </div>
-        </div>
-        <p className="text-[8px] font-mono text-hw-muted uppercase tracking-wider -mt-2">
-          Max HR calculated using Robergs & Landwehr formula (205.8 - 0.685 × age).
+      <div>
+        <div className="vp-label">Rider profile</div>
+        <p className="mt-2 text-sm leading-6 text-vp-muted">
+          These values calibrate heart-rate zones, power context, and ride summaries.
         </p>
-        <div className="space-y-2">
-          <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-            <Zap size={12} className="text-yellow-400" /> FTP (Watts)
-          </label>
-          <input 
-            type="number" 
-            value={profile.ftp ?? ''}
-            onChange={(e) => setProfile({...profile, ftp: parseInt(e.target.value) || 0})}
-            className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono focus:border-hw-accent/50 outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-            <User size={12} className="text-blue-400" /> Weight (KG)
-          </label>
-          <input 
-            type="number" 
-            value={profile.weight ?? ''}
-            onChange={(e) => setProfile({...profile, weight: parseInt(e.target.value) || 0})}
-            className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono focus:border-hw-accent/50 outline-none transition-colors"
-          />
-        </div>
       </div>
-      <button 
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <NumberField
+          label="Age"
+          value={profile.age}
+          icon={<User size={12} className="text-vp-accent" />}
+          suffix="Years"
+          onChange={(age) => setProfile({ ...profile, age, maxHr: calculateMaxHr(age) })}
+        />
+        <NumberField
+          label="Max Heart Rate"
+          value={profile.maxHr}
+          icon={<Target size={12} className="text-vp-hr" />}
+          suffix="Auto"
+          readOnly
+        />
+        <NumberField
+          label="FTP"
+          value={profile.ftp}
+          icon={<Zap size={12} className="text-vp-power" />}
+          suffix="Watts"
+          onChange={(ftp) => setProfile({ ...profile, ftp })}
+        />
+        <NumberField
+          label="Weight"
+          value={profile.weight}
+          icon={<User size={12} className="text-vp-speed" />}
+          suffix="KG"
+          onChange={(weight) => setProfile({ ...profile, weight })}
+        />
+      </div>
+
+      <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+        Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.
+      </div>
+
+      <button
         onClick={onSave}
         disabled={saveStatus === 'saving'}
-        className="w-full py-4 bg-hw-accent text-hw-bg font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all"
+        className="vp-focus-ring flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-50"
       >
-        <Save size={20} /> {saveStatus === 'saving' ? 'SAVING...' : 'SAVE PROFILE'}
+        <Save size={18} />
+        {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved' : 'Save Profile'}
       </button>
     </motion.div>
   );

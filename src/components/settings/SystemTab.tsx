@@ -37,23 +37,23 @@ export const SystemTab = ({
       className="space-y-6"
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
-            <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-              <Globe size={12} /> App URL
+            <label className="vp-label flex items-center gap-2">
+              <Globe size={12} className="text-vp-info" /> App URL
             </label>
             <input 
               type="text" 
               value={sysConfig.APP_URL || ''}
               onChange={(e) => setSysConfig({...sysConfig, APP_URL: e.target.value})}
               placeholder="http://localhost:3000"
-              className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono text-xs focus:border-hw-accent/50 outline-none transition-colors"
+              className="vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 font-mono text-xs text-vp-text outline-none transition-colors placeholder:text-vp-dim focus:border-vp-accent/50"
             />
           </div>
 
-          <div className="p-3 bg-hw-accent/5 border border-hw-accent/20 rounded-lg space-y-2">
+          <div className="space-y-2 rounded-lg border border-vp-accent/20 bg-vp-accent/5 p-3">
             <div className="flex items-center justify-between">
-              <label className="text-[9px] font-mono text-hw-accent uppercase tracking-widest flex items-center gap-2">
+              <label className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-vp-accent">
                 <CheckCircle size={10} /> Authorized Redirect URI
               </label>
               <button 
@@ -61,40 +61,40 @@ export const SystemTab = ({
                   const uri = `${sysConfig.APP_URL || 'http://localhost:3000'}/api/auth/callback`;
                   navigator.clipboard.writeText(uri);
                 }}
-                className="text-[9px] font-mono bg-hw-accent/10 hover:bg-hw-accent/20 text-hw-accent px-2 py-1 rounded transition-colors"
+                className="rounded bg-vp-accent/10 px-2 py-1 text-[9px] font-mono text-vp-accent transition-colors hover:bg-vp-accent/20"
               >
                 COPY URI
               </button>
             </div>
-            <code className="block text-[10px] text-white/70 font-mono break-all bg-black/20 p-2 rounded border border-white/5">
+            <code className="block break-all rounded border border-vp-border bg-vp-bg/50 p-2 font-mono text-[10px] text-vp-text/70">
               {`${sysConfig.APP_URL || 'http://localhost:3000'}/api/auth/callback`}
             </code>
-            <p className="text-[8px] text-hw-muted uppercase font-mono leading-tight">
+            <p className="text-[8px] text-vp-muted uppercase font-mono leading-tight">
               Pastikan URI ini terdaftar di Google Cloud Console {'>'} Credentials {'>'} Authorized redirect URIs.
             </p>
           </div>
         
-          <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+          <div className="grid grid-cols-1 gap-4 border-t border-vp-border pt-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-                <Key size={12} /> Google Client ID
+              <label className="vp-label flex items-center gap-2">
+                <Key size={12} className="text-vp-warning" /> Google Client ID
               </label>
               <input 
                 type="text" 
                 value={sysConfig.GOOGLE_CLIENT_ID || ''}
                 onChange={(e) => setSysConfig({...sysConfig, GOOGLE_CLIENT_ID: e.target.value})}
-                className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono text-[10px] focus:border-hw-accent/50 outline-none transition-colors"
+                className="vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 font-mono text-[10px] text-vp-text outline-none transition-colors focus:border-vp-accent/50"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-                <Lock size={12} /> Google Client Secret
+              <label className="vp-label flex items-center gap-2">
+                <Lock size={12} className="text-vp-warning" /> Google Client Secret
               </label>
               <input 
                 type="password" 
                 value={sysConfig.GOOGLE_CLIENT_SECRET || ''}
                 onChange={(e) => setSysConfig({...sysConfig, GOOGLE_CLIENT_SECRET: e.target.value})}
-                className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono text-[10px] focus:border-hw-accent/50 outline-none transition-colors"
+                className="vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 font-mono text-[10px] text-vp-text outline-none transition-colors focus:border-vp-accent/50"
               />
             </div>
           </div>
@@ -102,40 +102,40 @@ export const SystemTab = ({
             <button 
               onClick={onValidateGoogle}
               disabled={googleValidating}
-              className="py-2 px-4 bg-white/5 hover:bg-white/10 text-hw-muted hover:text-white rounded-lg flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider transition-all disabled:opacity-50"
+              className="vp-button vp-focus-ring"
             >
               {googleValidating ? <Loader2 size={12} className="animate-spin" /> : <Target size={12} />}
               Validasi Google
             </button>
             {googleValidStatus && (
-              <span className={`text-[10px] font-mono flex items-center gap-1 ${googleValidStatus.valid ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`text-[10px] font-mono flex items-center gap-1 ${googleValidStatus.valid ? 'text-vp-accent' : 'text-vp-danger'}`}>
                 {googleValidStatus.valid ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
                 {googleValidStatus.msg}
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+          <div className="grid grid-cols-1 gap-4 border-t border-vp-border pt-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-                <Server size={12} /> Supabase URL
+              <label className="vp-label flex items-center gap-2">
+                <Server size={12} className="text-vp-info" /> Supabase URL
               </label>
               <input 
                 type="text" 
                 value={sysConfig.NEXT_PUBLIC_SUPABASE_URL || ''}
                 onChange={(e) => setSysConfig({...sysConfig, NEXT_PUBLIC_SUPABASE_URL: e.target.value})}
-                className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono text-[10px] focus:border-hw-accent/50 outline-none transition-colors"
+                className="vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 font-mono text-[10px] text-vp-text outline-none transition-colors focus:border-vp-accent/50"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-mono text-hw-muted uppercase tracking-widest flex items-center gap-2">
-                <Lock size={12} /> Supabase Anon Key
+              <label className="vp-label flex items-center gap-2">
+                <Lock size={12} className="text-vp-info" /> Supabase Anon Key
               </label>
               <input 
                 type="password" 
                 value={sysConfig.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}
                 onChange={(e) => setSysConfig({...sysConfig, NEXT_PUBLIC_SUPABASE_ANON_KEY: e.target.value})}
-                className="w-full bg-hw-muted/5 border border-hw-muted/20 rounded-lg p-3 text-white font-mono text-[10px] focus:border-hw-accent/50 outline-none transition-colors"
+                className="vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 font-mono text-[10px] text-vp-text outline-none transition-colors focus:border-vp-accent/50"
               />
             </div>
           </div>
@@ -143,13 +143,13 @@ export const SystemTab = ({
             <button 
               onClick={onValidateSupabase}
               disabled={supabaseValidating}
-              className="py-2 px-4 bg-white/5 hover:bg-white/10 text-hw-muted hover:text-white rounded-lg flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider transition-all disabled:opacity-50"
+              className="vp-button vp-focus-ring"
             >
               {supabaseValidating ? <Loader2 size={12} className="animate-spin" /> : <Target size={12} />}
               Validasi Supabase
             </button>
             {supabaseValidStatus && (
-              <span className={`text-[10px] font-mono flex items-center gap-1 ${supabaseValidStatus.valid ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`text-[10px] font-mono flex items-center gap-1 ${supabaseValidStatus.valid ? 'text-vp-accent' : 'text-vp-danger'}`}>
                 {supabaseValidStatus.valid ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
                 {supabaseValidStatus.msg}
               </span>
@@ -160,7 +160,7 @@ export const SystemTab = ({
         <button 
           onClick={onSave}
           disabled={saveStatus === 'saving'}
-          className="w-full py-4 bg-hw-accent text-hw-bg font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all mt-4"
+          className="vp-focus-ring mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-50"
         >
           {saveStatus === 'saving' ? 'SAVING...' : saveStatus === 'success' ? 'SYSTEM UPDATED!' : 'APPLY CONFIGURATION'}
         </button>
