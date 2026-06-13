@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Activity, Minimize2 } from 'lucide-react';
 import {
   ComposedChart,
   Line,
@@ -11,6 +12,7 @@ import {
 } from 'recharts';
 import { downsample } from '../lib/chart-utils';
 import { HR_ZONES, POWER_ZONES, getSafeMaxHr } from '@/lib/constants';
+import { IconButton, SegmentedControl, StatusPill } from './ui';
 
 interface PerformanceChartProps {
   data: any[];
@@ -61,11 +63,11 @@ export const PerformanceChart = ({
 }: PerformanceChartProps) => {
   // Sliding window options (in seconds)
   const WINDOW_OPTIONS = [
-    { label: '15s', value: 15 },
-    { label: '30s', value: 30 },
-    { label: '1m',  value: 60 },
-    { label: '2m',  value: 120 },
-    { label: '5m',  value: 300 },
+    { label: '15s', value: '15' },
+    { label: '30s', value: '30' },
+    { label: '1m',  value: '60' },
+    { label: '2m',  value: '120' },
+    { label: '5m',  value: '300' },
   ];
   const [windowSeconds, setWindowSeconds] = useState(30);
 
@@ -99,11 +101,14 @@ export const PerformanceChart = ({
   const toggleLine = (key: string) => {
     setVisibleLines(prev => ({ ...prev, [key]: !prev[key] }));
   };
+  const handleWindowChange = (value: string) => {
+    setWindowSeconds(Number(value));
+  };
 
   // Metric definitions — left axis: hr, cadence; right axis: power, speed, etc.
   const metrics = [
     { key: 'hr',         name: 'HR',   color: '#ef4444', unit: 'BPM',  yAxisId: 'left' },
-    { key: 'cadence',    name: 'CAD',  color: '#00ff00', unit: 'RPM',  yAxisId: 'left' },
+    { key: 'cadence',    name: 'CAD',  color: '#35f0bd', unit: 'RPM',  yAxisId: 'left' },
     { key: 'power',      name: 'PWR',  color: '#facc15', unit: 'W',    yAxisId: 'right' },
     { key: 'speed',      name: 'SPD',  color: '#60a5fa', unit: 'KM/H', yAxisId: 'right' },
     { key: 'distance',   name: 'DIST', color: '#a78bfa', unit: 'KM',   yAxisId: 'right' },
@@ -115,42 +120,60 @@ export const PerformanceChart = ({
   const hrZones    = useMemo(() => getHrZones(userMaxHr),  [userMaxHr]);
 
   return (
-    <div className="hardware-card h-full flex flex-col">
+    <div className="vp-panel-raised h-full flex flex-col">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
+      <div className="mb-5 flex flex-col gap-4 border-b border-vp-border pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
           {onExit && (
-            <button
+            <IconButton
               onClick={onExit}
-              className="p-1.5 rounded-md bg-white/5 border border-white/10 text-hw-muted hover:text-white hover:bg-white/10 transition-all mr-2"
-              title="Exit Fullscreen"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v5H3M21 8h-5V3M3 16h5v5M16 21v-5h5"/></svg>
-            </button>
+              label="Exit telemetry view"
+              icon={<Minimize2 size={15} />}
+            />
           )}
-          <div className="stat-label">{title}</div>
-          {hrZone && (
-            <div className={`px-2.5 py-1 rounded text-[10px] font-bold tracking-widest ${hrZone.bg} ${hrZone.color}`}>
-              ZONE: {hrZone.label}
+            <div className="min-w-0">
+              <div className="vp-label flex items-center gap-2">
+                <Activity size={13} className="text-vp-accent" />
+                {title}
+              </div>
+              <div className="mt-1 text-xs text-vp-muted">
+                {mode === 'live' ? `Last ${windowSeconds}s telemetry window` : `${chartData.length} rendered points`}
+              </div>
             </div>
-          )}
-          {mode === 'live' && (
-            <div className="flex items-center gap-1 bg-hw-muted/5 border border-hw-muted/15 rounded p-0.5">
-              {WINDOW_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setWindowSeconds(opt.value)}
-                  className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest transition-all duration-150 ${
-                    windowSeconds === opt.value
-                      ? 'bg-hw-accent/20 text-hw-accent border border-hw-accent/30'
-                      : 'text-hw-muted hover:text-white'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {hrZone && (
+              <StatusPill label={`Zone ${hrZone.label}`} tone="ready" />
+            )}
+            {mode === 'live' && (
+              <SegmentedControl
+                ariaLabel="Telemetry time window"
+                value={String(windowSeconds)}
+                options={WINDOW_OPTIONS}
+                onChange={handleWindowChange}
+              />
+            )}
+            <div className="flex items-center gap-1 rounded-lg border border-vp-border bg-white/[0.03] p-1">
+              <button
+                onClick={() => setShowPowerZones(v => !v)}
+                className={`vp-focus-ring rounded-md px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] transition-colors ${
+                  showPowerZones ? 'bg-vp-power/15 text-vp-power' : 'text-vp-muted hover:text-vp-text'
+                }`}
+              >
+                FTP
+              </button>
+              <button
+                onClick={() => setShowHrZones(v => !v)}
+                className={`vp-focus-ring rounded-md px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] transition-colors ${
+                  showHrZones ? 'bg-vp-hr/15 text-vp-hr' : 'text-vp-muted hover:text-vp-text'
+                }`}
+              >
+                HR
+              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Metric toggles */}
@@ -160,38 +183,17 @@ export const PerformanceChart = ({
               key={m.key}
               id={`toggle-${m.key}`}
               onClick={() => toggleLine(m.key)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-all duration-200 ${
+              className={`vp-focus-ring flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 transition-colors ${
                 visibleLines[m.key]
-                  ? 'bg-white/10 border-white/20'
-                  : 'opacity-30 border-transparent grayscale hover:opacity-50'
+                  ? 'border-vp-border-strong bg-white/[0.08]'
+                  : 'border-transparent opacity-40 grayscale hover:bg-white/[0.04] hover:opacity-70'
               }`}
             >
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.color, boxShadow: `0 0 6px ${m.color}` }} />
-              <span className="text-[9px] font-mono text-white uppercase tracking-wider">{m.name}</span>
+              <span className="text-[9px] font-mono text-vp-text uppercase tracking-wider">{m.name}</span>
               <span className="text-[7px] font-mono opacity-40">{m.yAxisId === 'left' ? 'L' : 'R'}</span>
             </button>
           ))}
-
-          {/* Zone band toggles */}
-          <div className="w-px bg-white/10 mx-1" />
-          <button
-            onClick={() => setShowPowerZones(v => !v)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-all duration-200 ${
-              showPowerZones ? 'bg-yellow-400/10 border-yellow-400/20' : 'opacity-30 border-transparent'
-            }`}
-          >
-            <div className="w-1.5 h-1.5 rounded-sm bg-yellow-400/60" />
-            <span className="text-[9px] font-mono text-yellow-400 uppercase tracking-wider">FTP</span>
-          </button>
-          <button
-            onClick={() => setShowHrZones(v => !v)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-all duration-200 ${
-              showHrZones ? 'bg-red-400/10 border-red-400/20' : 'opacity-30 border-transparent'
-            }`}
-          >
-            <div className="w-1.5 h-1.5 rounded-sm bg-red-400/60" />
-            <span className="text-[9px] font-mono text-red-400 uppercase tracking-wider">HR</span>
-          </button>
         </div>
       </div>
 
@@ -270,8 +272,8 @@ export const PerformanceChart = ({
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
                     return (
-                      <div className="bg-hw-bg/95 backdrop-blur-xl border border-white/10 p-3 rounded-lg shadow-2xl font-mono text-[10px]">
-                        <div className="text-hw-muted mb-2 border-b border-white/5 pb-1 uppercase tracking-widest">{label}</div>
+                      <div className="rounded-lg border border-vp-border bg-vp-bg/95 p-3 font-mono text-[10px] shadow-2xl backdrop-blur-xl">
+                        <div className="mb-2 border-b border-vp-border pb-1 uppercase tracking-widest text-vp-muted">{label}</div>
                         <div className="space-y-1.5">
                           {payload.map((item: any) => {
                             const metricDef = metrics.find(m => m.name === item.name);
@@ -279,7 +281,7 @@ export const PerformanceChart = ({
                               <div key={item.name} className="flex items-center justify-between gap-6">
                                 <span className="flex items-center gap-1.5">
                                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
-                                  <span className="uppercase text-white/80">{item.name}</span>
+                                  <span className="uppercase text-vp-text/80">{item.name}</span>
                                 </span>
                                 <span className="font-bold tabular-nums" style={{ color: item.color }}>
                                   {item.value}
@@ -314,9 +316,12 @@ export const PerformanceChart = ({
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-full w-full flex items-center justify-center border border-white/5 rounded-lg bg-white/2">
-            <div className="text-[10px] font-mono text-hw-muted uppercase tracking-[0.2em] animate-pulse">
-              Waiting for session telemetry...
+          <div className="flex h-full w-full items-center justify-center rounded-lg border border-dashed border-vp-border bg-white/[0.02]">
+            <div className="text-center">
+              <Activity size={20} className="mx-auto mb-3 text-vp-muted" />
+              <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-vp-muted">
+                Waiting for session telemetry
+              </div>
             </div>
           </div>
         )}
