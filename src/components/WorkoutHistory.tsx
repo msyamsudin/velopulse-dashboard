@@ -7,6 +7,7 @@ import { HistoryDetail } from './history/HistoryDetail';
 import { Download, RefreshCw, Search, Upload, X } from 'lucide-react';
 import type { ImportTcxResult } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
+import { IconButton, SegmentedControl, StatusPill } from './ui';
 
 interface WorkoutHistoryProps {
   sessions: any[];
@@ -236,84 +237,73 @@ export const WorkoutHistory = ({
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
-          className="fixed inset-0 z-100 bg-hw-bg/95 backdrop-blur-xl p-4 md:p-8 flex flex-col overflow-y-auto"
+          className="fixed inset-0 z-100 flex flex-col overflow-y-auto bg-vp-bg/95 p-3 backdrop-blur-xl md:p-6"
         >
           <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight uppercase font-mono flex items-center gap-4">
-                  <span>Workout <span className="text-hw-accent">History</span></span>
-                  <div className="flex bg-hw-muted/10 p-1 rounded-lg text-xs ml-2 md:ml-4">
-                    <button
-                      onClick={() => setViewMode('sessions')}
-                      className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'sessions' ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
-                    >
-                      Sessions
-                    </button>
-                    <button
-                      onClick={() => setViewMode('summary')}
-                      className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'summary' ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
-                    >
-                      Summary
-                    </button>
-                  </div>
+            <div className="mb-5 flex flex-col gap-4 border-b border-vp-border pb-4 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <div className="vp-label">Review mode</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-normal text-vp-text">
+                  Training log
                 </h2>
-                <div className="text-hw-muted text-xs font-mono uppercase tracking-widest mt-1">
-                  Past workout telemetry data
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusPill label={`${sessions.length} sessions`} tone="neutral" />
+                  <StatusPill
+                    label={pendingSupabaseCount > 0 ? `${pendingSupabaseCount} pending sync` : 'Supabase synced'}
+                    tone={pendingSupabaseCount > 0 ? 'warning' : 'ready'}
+                  />
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-muted hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all"
-              >
-                Close Dashboard
-              </button>
+              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                <SegmentedControl
+                  ariaLabel="History view"
+                  value={viewMode}
+                  options={[
+                    { label: 'Sessions', value: 'sessions' },
+                    { label: 'Summary', value: 'summary' },
+                  ]}
+                  onChange={(value) => setViewMode(value as 'sessions' | 'summary')}
+                />
+                <button onClick={onClose} className="vp-button vp-focus-ring">
+                  Close
+                </button>
+              </div>
             </div>
 
             {viewMode === 'sessions' ? (
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Batch Export Control Panel */}
                 {sessions.length > 0 && (
-                  <div className="flex flex-col gap-4 mb-6 p-4 rounded-lg bg-hw-muted/5 border border-hw-muted/10 backdrop-blur-md">
+                  <div className="mb-5 flex flex-col gap-4 rounded-lg border border-vp-border bg-white/[0.03] p-4">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                       <div className="relative w-full lg:max-w-md">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-hw-muted" />
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-vp-muted" />
                         <input
                           value={sessionSearch}
                           onChange={(event) => setSessionSearch(event.target.value)}
                           placeholder="Search month, date, intensity, metric..."
-                          className="w-full rounded-lg border border-white/10 bg-black/20 py-2 pl-9 pr-9 text-xs text-white outline-none transition-colors placeholder:text-hw-muted focus:border-hw-accent/40 font-mono"
+                          className="vp-focus-ring w-full rounded-lg border border-vp-border bg-vp-bg/60 py-2.5 pl-9 pr-9 text-xs text-vp-text outline-none transition-colors placeholder:text-vp-muted focus:border-vp-accent/40 font-mono"
                         />
                         {sessionSearch && (
-                          <button
+                          <IconButton
                             onClick={() => setSessionSearch('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-hw-muted hover:text-white"
-                            title="Clear search"
-                          >
-                            <X size={13} />
-                          </button>
+                            className="absolute right-1.5 top-1/2 h-7 w-7 -translate-y-1/2"
+                            label="Clear search"
+                            icon={<X size={13} />}
+                          />
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-hw-muted">
-                        <span>Showing <span className="text-white">{filteredSessions.length}</span> of {sessions.length} sessions</span>
-                        <span className={`rounded border px-2 py-1 ${
-                          pendingSupabaseCount > 0
-                            ? 'border-yellow-400/25 bg-yellow-400/5 text-yellow-300'
-                            : 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
-                        }`}>
-                          Supabase {pendingSupabaseCount > 0 ? `${pendingSupabaseCount} pending` : 'synced'}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusPill label={`Showing ${filteredSessions.length} of ${sessions.length}`} tone="neutral" />
                         {pendingSupabaseCount > 0 && onSyncSupabasePending && (
-                          <button
+                          <IconButton
                             onClick={handleRetrySupabaseSync}
                             disabled={isSupabaseRetrying}
-                            title="Retry Supabase sync"
-                            aria-label="Retry Supabase sync"
-                            className="rounded border border-hw-accent/30 px-2 py-1 text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg disabled:opacity-40"
-                          >
-                            <RefreshCw size={10} className={isSupabaseRetrying ? 'animate-spin' : ''} />
-                          </button>
+                            label="Retry Supabase sync"
+                            icon={<RefreshCw size={13} className={isSupabaseRetrying ? 'animate-spin' : ''} />}
+                            tone="primary"
+                          />
                         )}
                       </div>
                     </div>
@@ -322,16 +312,16 @@ export const WorkoutHistory = ({
                       <div className="flex items-center gap-3">
                       <button
                         onClick={handleToggleSelectionMode}
-                        className={`px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest transition-all border ${
+                        className={`vp-button vp-focus-ring ${
                           isSelectionMode 
-                            ? 'bg-hw-accent text-hw-bg border-hw-accent font-bold' 
-                            : 'border-hw-muted/30 text-hw-muted hover:border-hw-accent hover:text-hw-accent'
+                            ? 'vp-button-primary' 
+                            : ''
                         }`}
                       >
-                        {isSelectionMode ? 'Cancel Batch' : '✓ Batch Export'}
+                        {isSelectionMode ? 'Cancel Batch' : 'Batch Export'}
                       </button>
                       {isSelectionMode && (
-                        <span className="text-[10px] font-mono uppercase text-hw-accent tracking-widest font-bold">
+                        <span className="text-[10px] font-mono uppercase text-vp-accent tracking-widest font-bold">
                           {visibleSelectedCount} of {filteredSessions.length} visible selected
                         </span>
                       )}
@@ -350,9 +340,9 @@ export const WorkoutHistory = ({
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isImporting}
-                            className="px-3 py-1.5 rounded bg-white/5 border border-white/10 text-white hover:border-hw-accent hover:text-hw-accent font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-1.5"
+                            className="vp-button vp-focus-ring"
                           >
-                            <Upload size={10} />
+                            <Upload size={13} />
                             {isImporting ? 'Importing' : 'Import TCX'}
                           </button>
                         )}
@@ -360,24 +350,24 @@ export const WorkoutHistory = ({
                           <>
                           <button
                             onClick={visibleSelectedCount === filteredSessions.length ? handleClearSelection : handleSelectAll}
-                            className="px-3 py-1.5 rounded border border-white/10 text-white hover:border-white/30 font-mono text-[10px] uppercase tracking-widest transition-all"
+                            className="vp-button vp-focus-ring"
                           >
                             {visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible'}
                           </button>
                           <button
                             onClick={handleExportCombined}
                             disabled={selectedSessionIds.length === 0}
-                            className="px-3 py-1.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500 hover:text-black font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                            className="vp-button vp-focus-ring border-vp-warning/30 bg-vp-warning/10 text-vp-warning hover:bg-vp-warning hover:text-vp-bg"
                           >
-                            <Download size={10} />
+                            <Download size={13} />
                             Combined TCX
                           </button>
                           <button
                             onClick={handleExportZip}
                             disabled={selectedSessionIds.length === 0}
-                            className="px-3 py-1.5 rounded bg-hw-accent/10 border border-hw-accent/30 text-hw-accent hover:bg-hw-accent hover:text-hw-bg font-mono text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                            className="vp-button vp-focus-ring border-vp-accent/30 bg-vp-accent/10 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
                           >
-                            <Download size={10} />
+                            <Download size={13} />
                             ZIP (Individual)
                           </button>
                           </>
@@ -385,7 +375,7 @@ export const WorkoutHistory = ({
                       </div>
                     </div>
                     {importNotice && (
-                      <div className="rounded border border-hw-accent/20 bg-hw-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-accent">
+                      <div className="rounded border border-vp-accent/20 bg-vp-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-vp-accent">
                         {importNotice}
                       </div>
                     )}
@@ -406,7 +396,7 @@ export const WorkoutHistory = ({
                       <button
                         onClick={handleLoadOlder}
                         disabled={isLoadingOlder}
-                        className="inline-flex items-center gap-2 rounded border border-hw-accent/30 px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg disabled:opacity-40"
+                        className="vp-button vp-focus-ring border-vp-accent/30 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
                       >
                         <RefreshCw size={12} className={isLoadingOlder ? 'animate-spin' : ''} />
                         {isLoadingOlder ? 'Loading older' : 'Load older workouts'}
@@ -439,8 +429,8 @@ export const WorkoutHistory = ({
               />
             )}
 
-            <div className="mt-4 pt-6 border-t border-white/5 text-[10px] font-mono text-hw-muted uppercase tracking-[0.4em] text-center">
-              Secured via Cloud Telemetry
+            <div className="mt-4 border-t border-vp-border pt-5 text-center text-[10px] font-mono uppercase tracking-[0.24em] text-vp-muted">
+              Cloud telemetry archive
             </div>
           </div>
         </motion.div>
