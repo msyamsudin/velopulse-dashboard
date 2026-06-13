@@ -32,8 +32,10 @@ export const SyncActionBar = ({ onSync, isPending, isSuccess, isError }: SyncAct
               : 'Workout complete. Session data is ready to sync'}
         </InlineNotice>
         <button
+          type="button"
           onClick={onSync}
           disabled={isPending || isSuccess}
+          aria-label={isError ? 'Retry Google Fit sync' : 'Sync workout to Google Fit'}
           className={`vp-focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors disabled:pointer-events-none disabled:opacity-50 ${
             isError
               ? 'border border-vp-danger/35 bg-vp-danger/10 text-vp-danger hover:bg-vp-danger/15'

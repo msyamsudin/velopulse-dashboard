@@ -265,7 +265,7 @@ export const WorkoutHistory = ({
                   ]}
                   onChange={(value) => setViewMode(value as 'sessions' | 'summary')}
                 />
-                <button onClick={onClose} className="vp-button vp-focus-ring">
+                <button type="button" onClick={onClose} className="vp-button vp-focus-ring" aria-label="Close training log">
                   Close
                 </button>
               </div>
@@ -311,7 +311,9 @@ export const WorkoutHistory = ({
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="flex items-center gap-3">
                       <button
+                        type="button"
                         onClick={handleToggleSelectionMode}
+                        aria-label={isSelectionMode ? 'Cancel batch export selection' : 'Start batch export selection'}
                         className={`vp-button vp-focus-ring ${
                           isSelectionMode 
                             ? 'vp-button-primary' 
@@ -338,8 +340,10 @@ export const WorkoutHistory = ({
                         />
                         {onImportTCX && (
                           <button
+                            type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isImporting}
+                            aria-label="Import TCX workout files"
                             className="vp-button vp-focus-ring"
                           >
                             <Upload size={13} />
@@ -349,22 +353,28 @@ export const WorkoutHistory = ({
                         {isSelectionMode && (
                           <>
                           <button
+                            type="button"
                             onClick={visibleSelectedCount === filteredSessions.length ? handleClearSelection : handleSelectAll}
+                            aria-label={visibleSelectedCount === filteredSessions.length ? 'Deselect visible sessions' : 'Select visible sessions'}
                             className="vp-button vp-focus-ring"
                           >
                             {visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible'}
                           </button>
                           <button
+                            type="button"
                             onClick={handleExportCombined}
                             disabled={selectedSessionIds.length === 0}
+                            aria-label="Export selected sessions as one combined TCX file"
                             className="vp-button vp-focus-ring border-vp-warning/30 bg-vp-warning/10 text-vp-warning hover:bg-vp-warning hover:text-vp-bg"
                           >
                             <Download size={13} />
                             Combined TCX
                           </button>
                           <button
+                            type="button"
                             onClick={handleExportZip}
                             disabled={selectedSessionIds.length === 0}
+                            aria-label="Export selected sessions as individual TCX files in a ZIP"
                             className="vp-button vp-focus-ring border-vp-accent/30 bg-vp-accent/10 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
                           >
                             <Download size={13} />
@@ -394,8 +404,10 @@ export const WorkoutHistory = ({
                   {hasMoreSupabaseHistory && !sessionSearch && (
                     <div className="mt-6 flex justify-center">
                       <button
+                        type="button"
                         onClick={handleLoadOlder}
                         disabled={isLoadingOlder}
+                        aria-label="Load older workouts"
                         className="vp-button vp-focus-ring border-vp-accent/30 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
                       >
                         <RefreshCw size={12} className={isLoadingOlder ? 'animate-spin' : ''} />

@@ -23,8 +23,10 @@ export const DevicePanel = ({
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button 
+            type="button"
             onClick={connectHeartRate}
             disabled={hrConnected}
+            aria-label={hrConnected ? 'Heart rate monitor connected' : 'Connect heart rate monitor'}
             className={`vp-focus-ring group flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors disabled:pointer-events-none ${
               hrConnected ? 'border-vp-accent/45 bg-vp-accent/8' : 'border-vp-border bg-white/[0.02] hover:border-vp-accent/30 hover:bg-white/[0.04]'
             }`}
@@ -46,8 +48,10 @@ export const DevicePanel = ({
           </button>
 
           <button 
+            type="button"
             onClick={connectBike}
             disabled={bikeConnected}
+            aria-label={bikeConnected ? 'Stationary bike connected' : 'Connect stationary bike'}
             className={`vp-focus-ring group flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors disabled:pointer-events-none ${
               bikeConnected ? 'border-vp-accent/45 bg-vp-accent/8' : 'border-vp-border bg-white/[0.02] hover:border-vp-accent/30 hover:bg-white/[0.04]'
             }`}

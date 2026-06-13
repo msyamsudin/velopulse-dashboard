@@ -92,10 +92,15 @@ export const PreRideCockpit = ({
     : sensorCount === 1
       ? 'One core sensor is online. You can start with partial telemetry.'
       : 'You can start now, but live telemetry will be limited.';
+  const handleDisconnect = () => {
+    if (confirm('Disconnect all devices? You will need to reconnect before recording live telemetry.')) {
+      onDisconnect();
+    }
+  };
 
   return (
     <div className="grid h-full min-h-[620px] grid-cols-1 gap-4 p-1 md:p-2 xl:grid-cols-[1.05fr_0.95fr]">
-      <div className="grid min-h-0 grid-cols-1 gap-4">
+      <div className="grid min-h-0 content-start grid-cols-1 gap-4">
         <Panel raised className="flex min-h-[340px] flex-col justify-between">
           <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -139,7 +144,9 @@ export const PreRideCockpit = ({
             </div>
             <div className="flex flex-col gap-2 sm:min-w-56">
               <button
+                type="button"
                 onClick={onStart}
+                aria-label="Start workout session"
                 className="vp-focus-ring flex min-h-14 items-center justify-center gap-3 rounded-lg bg-vp-accent px-7 py-4 text-sm font-black uppercase tracking-[0.16em] text-vp-bg transition-colors hover:bg-vp-accent/90"
               >
                 <Play size={20} fill="currentColor" />
@@ -147,7 +154,9 @@ export const PreRideCockpit = ({
               </button>
               {sensorCount > 0 && (
                 <button
-                  onClick={onDisconnect}
+                  type="button"
+                  onClick={handleDisconnect}
+                  aria-label="Disconnect all connected devices"
                   className="vp-button vp-button-danger vp-focus-ring"
                 >
                   Disconnect devices

@@ -203,6 +203,12 @@ export default function App() {
     });
   };
 
+  const handleStopRecording = () => {
+    if (confirm('Stop this workout session?')) {
+      toggleRecording();
+    }
+  };
+
   const currentData = {
     hr: bleData.heartRate || 0,
     cadence: bleData.cadence || 0,
@@ -446,7 +452,10 @@ export default function App() {
               height: 40,
               borderRadius: '8px'
             }}
-            onClick={toggleRecording}
+            type="button"
+            onClick={handleStopRecording}
+            aria-label="Stop workout session"
+            title="Stop workout session"
             className="vp-focus-ring fixed top-6 right-6 z-100 group flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-vp-danger/30 bg-vp-danger/10 text-vp-danger shadow-2xl backdrop-blur-sm transition-colors hover:border-vp-danger/60 hover:bg-vp-danger hover:text-white"
           >
             {/* The Stealth Dot (Normal state) */}

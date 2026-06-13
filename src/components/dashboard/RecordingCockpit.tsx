@@ -199,8 +199,10 @@ export const RecordingCockpit = ({
           <SignalPill label="Bike" connected={bikeConnected} icon={<Bike size={12} />} />
           {onOpenChart && (
             <button
+              type="button"
               onClick={onOpenChart}
               disabled={!chartAvailable}
+              aria-label={chartAvailable ? 'Open live telemetry chart' : 'Live telemetry chart unavailable until data is recorded'}
               className="vp-button vp-focus-ring border-vp-accent/25 bg-vp-accent/8 text-vp-accent hover:border-vp-accent/45 hover:bg-vp-accent/15 disabled:border-vp-border disabled:bg-white/[0.02] disabled:text-vp-dim"
               title={chartAvailable ? 'Open live telemetry chart' : 'Chart available after telemetry is recorded'}
             >
@@ -209,8 +211,10 @@ export const RecordingCockpit = ({
             </button>
           )}
           <button
+            type="button"
             onClick={onStartHrr}
             disabled={!canStartHrr || hrrInProgress}
+            aria-label={hrrInProgress ? 'Heart rate recovery measurement running' : 'Start heart rate recovery measurement'}
             className="vp-button vp-button-danger vp-focus-ring disabled:opacity-35"
             title={canStartHrr ? 'Mulai ukur HRR' : 'HRR tersedia saat recording, HR online, bike online, dan sepeda idle'}
           >

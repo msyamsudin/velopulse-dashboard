@@ -78,6 +78,11 @@ export const SessionSummaryModal = ({
 
     downloadTCX(tempSession as any);
   };
+  const handleDiscard = () => {
+    if (confirm('Discard this workout? Unsaved session data will be lost.')) {
+      onDiscard();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-vp-bg/90 p-4 backdrop-blur-xl">
@@ -137,22 +142,28 @@ export const SessionSummaryModal = ({
 
           <div className="grid grid-cols-1 gap-3 border-t border-vp-border pt-5 md:grid-cols-3">
             <button
+              type="button"
               onClick={onSave}
+              aria-label="Save workout session"
               className="vp-focus-ring flex min-h-12 items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90"
             >
               <Save size={18} />
               Save
             </button>
             <button
+              type="button"
               onClick={handleExport}
               disabled={!canExport}
+              aria-label={canExport ? 'Export workout as TCX' : 'Export unavailable until session data is ready'}
               className="vp-button vp-focus-ring min-h-12 text-vp-accent disabled:text-vp-muted"
             >
               <Download size={18} />
               Export TCX
             </button>
             <button
-              onClick={onDiscard}
+              type="button"
+              onClick={handleDiscard}
+              aria-label="Discard unsaved workout session"
               className="vp-button vp-button-danger vp-focus-ring min-h-12"
             >
               <Trash2 size={18} />
