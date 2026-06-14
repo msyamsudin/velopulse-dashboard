@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Activity, Download, Trophy } from 'lucide-react';
-import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import { generateSummaryInsights, getInsightToneClasses, getPersonalRecords } from '../../lib/workout-analysis';
 import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../../lib/export-service';
 
@@ -83,6 +83,8 @@ export const HistorySummary = ({
   setOffsetDays
 }: HistorySummaryProps) => {
   const [recordRange, setRecordRange] = useState<'30d' | '90d' | 'all'>('all');
+  const [averageDisplayMode, setAverageDisplayMode] = useState<'hidden' | 'flat' | 'trend'>('hidden');
+  const [chartValueMode, setChartValueMode] = useState<'period' | 'cumulative'>('period');
 
   if (!globalSummary) return null;
 
@@ -94,19 +96,123 @@ export const HistorySummary = ({
     { value: 'all', label: 'ALL' },
   ] as const;
 
-  const values = normalizedChartData.map(d => d[weeklyMetric] as number);
-  const maxVal = Math.max(...values, 0.001);
+  const denseData = normalizedChartData.length > 45;
+  const barScrollable = normalizedChartData.length > 14;
+  const compactLabels = normalizedChartData.length > 20;
+  const formatChartMetric = (value: number) => weeklyMetric === 'distance' ? value.toFixed(1) : `${Math.round(value)}`;
+  const chartData = useMemo(() => {
+    let cumulativeTotal = 0;
+    let cumulativeCadenceTotal = 0;
+    let cumulativeCadenceCount = 0;
+    let runningAverageTotal = 0;
+    let runningAverageCount = 0;
+
+    return normalizedChartData.map((point, index) => {
+      const metricValue = Number(point[weeklyMetric]) || 0;
+      const hasData = Boolean(point.hasData);
+      const showSubLabel = !compactLabels || hasData || point.isHighlight;
+      const showMainLabel = !compactLabels || hasData || point.isHighlight || index % 3 === 0;
+      cumulativeTotal += metricValue;
+
+      if (weeklyMetric === 'cadence' && hasData) {
+        cumulativeCadenceTotal += metricValue;
+        cumulativeCadenceCount += 1;
+      }
+
+      const cumulativeValue = weeklyMetric === 'cadence'
+        ? cumulativeCadenceCount > 0 ? cumulativeCadenceTotal / cumulativeCadenceCount : 0
+        : cumulativeTotal;
+      const displayValue = chartValueMode === 'cumulative' ? cumulativeValue : metricValue;
+      let averageTrendValue: number | null = null;
+
+      if (hasData) {
+        runningAverageTotal += displayValue;
+        runningAverageCount += 1;
+        averageTrendValue = runningAverageTotal / runningAverageCount;
+      }
+
+      return {
+        ...point,
+        metricValue,
+        cumulativeValue,
+        displayValue,
+        averageTrendValue,
+        metricLabel: formatChartMetric(metricValue),
+        cumulativeLabel: formatChartMetric(cumulativeValue),
+        displayMetricLabel: formatChartMetric(displayValue),
+        averageTrendLabel: averageTrendValue === null ? '' : formatChartMetric(averageTrendValue),
+        showMainLabel,
+        showSubLabel,
+      };
+    });
+  }, [normalizedChartData, weeklyMetric, compactLabels, chartValueMode]);
+  const chartStats = useMemo(() => {
+    return chartData.reduce((stats, point) => {
+      const metricValue = point.displayValue;
+
+      if (metricValue > stats.maxVal) stats.maxVal = metricValue;
+      if (point.hasData) {
+        stats.activePeriods += 1;
+        stats.averageTotal += metricValue;
+        stats.averageCount += 1;
+      }
+      if (!stats.peakPoint || metricValue > stats.peakPoint.displayValue) {
+        stats.peakPoint = point;
+      }
+
+      return stats;
+    }, {
+      maxVal: 0.001,
+      activePeriods: 0,
+      averageTotal: 0,
+      averageCount: 0,
+      peakPoint: chartData[0],
+    } as {
+      maxVal: number;
+      activePeriods: number;
+      averageTotal: number;
+      averageCount: number;
+      peakPoint: typeof chartData[number] | undefined;
+    });
+  }, [chartData]);
+  const maxVal = chartStats.maxVal;
   const unit = weeklyMetric === 'distance' ? 'km' : weeklyMetric === 'calories' ? 'kcal' : weeklyMetric === 'duration' ? 'min' : 'rpm';
   const metricColor = weeklyMetric === 'distance' ? '#00d2ff' : weeklyMetric === 'calories' ? '#f472b6' : weeklyMetric === 'duration' ? '#fbbf24' : '#00ffaa';
   const metricColorRgba = weeklyMetric === 'distance' ? '0,210,255' : weeklyMetric === 'calories' ? '244,114,182' : weeklyMetric === 'duration' ? '251,191,36' : '0,255,170';
-  const denseData = normalizedChartData.length > 45;
-  const barScrollable = normalizedChartData.length > 14;
   const effectiveChartType = denseData && chartType === 'bar' ? 'line' : chartType;
-  const compactLabels = normalizedChartData.length > 20;
-  const activePeriods = normalizedChartData.filter(d => d.hasData).length;
-  const peakPoint = normalizedChartData.reduce((best, current) =>
-    (current[weeklyMetric] as number) > (best?.[weeklyMetric] as number ?? -1) ? current : best
-    , normalizedChartData[0]);
+  const activePeriods = chartStats.activePeriods;
+  const averageLineValue = chartStats.averageCount > 0 ? chartStats.averageTotal / chartStats.averageCount : 0;
+  const averageLinePct = maxVal > 0 ? Math.min(100, Math.max(0, (averageLineValue / maxVal) * 100)) : 0;
+  const averageLineLabel = weeklyMetric === 'distance'
+    ? averageLineValue.toFixed(1)
+    : `${Math.round(averageLineValue)}`;
+  const hasAverageLineData = chartStats.averageCount > 0;
+  const showFlatAverage = averageDisplayMode === 'flat' && hasAverageLineData;
+  const showTrendAverage = averageDisplayMode === 'trend' && hasAverageLineData;
+  const averageTrendPoints = useMemo(() => {
+    const activePoints = chartData
+      .map((point, index) => ({
+        index,
+        value: typeof point.averageTrendValue === 'number' ? point.averageTrendValue : null,
+      }))
+      .filter((point): point is { index: number; value: number } => point.value !== null);
+
+    if (activePoints.length === 0) return '';
+
+    const denominator = Math.max(chartData.length - 1, 1);
+    return activePoints
+      .map(point => {
+        const x = (point.index / denominator) * 100;
+        const y = 100 - Math.min(100, Math.max(0, (point.value / maxVal) * 100));
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }, [chartData, maxVal]);
+  const peakPoint = chartStats.peakPoint;
+  const chartSummaryPoint = chartValueMode === 'cumulative' ? chartData[chartData.length - 1] : peakPoint;
+  const chartValueModeLabel = chartValueMode === 'cumulative'
+    ? weeklyMetric === 'cadence' ? 'running avg' : 'running total'
+    : weeklyMetric;
   const periodLabel = summaryPeriod === 'daily'
     ? 'Daily Trends'
     : summaryPeriod === 'weekly'
@@ -131,13 +237,13 @@ export const HistorySummary = ({
     { value: 'cadence', label: 'RPM' },
   ] as const;
   const shiftDays = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
-  const autoInsights = generateSummaryInsights({
+  const autoInsights = useMemo(() => generateSummaryInsights({
     comparisonSummary,
     summaryInsights,
     globalSummary,
     weeklyDailyData,
     rangeLabel,
-  });
+  }), [comparisonSummary, summaryInsights, globalSummary, weeklyDailyData, rangeLabel]);
   const recordRangeOptions = [
     { value: '30d', label: '30D' },
     { value: '90d', label: '90D' },
@@ -156,7 +262,7 @@ export const HistorySummary = ({
       return !Number.isNaN(sessionDate.getTime()) && sessionDate >= start;
     });
   }, [sessions, recordRange]);
-  const personalRecords = getPersonalRecords(recordSessions);
+  const personalRecords = useMemo(() => getPersonalRecords(recordSessions), [recordSessions]);
 
   return (
     <div className="pb-8 flex flex-col gap-4">
@@ -415,7 +521,7 @@ export const HistorySummary = ({
 
               <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5 xl:min-w-[430px]">
                 <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Display</div>
-                <div className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)_132px_76px] gap-2">
                   <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8 bg-black/20">
                     <button
                       onClick={() => setChartType('bar')}
@@ -443,6 +549,30 @@ export const HistorySummary = ({
                       </button>
                     ))}
                   </div>
+
+                  <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-white/8 bg-black/20" title="Average line display mode">
+                    {[
+                      { value: 'hidden', label: 'OFF' },
+                      { value: 'flat', label: 'AVG' },
+                      { value: 'trend', label: 'LINE' },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => setAverageDisplayMode(option.value as typeof averageDisplayMode)}
+                        className={`px-2 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${averageDisplayMode === option.value ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setChartValueMode(chartValueMode === 'period' ? 'cumulative' : 'period')}
+                    className={`rounded-lg border px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartValueMode === 'cumulative' ? 'border-hw-accent/40 bg-hw-accent text-hw-bg' : 'border-white/8 bg-black/20 text-hw-muted hover:text-white'}`}
+                    title={weeklyMetric === 'cadence' ? 'Show running average cadence' : 'Show running total progress'}
+                  >
+                    TOTAL
+                  </button>
                 </div>
               </div>
             </div>
@@ -454,17 +584,18 @@ export const HistorySummary = ({
                 <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-[0.16em] text-white/60">
                   <span>{activePeriods} active periods</span>
                   <span>{effectiveChartType} view</span>
-                  <span>{weeklyMetric}</span>
+                  <span>{chartValueModeLabel}</span>
                 </div>
-                {peakPoint && (
+                {chartSummaryPoint && (
                   <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50">
-                    Peak: <span style={{ color: metricColor }} className="font-bold">{weeklyMetric === 'distance' ? peakPoint.distance.toFixed(1) : peakPoint[weeklyMetric]}</span> {unit} on {peakPoint.displayLabel} {peakPoint.subLabel}
+                    {chartValueMode === 'cumulative' ? 'Current' : 'Peak'}: <span style={{ color: metricColor }} className="font-bold">{chartSummaryPoint.displayMetricLabel}</span> {unit} on {chartSummaryPoint.displayLabel} {chartSummaryPoint.subLabel}
                   </div>
                 )}
               </div>
               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                <LineChart data={normalizedChartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                <LineChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
                   <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 6" />
+                  <YAxis hide domain={[0, maxVal]} />
                   <XAxis
                     dataKey="displayLabel"
                     stroke="#ffffff50"
@@ -481,9 +612,11 @@ export const HistorySummary = ({
                         const point = payload[0].payload;
                         return (
                           <div className="bg-[#1a1a1a] border border-white/10 px-4 py-3 rounded shadow-xl">
-                            <div style={{ color: metricColor }} className="font-bold text-xl">{payload[0].value} <span className="text-xs text-hw-muted font-normal">{unit}</span></div>
+                            <div style={{ color: metricColor }} className="font-bold text-xl">{point.displayMetricLabel} <span className="text-xs text-hw-muted font-normal">{unit}</span></div>
                             <div className="text-[10px] uppercase font-mono text-hw-muted mt-1">{point.displayLabel} {point.subLabel}</div>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-[10px] font-mono uppercase">
+                              <div className="text-white/50">{chartValueMode === 'cumulative' ? 'Cumulative' : 'Period'}</div>
+                              <div className="text-right text-white">{point.displayMetricLabel} <span className="text-[8px] opacity-40">{unit}</span></div>
                               <div className="text-white/50">Sessions</div>
                               <div className="text-right text-white">{point.sessions}</div>
                               <div className="text-white/50">Distance</div>
@@ -501,13 +634,42 @@ export const HistorySummary = ({
                       return null;
                     }}
                   />
+                  {showFlatAverage && (
+                    <ReferenceLine
+                      y={averageLineValue}
+                      stroke="rgba(255,255,255,0.65)"
+                      strokeDasharray="5 5"
+                      ifOverflow="extendDomain"
+                      label={{
+                        value: `AVG ${averageLineLabel} ${unit}`,
+                        position: 'insideTopRight',
+                        fill: 'rgba(255,255,255,0.6)',
+                        fontSize: 10,
+                        fontFamily: 'monospace'
+                      }}
+                    />
+                  )}
+                  {showTrendAverage && (
+                    <Line
+                      type="monotone"
+                      dataKey="averageTrendValue"
+                      stroke="rgba(255,255,255,0.72)"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      activeDot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  )}
                   <Line
                     type="monotone"
-                    dataKey={weeklyMetric}
+                    dataKey="displayValue"
                     stroke={metricColor}
                     strokeWidth={3}
                     dot={denseData ? false : { r: 4, strokeWidth: 2, fill: '#1a1a1a', stroke: metricColor }}
                     activeDot={{ r: 6, fill: metricColor, stroke: '#fff', strokeWidth: 2 }}
+                    isAnimationActive={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -518,26 +680,49 @@ export const HistorySummary = ({
                 <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-[0.16em] text-white/60">
                   <span>{activePeriods} active periods</span>
                   <span>{effectiveChartType} view</span>
-                  <span>{weeklyMetric}</span>
+                  <span>{chartValueModeLabel}</span>
                 </div>
-                {peakPoint && (
+                {chartSummaryPoint && (
                   <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50">
-                    Peak: <span style={{ color: metricColor }} className="font-bold">{weeklyMetric === 'distance' ? peakPoint.distance.toFixed(1) : peakPoint[weeklyMetric]}</span> {unit} on {peakPoint.displayLabel} {peakPoint.subLabel}
+                    {chartValueMode === 'cumulative' ? 'Current' : 'Peak'}: <span style={{ color: metricColor }} className="font-bold">{chartSummaryPoint.displayMetricLabel}</span> {unit} on {chartSummaryPoint.displayLabel} {chartSummaryPoint.subLabel}
                   </div>
                 )}
               </div>
-              <div className="flex items-end gap-2 min-h-[260px] h-[clamp(260px,40vh,420px)] w-full overflow-x-auto custom-scrollbar pb-2 pr-2">
-                {normalizedChartData.map((day) => {
-                  const pct = maxVal > 0 ? (day[weeklyMetric] as number) / maxVal : 0;
-                  const showSubLabel = !compactLabels || day.hasData || day.isHighlight;
-                  const showMainLabel = !compactLabels || day.hasData || day.isHighlight || normalizedChartData.indexOf(day) % 3 === 0;
+              <div className="relative flex items-end gap-2 min-h-[260px] h-[clamp(260px,40vh,420px)] w-full overflow-x-auto custom-scrollbar pb-2 pr-2">
+                {showFlatAverage && (
+                  <div
+                    className="pointer-events-none absolute left-0 right-2 z-10 border-t border-dashed border-white/60"
+                    style={{ bottom: `${averageLinePct}%` }}
+                  >
+                    <div className="absolute -top-5 right-0 rounded-md border border-white/10 bg-black/75 px-2 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-white/60">
+                      AVG {averageLineLabel} {unit}
+                    </div>
+                  </div>
+                )}
+                {showTrendAverage && averageTrendPoints && (
+                  <svg
+                    className="pointer-events-none absolute inset-x-0 top-0 z-10 h-full pr-2"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    <polyline
+                      points={averageTrendPoints}
+                      fill="none"
+                      stroke="rgba(255,255,255,0.72)"
+                      strokeWidth="1.2"
+                      strokeDasharray="4 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                )}
+                {chartData.map((day) => {
+                  const pct = maxVal > 0 ? day.displayValue / maxVal : 0;
                   return (
                     <div key={day.date} className="flex flex-col items-center justify-end gap-1.5 group h-full snap-end" style={{ minWidth: barScrollable ? '46px' : '0', flex: barScrollable ? '0 0 46px' : '1 1 0' }}>
                       <div className={`text-[9px] font-mono tabular-nums transition-all duration-200 ${day.hasData ? 'text-white/70 group-hover:text-white' : 'text-transparent'}`}>
                         {day.hasData
-                          ? weeklyMetric === 'distance'
-                            ? `${(day[weeklyMetric] as number).toFixed(1)}`
-                            : `${day[weeklyMetric]}`
+                          ? day.displayMetricLabel
                           : ''}
                       </div>
 
@@ -549,6 +734,8 @@ export const HistorySummary = ({
                           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
                             <div className="text-white/40">Sessions</div>
                             <div className="text-right text-white">{day.sessions}</div>
+                            <div className="text-white/40">{chartValueMode === 'cumulative' ? 'Cumulative' : 'Period'}</div>
+                            <div className="text-right text-white">{day.displayMetricLabel} {unit}</div>
                             <div className="text-white/40">Distance</div>
                             <div className="text-right text-white">{day.distance.toFixed(1)} km</div>
                             <div className="text-white/40">Duration</div>
@@ -596,11 +783,11 @@ export const HistorySummary = ({
 
                       <div className={`text-[9px] font-mono font-bold uppercase tracking-wider mt-0.5 ${day.isHighlight ? 'text-white' : day.hasData ? 'text-white/50' : 'text-white/20'
                         }`} style={day.isHighlight ? { color: metricColor } : {}}>
-                        {showMainLabel ? day.displayLabel : ''}
+                        {day.showMainLabel ? day.displayLabel : ''}
                       </div>
 
                       <div className={`text-[8px] font-mono ${day.hasData ? 'text-white/25' : 'text-white/10'}`}>
-                        {showSubLabel ? day.subLabel : ''}
+                        {day.showSubLabel ? day.subLabel : ''}
                       </div>
                     </div>
                   );
