@@ -12,7 +12,7 @@ export const useHeartRateRecovery = () => {
   const setHrrResult = useWorkoutStore(state => state.setHrrResult);
 
   const [status, setStatus] = useState<HrrStatus>('idle');
-  const [bufferTime, setBufferTime] = useState(10); // 10s buffer
+  const [bufferTime, setBufferTime] = useState(0);
   const [measureTime, setMeasureTime] = useState(120); // 120s measurement
   const [startHr, setStartHr] = useState<number | null>(null);
   const [endHr, setEndHr] = useState<number | null>(null);
@@ -38,7 +38,7 @@ export const useHeartRateRecovery = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = null;
     setStatus('idle');
-    setBufferTime(10);
+    setBufferTime(0);
     setMeasureTime(120);
     setStartHr(null);
     setEndHr(null);
@@ -128,9 +128,10 @@ export const useHeartRateRecovery = () => {
       setEndHr(null);
       setHrrScore(null);
       setClassification(null);
-      setBufferTime(10);
+      setBufferTime(0);
       setMeasureTime(120);
-      setStatus('buffer');
+      setStartHr(currentHrRef.current);
+      setStatus('measuring');
     }
   };
 };
