@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Activity, Download, Trophy } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, LabelList } from 'recharts';
 import { generateSummaryInsights, getInsightToneClasses, getPersonalRecords } from '../../lib/workout-analysis';
 import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../../lib/export-service';
+
+type MetricKey = 'distance' | 'calories' | 'duration' | 'cadence';
 
 interface HistorySummaryProps {
   sessions: any[];
@@ -16,7 +18,7 @@ interface HistorySummaryProps {
   setSummaryRange: (range: '7d' | '30d' | '90d' | '1y' | 'all') => void;
   chartType: 'bar' | 'line';
   setChartType: (type: 'bar' | 'line') => void;
-  weeklyMetric: 'distance' | 'calories' | 'duration' | 'cadence';
+  weeklyMetric: MetricKey;
   setWeeklyMetric: (metric: any) => void;
   normalizedChartData: any[];
   weeklyDailyData: Array<{
@@ -83,8 +85,10 @@ export const HistorySummary = ({
   setOffsetDays
 }: HistorySummaryProps) => {
   const [recordRange, setRecordRange] = useState<'30d' | '90d' | 'all'>('all');
-  const [averageDisplayMode, setAverageDisplayMode] = useState<'hidden' | 'flat' | 'trend'>('hidden');
+  const [averageDisplayMode, setAverageDisplayMode] = useState<'hidden' | 'primary' | 'all'>('primary');
+  const [averageStyle, setAverageStyle] = useState<'flat' | 'moving'>('flat');
   const [chartValueMode, setChartValueMode] = useState<'period' | 'cumulative'>('period');
+  const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([weeklyMetric]);
 
   if (!globalSummary) return null;
 
@@ -99,56 +103,148 @@ export const HistorySummary = ({
   const denseData = normalizedChartData.length > 45;
   const barScrollable = normalizedChartData.length > 14;
   const compactLabels = normalizedChartData.length > 20;
-  const formatChartMetric = (value: number) => weeklyMetric === 'distance' ? value.toFixed(1) : `${Math.round(value)}`;
+  const metricOptions = [
+    { value: 'distance', label: 'KM', name: 'Distance', unit: 'km', color: '#00d2ff', colorRgba: '0,210,255' },
+    { value: 'calories', label: 'KCAL', name: 'Calories', unit: 'kcal', color: '#f472b6', colorRgba: '244,114,182' },
+    { value: 'duration', label: 'MIN', name: 'Duration', unit: 'min', color: '#fbbf24', colorRgba: '251,191,36' },
+    { value: 'cadence', label: 'RPM', name: 'Cadence', unit: 'rpm', color: '#00ffaa', colorRgba: '0,255,170' },
+  ] as const;
+  const metricConfigByKey = metricOptions.reduce((acc, option) => {
+    acc[option.value] = option;
+    return acc;
+  }, {} as Record<MetricKey, typeof metricOptions[number]>);
+  const hasSelectedMetrics = selectedMetrics.length > 0;
+  const primaryMetric = selectedMetrics.includes(weeklyMetric) ? weeklyMetric : selectedMetrics[0] ?? weeklyMetric;
+  const formatChartMetric = (metric: MetricKey, value: number) => metric === 'distance' ? value.toFixed(1) : `${Math.round(value)}`;
+  const toggleSelectedMetric = (metric: MetricKey) => {
+    if (selectedMetrics.includes(metric)) {
+      const next = selectedMetrics.filter(item => item !== metric);
+      setSelectedMetrics(next);
+
+      if (metric === weeklyMetric && next[0]) {
+        setWeeklyMetric(next[0]);
+      }
+      return;
+    }
+
+    setSelectedMetrics([...selectedMetrics, metric]);
+    setWeeklyMetric(metric);
+  };
   const chartData = useMemo(() => {
-    let cumulativeTotal = 0;
+    const cumulativeTotals = metricOptions.reduce((acc, metric) => {
+      acc[metric.value] = 0;
+      return acc;
+    }, {} as Record<MetricKey, number>);
     let cumulativeCadenceTotal = 0;
     let cumulativeCadenceCount = 0;
-    let runningAverageTotal = 0;
-    let runningAverageCount = 0;
+    const runningAverageTotals = metricOptions.reduce((acc, metric) => {
+      acc[metric.value] = 0;
+      return acc;
+    }, {} as Record<MetricKey, number>);
+    const runningAverageCounts = metricOptions.reduce((acc, metric) => {
+      acc[metric.value] = 0;
+      return acc;
+    }, {} as Record<MetricKey, number>);
 
-    return normalizedChartData.map((point, index) => {
-      const metricValue = Number(point[weeklyMetric]) || 0;
+    const mappedData = normalizedChartData.map((point, index) => {
       const hasData = Boolean(point.hasData);
       const showSubLabel = !compactLabels || hasData || point.isHighlight;
       const showMainLabel = !compactLabels || hasData || point.isHighlight || index % 3 === 0;
-      cumulativeTotal += metricValue;
+      const metricValues = {} as Record<MetricKey, number>;
+      const cumulativeValues = {} as Record<MetricKey, number>;
+      const displayValues = {} as Record<MetricKey, number>;
+      const averageTrendValues = {} as Record<MetricKey, number | null>;
 
-      if (weeklyMetric === 'cadence' && hasData) {
-        cumulativeCadenceTotal += metricValue;
-        cumulativeCadenceCount += 1;
-      }
+      metricOptions.forEach(metric => {
+        const key = metric.value;
+        const metricValue = Number(point[key]) || 0;
+        metricValues[key] = metricValue;
+        cumulativeTotals[key] += metricValue;
 
-      const cumulativeValue = weeklyMetric === 'cadence'
-        ? cumulativeCadenceCount > 0 ? cumulativeCadenceTotal / cumulativeCadenceCount : 0
-        : cumulativeTotal;
-      const displayValue = chartValueMode === 'cumulative' ? cumulativeValue : metricValue;
-      let averageTrendValue: number | null = null;
+        if (key === 'cadence' && hasData) {
+          cumulativeCadenceTotal += metricValue;
+          cumulativeCadenceCount += 1;
+        }
 
-      if (hasData) {
-        runningAverageTotal += displayValue;
-        runningAverageCount += 1;
-        averageTrendValue = runningAverageTotal / runningAverageCount;
-      }
+        const cumulativeValue = key === 'cadence'
+          ? cumulativeCadenceCount > 0 ? cumulativeCadenceTotal / cumulativeCadenceCount : 0
+          : cumulativeTotals[key];
+        const displayValue = chartValueMode === 'cumulative' ? cumulativeValue : metricValue;
+        let averageTrendValue: number | null = null;
+
+        if (hasData) {
+          runningAverageTotals[key] += displayValue;
+          runningAverageCounts[key] += 1;
+          averageTrendValue = runningAverageTotals[key] / runningAverageCounts[key];
+        }
+
+        cumulativeValues[key] = cumulativeValue;
+        displayValues[key] = displayValue;
+        averageTrendValues[key] = averageTrendValue;
+      });
 
       return {
         ...point,
-        metricValue,
-        cumulativeValue,
-        displayValue,
-        averageTrendValue,
-        metricLabel: formatChartMetric(metricValue),
-        cumulativeLabel: formatChartMetric(cumulativeValue),
-        displayMetricLabel: formatChartMetric(displayValue),
-        averageTrendLabel: averageTrendValue === null ? '' : formatChartMetric(averageTrendValue),
+        metricValues,
+        cumulativeValues,
+        displayValues,
+        averageTrendValues,
+        metricValue: metricValues[primaryMetric],
+        cumulativeValue: cumulativeValues[primaryMetric],
+        displayValue: displayValues[primaryMetric],
+        averageTrendValue: averageTrendValues[primaryMetric],
+        metricLabel: formatChartMetric(primaryMetric, metricValues[primaryMetric]),
+        cumulativeLabel: formatChartMetric(primaryMetric, cumulativeValues[primaryMetric]),
+        displayMetricLabel: formatChartMetric(primaryMetric, displayValues[primaryMetric]),
+        averageTrendLabel: averageTrendValues[primaryMetric] === null ? '' : formatChartMetric(primaryMetric, averageTrendValues[primaryMetric] ?? 0),
         showMainLabel,
         showSubLabel,
       };
     });
-  }, [normalizedChartData, weeklyMetric, compactLabels, chartValueMode]);
+
+    const maxByMetric = selectedMetrics.reduce((acc, metric) => {
+      acc[metric] = Math.max(0.001, ...mappedData.map(point => point.displayValues[metric] || 0));
+      return acc;
+    }, {} as Record<MetricKey, number>);
+
+    const rollingValues = metricOptions.reduce((acc, metric) => {
+      acc[metric.value] = [];
+      return acc;
+    }, {} as Record<MetricKey, number[]>);
+
+    return mappedData.map(point => {
+      const scaledValues = {} as Record<MetricKey, number>;
+      const movingAverageValues = {} as Record<MetricKey, number | null>;
+      const movingAverageScaledValues = {} as Record<MetricKey, number | null>;
+
+      metricOptions.forEach(metric => {
+        const key = metric.value;
+        const maxMetricValue = maxByMetric[key] || 0.001;
+        scaledValues[key] = Math.min(100, Math.max(0, ((point.displayValues[key] || 0) / maxMetricValue) * 100));
+
+        if (point.hasData) {
+          rollingValues[key].push(point.displayValues[key] || 0);
+          const windowValues = rollingValues[key].slice(-3);
+          const movingAverageValue = windowValues.reduce((total, value) => total + value, 0) / windowValues.length;
+          movingAverageValues[key] = movingAverageValue;
+          movingAverageScaledValues[key] = Math.min(100, Math.max(0, (movingAverageValue / maxMetricValue) * 100));
+        } else {
+          movingAverageValues[key] = null;
+          movingAverageScaledValues[key] = null;
+        }
+      });
+
+      return {
+        ...point,
+        scaledValues,
+        movingAverageValues,
+        movingAverageScaledValues,
+      };
+    });
+  }, [normalizedChartData, compactLabels, chartValueMode, primaryMetric, selectedMetrics]);
   const chartStats = useMemo(() => {
     return chartData.reduce((stats, point) => {
-      const metricValue = point.displayValue;
+      const metricValue = point.displayValues[primaryMetric] || 0;
 
       if (metricValue > stats.maxVal) stats.maxVal = metricValue;
       if (point.hasData) {
@@ -156,7 +252,7 @@ export const HistorySummary = ({
         stats.averageTotal += metricValue;
         stats.averageCount += 1;
       }
-      if (!stats.peakPoint || metricValue > stats.peakPoint.displayValue) {
+      if (!stats.peakPoint || metricValue > (stats.peakPoint.displayValues[primaryMetric] || 0)) {
         stats.peakPoint = point;
       }
 
@@ -174,45 +270,94 @@ export const HistorySummary = ({
       averageCount: number;
       peakPoint: typeof chartData[number] | undefined;
     });
-  }, [chartData]);
-  const maxVal = chartStats.maxVal;
-  const unit = weeklyMetric === 'distance' ? 'km' : weeklyMetric === 'calories' ? 'kcal' : weeklyMetric === 'duration' ? 'min' : 'rpm';
-  const metricColor = weeklyMetric === 'distance' ? '#00d2ff' : weeklyMetric === 'calories' ? '#f472b6' : weeklyMetric === 'duration' ? '#fbbf24' : '#00ffaa';
-  const metricColorRgba = weeklyMetric === 'distance' ? '0,210,255' : weeklyMetric === 'calories' ? '244,114,182' : weeklyMetric === 'duration' ? '251,191,36' : '0,255,170';
+  }, [chartData, primaryMetric]);
+  const unit = metricConfigByKey[primaryMetric].unit;
+  const metricColor = metricConfigByKey[primaryMetric].color;
+  const metricColorRgba = metricConfigByKey[primaryMetric].colorRgba;
   const effectiveChartType = denseData && chartType === 'bar' ? 'line' : chartType;
   const activePeriods = chartStats.activePeriods;
-  const averageLineValue = chartStats.averageCount > 0 ? chartStats.averageTotal / chartStats.averageCount : 0;
-  const averageLinePct = maxVal > 0 ? Math.min(100, Math.max(0, (averageLineValue / maxVal) * 100)) : 0;
-  const averageLineLabel = weeklyMetric === 'distance'
-    ? averageLineValue.toFixed(1)
-    : `${Math.round(averageLineValue)}`;
-  const hasAverageLineData = chartStats.averageCount > 0;
-  const showFlatAverage = averageDisplayMode === 'flat' && hasAverageLineData;
-  const showTrendAverage = averageDisplayMode === 'trend' && hasAverageLineData;
-  const averageTrendPoints = useMemo(() => {
-    const activePoints = chartData
-      .map((point, index) => ({
-        index,
-        value: typeof point.averageTrendValue === 'number' ? point.averageTrendValue : null,
-      }))
-      .filter((point): point is { index: number; value: number } => point.value !== null);
+  const averageMetrics = averageDisplayMode === 'hidden'
+    ? []
+    : averageDisplayMode === 'primary'
+      ? hasSelectedMetrics ? [primaryMetric] : []
+      : selectedMetrics;
+  const averageLines = useMemo(() => {
+    return averageMetrics
+      .map(metric => {
+        const activePoints = chartData.filter(point => point.hasData);
+        if (activePoints.length === 0) return null;
 
-    if (activePoints.length === 0) return '';
+        const averageValue = activePoints.reduce((total, point) => total + (point.displayValues[metric] || 0), 0) / activePoints.length;
+        const maxMetricValue = Math.max(0.001, ...chartData.map(point => point.displayValues[metric] || 0));
 
-    const denominator = Math.max(chartData.length - 1, 1);
-    return activePoints
-      .map(point => {
-        const x = (point.index / denominator) * 100;
-        const y = 100 - Math.min(100, Math.max(0, (point.value / maxVal) * 100));
-        return `${x},${y}`;
+        return {
+          metric,
+          value: averageValue,
+          pct: Math.min(100, Math.max(0, (averageValue / maxMetricValue) * 100)),
+          label: formatChartMetric(metric, averageValue),
+          config: metricConfigByKey[metric],
+        };
       })
-      .join(' ');
-  }, [chartData, maxVal]);
+      .filter((line): line is {
+        metric: MetricKey;
+        value: number;
+        pct: number;
+        label: string;
+        config: typeof metricOptions[number];
+      } => line !== null);
+  }, [averageMetrics, chartData]);
+  const movingAverageLines = useMemo(() => {
+    if (averageStyle !== 'moving') return [];
+
+    return averageMetrics
+      .map(metric => {
+        const activePoints = chartData
+          .map((point, index) => ({
+            index,
+            value: point.movingAverageScaledValues[metric],
+          }))
+          .filter((point): point is { index: number; value: number } => typeof point.value === 'number');
+
+        if (activePoints.length === 0) return null;
+
+        const denominator = Math.max(chartData.length - 1, 1);
+        const lastPoint = activePoints[activePoints.length - 1];
+        const lastRawValue = chartData[lastPoint.index]?.movingAverageValues[metric] ?? 0;
+        const points = activePoints
+          .map(point => {
+            const x = (point.index / denominator) * 100;
+            const y = 100 - Math.min(100, Math.max(0, point.value));
+            return `${x},${y}`;
+          })
+          .join(' ');
+
+        return {
+          metric,
+          points,
+          lastIndex: lastPoint.index,
+          lastX: (lastPoint.index / denominator) * 100,
+          lastY: 100 - Math.min(100, Math.max(0, lastPoint.value)),
+          label: formatChartMetric(metric, lastRawValue),
+          config: metricConfigByKey[metric],
+        };
+      })
+      .filter((line): line is {
+        metric: MetricKey;
+        points: string;
+        lastIndex: number;
+        lastX: number;
+        lastY: number;
+        label: string;
+        config: typeof metricOptions[number];
+      } => line !== null);
+  }, [averageMetrics, averageStyle, chartData]);
   const peakPoint = chartStats.peakPoint;
   const chartSummaryPoint = chartValueMode === 'cumulative' ? chartData[chartData.length - 1] : peakPoint;
   const chartValueModeLabel = chartValueMode === 'cumulative'
-    ? weeklyMetric === 'cadence' ? 'running avg' : 'running total'
-    : weeklyMetric;
+    ? hasSelectedMetrics
+      ? selectedMetrics.includes('cadence') ? 'running total / avg' : 'running total'
+      : 'no metrics'
+    : selectedMetrics.length > 1 ? 'multi metric' : hasSelectedMetrics ? primaryMetric : 'no metrics';
   const periodLabel = summaryPeriod === 'daily'
     ? 'Daily Trends'
     : summaryPeriod === 'weekly'
@@ -230,12 +375,6 @@ export const HistorySummary = ({
         ? '1 year'
         : 'all time';
   const periodOptions = ['daily', 'weekly', 'monthly', 'yearly'] as const;
-  const metricOptions = [
-    { value: 'distance', label: 'KM' },
-    { value: 'calories', label: 'KCAL' },
-    { value: 'duration', label: 'MIN' },
-    { value: 'cadence', label: 'RPM' },
-  ] as const;
   const shiftDays = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
   const autoInsights = useMemo(() => generateSummaryInsights({
     comparisonSummary,
@@ -519,9 +658,9 @@ export const HistorySummary = ({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5 xl:min-w-[430px]">
+              <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5 xl:min-w-[560px]">
                 <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Display</div>
-                <div className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)_132px_76px] gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)_174px_120px_76px] gap-2">
                   <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8 bg-black/20">
                     <button
                       onClick={() => setChartType('bar')}
@@ -542,8 +681,10 @@ export const HistorySummary = ({
                     {metricOptions.map(option => (
                       <button
                         key={option.value}
-                        onClick={() => setWeeklyMetric(option.value)}
-                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${weeklyMetric === option.value ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
+                        onClick={() => toggleSelectedMetric(option.value)}
+                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${selectedMetrics.includes(option.value) ? 'text-hw-bg' : 'text-hw-muted hover:text-white'}`}
+                        style={selectedMetrics.includes(option.value) ? { backgroundColor: option.color } : undefined}
+                        title={`Toggle ${option.name}`}
                       >
                         {option.label}
                       </button>
@@ -553,8 +694,8 @@ export const HistorySummary = ({
                   <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-white/8 bg-black/20" title="Average line display mode">
                     {[
                       { value: 'hidden', label: 'OFF' },
-                      { value: 'flat', label: 'AVG' },
-                      { value: 'trend', label: 'LINE' },
+                      { value: 'primary', label: 'PRIMARY' },
+                      { value: 'all', label: 'ALL' },
                     ].map(option => (
                       <button
                         key={option.value}
@@ -566,13 +707,44 @@ export const HistorySummary = ({
                     ))}
                   </div>
 
+                  <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8 bg-black/20" title="Average line style">
+                    {[
+                      { value: 'flat', label: 'FLAT' },
+                      { value: 'moving', label: 'MOVING' },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => setAverageStyle(option.value as typeof averageStyle)}
+                        className={`px-2 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${averageStyle === option.value ? 'bg-hw-accent text-hw-bg' : 'text-hw-muted hover:text-white'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <button
                     onClick={() => setChartValueMode(chartValueMode === 'period' ? 'cumulative' : 'period')}
                     className={`rounded-lg border px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${chartValueMode === 'cumulative' ? 'border-hw-accent/40 bg-hw-accent text-hw-bg' : 'border-white/8 bg-black/20 text-hw-muted hover:text-white'}`}
-                    title={weeklyMetric === 'cadence' ? 'Show running average cadence' : 'Show running total progress'}
+                    title={selectedMetrics.includes('cadence') ? 'Cadence uses running average in total mode' : 'Show running total progress'}
                   >
                     TOTAL
                   </button>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {selectedMetrics.map(metric => {
+                    const config = metricConfigByKey[metric];
+                    return (
+                      <button
+                        key={metric}
+                        onClick={() => setWeeklyMetric(metric)}
+                        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[8px] font-mono uppercase tracking-[0.14em] transition-colors ${weeklyMetric === metric ? 'border-white/35 bg-white/10 text-white' : 'border-white/8 text-white/45 hover:text-white'}`}
+                        title={`Use ${config.name} as the primary summary metric`}
+                      >
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: config.color }} />
+                        {config.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -586,16 +758,16 @@ export const HistorySummary = ({
                   <span>{effectiveChartType} view</span>
                   <span>{chartValueModeLabel}</span>
                 </div>
-                {chartSummaryPoint && (
+                {hasSelectedMetrics && chartSummaryPoint && (
                   <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50">
-                    {chartValueMode === 'cumulative' ? 'Current' : 'Peak'}: <span style={{ color: metricColor }} className="font-bold">{chartSummaryPoint.displayMetricLabel}</span> {unit} on {chartSummaryPoint.displayLabel} {chartSummaryPoint.subLabel}
+                    {chartValueMode === 'cumulative' ? 'Current' : 'Peak'}: <span style={{ color: metricColor }} className="font-bold">{formatChartMetric(primaryMetric, chartSummaryPoint.displayValues[primaryMetric] || 0)}</span> {unit} on {chartSummaryPoint.displayLabel} {chartSummaryPoint.subLabel}
                   </div>
                 )}
               </div>
               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                 <LineChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
                   <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 6" />
-                  <YAxis hide domain={[0, maxVal]} />
+                  <YAxis hide domain={[0, 100]} />
                   <XAxis
                     dataKey="displayLabel"
                     stroke="#ffffff50"
@@ -612,11 +784,21 @@ export const HistorySummary = ({
                         const point = payload[0].payload;
                         return (
                           <div className="bg-[#1a1a1a] border border-white/10 px-4 py-3 rounded shadow-xl">
-                            <div style={{ color: metricColor }} className="font-bold text-xl">{point.displayMetricLabel} <span className="text-xs text-hw-muted font-normal">{unit}</span></div>
                             <div className="text-[10px] uppercase font-mono text-hw-muted mt-1">{point.displayLabel} {point.subLabel}</div>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-[10px] font-mono uppercase">
+                              {selectedMetrics.map(metric => {
+                                const config = metricConfigByKey[metric];
+                                return (
+                                  <div key={metric} className="contents">
+                                    <div style={{ color: config.color }}>{config.name}</div>
+                                    <div className="text-right text-white">
+                                      {formatChartMetric(metric, point.displayValues[metric] || 0)} <span className="text-[8px] opacity-40">{config.unit}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                               <div className="text-white/50">{chartValueMode === 'cumulative' ? 'Cumulative' : 'Period'}</div>
-                              <div className="text-right text-white">{point.displayMetricLabel} <span className="text-[8px] opacity-40">{unit}</span></div>
+                              <div className="text-right text-white">{selectedMetrics.length} metric{selectedMetrics.length > 1 ? 's' : ''}</div>
                               <div className="text-white/50">Sessions</div>
                               <div className="text-right text-white">{point.sessions}</div>
                               <div className="text-white/50">Distance</div>
@@ -634,43 +816,85 @@ export const HistorySummary = ({
                       return null;
                     }}
                   />
-                  {showFlatAverage && (
+                  {averageStyle === 'flat' && averageLines.map((line, index) => (
                     <ReferenceLine
-                      y={averageLineValue}
-                      stroke="rgba(255,255,255,0.65)"
+                      key={line.metric}
+                      y={line.pct}
+                      stroke={line.config.color}
                       strokeDasharray="5 5"
+                      strokeOpacity={line.metric === primaryMetric ? 0.72 : 0.46}
                       ifOverflow="extendDomain"
-                      label={{
-                        value: `AVG ${averageLineLabel} ${unit}`,
-                        position: 'insideTopRight',
-                        fill: 'rgba(255,255,255,0.6)',
+                      label={index < 3 ? {
+                        value: `AVG ${line.config.label} ${line.label}`,
+                        position: index % 2 === 0 ? 'insideTopRight' : 'insideTopLeft',
+                        fill: line.config.color,
                         fontSize: 10,
                         fontFamily: 'monospace'
-                      }}
+                      } : undefined}
                     />
-                  )}
-                  {showTrendAverage && (
+                  ))}
+                  {averageStyle === 'moving' && movingAverageLines.map(line => (
                     <Line
+                      key={`moving-${line.metric}`}
                       type="monotone"
-                      dataKey="averageTrendValue"
-                      stroke="rgba(255,255,255,0.72)"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
+                      dataKey={(point) => point.movingAverageScaledValues[line.metric]}
+                      name={`${line.config.name} Moving Avg`}
+                      stroke={line.config.color}
+                      strokeWidth={line.metric === primaryMetric ? 1.4 : 1}
+                      strokeDasharray="6 5"
                       dot={false}
                       activeDot={false}
                       connectNulls
                       isAnimationActive={false}
-                    />
-                  )}
-                  <Line
-                    type="monotone"
-                    dataKey="displayValue"
-                    stroke={metricColor}
-                    strokeWidth={3}
-                    dot={denseData ? false : { r: 4, strokeWidth: 2, fill: '#1a1a1a', stroke: metricColor }}
-                    activeDot={{ r: 6, fill: metricColor, stroke: '#fff', strokeWidth: 2 }}
-                    isAnimationActive={false}
-                  />
+                    >
+                      <LabelList
+                        content={(props: any) => {
+                          if (props.index !== line.lastIndex) return null;
+                          const x = Number(props.x ?? 0);
+                          const y = Number(props.y ?? 0);
+                          return (
+                            <g transform={`translate(${x - 6}, ${y - 8})`}>
+                              <rect
+                                x={-78}
+                                y={-10}
+                                width={74}
+                                height={18}
+                                rx={4}
+                                fill="rgba(0,0,0,0.76)"
+                                stroke="rgba(255,255,255,0.12)"
+                              />
+                              <text
+                                x={-41}
+                                y={3}
+                                textAnchor="middle"
+                                fill={line.config.color}
+                                fontSize={10}
+                                fontFamily="monospace"
+                              >
+                                {`MOV ${line.config.label} ${line.label}`}
+                              </text>
+                            </g>
+                          );
+                        }}
+                      />
+                    </Line>
+                  ))}
+                  {selectedMetrics.map(metric => {
+                    const config = metricConfigByKey[metric];
+                    return (
+                      <Line
+                        key={metric}
+                        type="monotone"
+                        dataKey={(point) => point.scaledValues[metric] || 0}
+                        name={config.name}
+                        stroke={config.color}
+                        strokeWidth={metric === primaryMetric ? 3 : 2}
+                        dot={denseData ? false : { r: 4, strokeWidth: 2, fill: '#1a1a1a', stroke: config.color }}
+                        activeDot={{ r: 6, fill: config.color, stroke: '#fff', strokeWidth: 2 }}
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -682,60 +906,92 @@ export const HistorySummary = ({
                   <span>{effectiveChartType} view</span>
                   <span>{chartValueModeLabel}</span>
                 </div>
-                {chartSummaryPoint && (
+                {hasSelectedMetrics && chartSummaryPoint && (
                   <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50">
-                    {chartValueMode === 'cumulative' ? 'Current' : 'Peak'}: <span style={{ color: metricColor }} className="font-bold">{chartSummaryPoint.displayMetricLabel}</span> {unit} on {chartSummaryPoint.displayLabel} {chartSummaryPoint.subLabel}
+                    {chartValueMode === 'cumulative' ? 'Current' : 'Peak'}: <span style={{ color: metricColor }} className="font-bold">{formatChartMetric(primaryMetric, chartSummaryPoint.displayValues[primaryMetric] || 0)}</span> {unit} on {chartSummaryPoint.displayLabel} {chartSummaryPoint.subLabel}
                   </div>
                 )}
               </div>
               <div className="relative flex items-end gap-2 min-h-[260px] h-[clamp(260px,40vh,420px)] w-full overflow-x-auto custom-scrollbar pb-2 pr-2">
-                {showFlatAverage && (
+                {averageStyle === 'flat' && averageLines.map((line, index) => (
                   <div
-                    className="pointer-events-none absolute left-0 right-2 z-10 border-t border-dashed border-white/60"
-                    style={{ bottom: `${averageLinePct}%` }}
+                    key={line.metric}
+                    className="pointer-events-none absolute left-0 right-2 z-10 border-t border-dashed"
+                    style={{
+                      bottom: `${line.pct}%`,
+                      borderColor: line.config.color,
+                      opacity: line.metric === primaryMetric ? 0.76 : 0.48,
+                    }}
                   >
-                    <div className="absolute -top-5 right-0 rounded-md border border-white/10 bg-black/75 px-2 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-white/60">
-                      AVG {averageLineLabel} {unit}
-                    </div>
+                    {index < 3 && (
+                      <div
+                        className={`absolute -top-5 rounded-md border border-white/10 bg-black/75 px-2 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] ${index % 2 === 0 ? 'right-0' : 'left-0'}`}
+                        style={{ color: line.config.color }}
+                      >
+                        AVG {line.config.label} {line.label}
+                      </div>
+                    )}
                   </div>
-                )}
-                {showTrendAverage && averageTrendPoints && (
+                ))}
+                {averageStyle === 'moving' && movingAverageLines.length > 0 && (
                   <svg
                     className="pointer-events-none absolute inset-x-0 top-0 z-10 h-full pr-2"
                     viewBox="0 0 100 100"
                     preserveAspectRatio="none"
                     aria-hidden="true"
                   >
-                    <polyline
-                      points={averageTrendPoints}
-                      fill="none"
-                      stroke="rgba(255,255,255,0.72)"
-                      strokeWidth="1.2"
-                      strokeDasharray="4 3"
-                      vectorEffect="non-scaling-stroke"
-                    />
+                    {movingAverageLines.map(line => (
+                      <polyline
+                        key={line.metric}
+                        points={line.points}
+                        fill="none"
+                        stroke={line.config.color}
+                        strokeOpacity={line.metric === primaryMetric ? 0.72 : 0.46}
+                        strokeWidth={line.metric === primaryMetric ? '1.1' : '0.8'}
+                        strokeDasharray="5 4"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
                   </svg>
                 )}
+                {averageStyle === 'moving' && movingAverageLines.map((line, index) => (
+                  <div
+                    key={`moving-label-${line.metric}`}
+                    className="pointer-events-none absolute z-20 rounded-md border border-white/10 bg-black/75 px-2 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em]"
+                    style={{
+                      left: `${line.lastX}%`,
+                      top: `${line.lastY}%`,
+                      color: line.config.color,
+                      transform: `translate(-100%, calc(-50% + ${(index % 3) * 18 - 18}px))`,
+                    }}
+                  >
+                    MOV {line.config.label} {line.label}
+                  </div>
+                ))}
                 {chartData.map((day) => {
-                  const pct = maxVal > 0 ? day.displayValue / maxVal : 0;
                   return (
                     <div key={day.date} className="flex flex-col items-center justify-end gap-1.5 group h-full snap-end" style={{ minWidth: barScrollable ? '46px' : '0', flex: barScrollable ? '0 0 46px' : '1 1 0' }}>
                       <div className={`text-[9px] font-mono tabular-nums transition-all duration-200 ${day.hasData ? 'text-white/70 group-hover:text-white' : 'text-transparent'}`}>
                         {day.hasData
-                          ? day.displayMetricLabel
+                          ? selectedMetrics.length === 0 ? '' : selectedMetrics.length === 1 ? formatChartMetric(primaryMetric, day.displayValues[primaryMetric] || 0) : `${selectedMetrics.length}x`
                           : ''}
                       </div>
 
-                      <div className="w-full flex items-end gap-0.5 h-full max-h-full">
-                    <div className="flex-1 relative h-full">
-                      <div className="absolute bottom-0 w-full" style={{ height: `${pct * 100}%`, minHeight: day.hasData ? '4px' : '2px' }}>
-                        <div className="absolute bottom-full left-1/2 z-10 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border border-white/10 bg-[#111] px-3 py-2 text-[10px] font-mono uppercase shadow-xl group-hover:block pointer-events-none">
+                      <div className="w-full relative flex items-end gap-1 h-full max-h-full">
+                        <div className="absolute bottom-full left-1/2 z-10 mb-2 hidden w-48 -translate-x-1/2 rounded-xl border border-white/10 bg-[#111] px-3 py-2 text-[10px] font-mono uppercase shadow-xl group-hover:block pointer-events-none">
                           <div className="text-white/60">{day.displayLabel} {day.subLabel}</div>
                           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                            {selectedMetrics.map(metric => {
+                              const config = metricConfigByKey[metric];
+                              return (
+                                <div key={metric} className="contents">
+                                  <div style={{ color: config.color }}>{config.name}</div>
+                                  <div className="text-right text-white">{formatChartMetric(metric, day.displayValues[metric] || 0)} {config.unit}</div>
+                                </div>
+                              );
+                            })}
                             <div className="text-white/40">Sessions</div>
                             <div className="text-right text-white">{day.sessions}</div>
-                            <div className="text-white/40">{chartValueMode === 'cumulative' ? 'Cumulative' : 'Period'}</div>
-                            <div className="text-right text-white">{day.displayMetricLabel} {unit}</div>
                             <div className="text-white/40">Distance</div>
                             <div className="text-right text-white">{day.distance.toFixed(1)} km</div>
                             <div className="text-white/40">Duration</div>
@@ -746,38 +1002,39 @@ export const HistorySummary = ({
                             <div className="text-right text-white">{day.cadence} rpm</div>
                           </div>
                         </div>
-                        {day.isHighlight ? (
-                          <div
-                            className="w-full h-full rounded-t-md transition-all duration-500"
-                            style={{
-                              background: metricColor,
-                              boxShadow: `0 0 12px rgba(${metricColorRgba},0.5)`,
-                            }}
-                          />
-                        ) : day.hasData ? (
-                          <div
-                            className="w-full h-full rounded-t-md transition-all duration-500 group-hover:opacity-90"
-                            style={{
-                              background: `rgba(${metricColorRgba},0.42)`,
-                              borderTop: `1px solid rgba(${metricColorRgba},0.3)`,
-                              borderLeft: `1px solid rgba(${metricColorRgba},0.3)`,
-                              borderRight: `1px solid rgba(${metricColorRgba},0.3)`,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-full rounded-t-sm"
-                            style={{
-                              background: 'rgba(255,255,255,0.04)',
-                              borderTop: '1px solid rgba(255,255,255,0.06)',
-                              borderLeft: '1px solid rgba(255,255,255,0.06)',
-                              borderRight: '1px solid rgba(255,255,255,0.06)'
-                            }}
-                          />
-                        )}
+                        {selectedMetrics.map(metric => {
+                          const config = metricConfigByKey[metric];
+                          const pct = (day.scaledValues[metric] || 0) / 100;
+                          return (
+                            <div key={metric} className="flex-1 relative h-full min-w-0">
+                              <div className="absolute bottom-0 w-full" style={{ height: `${pct * 100}%`, minHeight: day.hasData ? '4px' : '2px' }}>
+                                {day.hasData ? (
+                                  <div
+                                    className="w-full h-full rounded-t-md transition-all duration-500 group-hover:opacity-90"
+                                    style={{
+                                      background: day.isHighlight ? config.color : `rgba(${config.colorRgba},0.42)`,
+                                      borderTop: `1px solid rgba(${config.colorRgba},0.3)`,
+                                      borderLeft: `1px solid rgba(${config.colorRgba},0.3)`,
+                                      borderRight: `1px solid rgba(${config.colorRgba},0.3)`,
+                                      boxShadow: day.isHighlight && metric === primaryMetric ? `0 0 12px rgba(${config.colorRgba},0.5)` : 'none',
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-full h-full rounded-t-sm"
+                                    style={{
+                                      background: 'rgba(255,255,255,0.04)',
+                                      borderTop: '1px solid rgba(255,255,255,0.06)',
+                                      borderLeft: '1px solid rgba(255,255,255,0.06)',
+                                      borderRight: '1px solid rgba(255,255,255,0.06)'
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                  </div>
 
                       <div className="w-full h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
 
