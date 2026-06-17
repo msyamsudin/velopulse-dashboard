@@ -43,8 +43,17 @@ export const useAppInitialization = () => {
     
     setIsLoadingProfile(true);
     fetch('/api/profile')
-      .then(res => {
-        if (!res.ok) throw new Error('Fetch failed');
+      .then(async res => {
+        if (!res.ok) {
+          let errorMsg = 'Fetch failed';
+          try {
+            const errData = await res.json();
+            errorMsg = errData.error || errorMsg;
+          } catch {
+            errorMsg = `Fetch failed with status ${res.status}`;
+          }
+          throw new Error(errorMsg);
+        }
         return res.json();
       })
       .then(data => {
