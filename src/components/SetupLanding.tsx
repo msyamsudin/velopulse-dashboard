@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import { ShieldCheck, ArrowRight, Settings, Activity, Globe, Zap, Server, User } from 'lucide-react';
+import { useI18n } from '@/i18n';
 
 interface SetupLandingProps {
   onInitialize: () => void;
@@ -8,6 +9,7 @@ interface SetupLandingProps {
 }
 
 export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: SetupLandingProps) => {
+  const { t } = useI18n();
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-hw-bg overflow-hidden relative">
       <motion.div
@@ -25,37 +27,37 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
               <div className="space-y-4">
                 <div className="flex items-center gap-3 text-hw-accent mb-2">
                   <Activity size={24} className="animate-pulse" />
-                  <span className="text-[10px] font-mono uppercase tracking-[0.4em] font-bold">System Initialization Required</span>
+                  <span className="text-[10px] font-mono uppercase tracking-[0.4em] font-bold">{t('System Initialization Required')}</span>
                 </div>
                 <h1 className="text-5xl font-black tracking-tighter leading-[1.1]">
-                  WELCOME TO <br />
+                  {t('WELCOME TO')} <br />
                   <span className="text-hw-accent">VELOPULSE</span> PRO
                 </h1>
                 <p className="text-hw-muted text-sm leading-relaxed max-w-md">
-                  Your advanced fitness telemetry hub is almost ready. We need to establish a secure connection with your external data providers and cloud infrastructure.
+                  {t('Your advanced fitness telemetry hub is almost ready. We need to establish a secure connection with your external data providers and cloud infrastructure.')}
                 </p>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">Connection Checklist:</h3>
+                <h3 className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">{t('Connection Checklist:')}</h3>
                 <div className="grid grid-cols-1 gap-3">
                   <CheckItem
-                    label="Google Fit Integration"
+                    label={t('Google Fit Integration')}
                     icon={<Globe size={14} />}
                     isMissing={missingFields.some(f => f.includes('GOOGLE'))}
                   />
                   <CheckItem
-                    label="Supabase Cloud Database"
+                    label={t('Supabase Cloud Database')}
                     icon={<Server size={14} />}
                     isMissing={missingFields.some(f => f.includes('SUPABASE'))}
                   />
                   <CheckItem
-                    label="Application URL Configuration"
+                    label={t('Application URL Configuration')}
                     icon={<ShieldCheck size={14} />}
                     isMissing={missingFields.includes('APP_URL')}
                   />
                   <CheckItem
-                    label="User Profile Setup (Age, Weight, FTP)"
+                    label={t('User Profile Setup (Age, Weight, FTP)')}
                     icon={<User size={14} />}
                     isMissing={!!isProfileMissing}
                   />
@@ -67,7 +69,7 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
                 className="group relative flex items-center gap-4 px-8 py-4 bg-hw-accent text-hw-bg font-black uppercase tracking-widest text-xs rounded-full overflow-hidden transition-all hover:scale-105 active:scale-95"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  Initialize System <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  {t('Initialize System')} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                 </span>
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
               </button>
@@ -84,16 +86,16 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
                 </div>
 
                 {/* Floating Tags */}
-                <FloatingTag icon={<Zap size={10} />} label="Telemetry" pos="top-0 left-0" delay={0} />
-                <FloatingTag icon={<Activity size={10} />} label="Biometrics" pos="bottom-0 right-0" delay={2} />
-                <FloatingTag icon={<ShieldCheck size={10} />} label="Secure" pos="top-1/2 -right-8" delay={1} />
+                <FloatingTag icon={<Zap size={10} />} label={t('Telemetry')} pos="top-0 left-0" delay={0} />
+                <FloatingTag icon={<Activity size={10} />} label={t('Biometrics')} pos="bottom-0 right-0" delay={2} />
+                <FloatingTag icon={<ShieldCheck size={10} />} label={t('Secure')} pos="top-1/2 -right-8" delay={1} />
               </div>
             </div>
           </div>
         </div>
 
         <p className="text-center mt-8 text-[9px] font-mono text-hw-muted uppercase tracking-[0.3em]">
-          VeloPulse Core System v1.1.0 // Waiting for Handshake
+          VeloPulse Core System v1.1.0 // {t('Waiting for Handshake')}
         </p>
       </motion.div>
     </div>

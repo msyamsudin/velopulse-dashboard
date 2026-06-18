@@ -25,10 +25,12 @@ import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
 import { useHeartRateRecovery } from './hooks/useHeartRateRecovery';
 import { HrrModal } from './components/dashboard/HrrModal';
 import { EmptyState } from './components/ui';
+import { useI18n } from './i18n';
 
-const DeferredPanelLoader = () => (
-  <EmptyState title="Loading panel" detail="Preparing telemetry view" pulse className="h-full min-h-40" />
-);
+const DeferredPanelLoader = () => {
+  const { t } = useI18n();
+  return <EmptyState title={t('Loading panel')} detail={t('Preparing telemetry view')} pulse className="h-full min-h-40" />;
+};
 
 const PerformanceChart = dynamic(
   () => import('./components/PerformanceChart').then(mod => mod.PerformanceChart),
@@ -54,6 +56,7 @@ type PrimarySurface = 'ready' | 'ride' | 'telemetry';
 type AppMode = 'setup' | 'ready' | 'ride' | 'telemetry' | 'review';
 
 export default function App() {
+  const { t } = useI18n();
   const hrr = useHeartRateRecovery();
   const isRecording = useWorkoutStore(state => state.isRecording);
   const elapsed = useWorkoutStore(state => state.elapsed);
@@ -119,7 +122,10 @@ export default function App() {
   const isCompactSurface = isRideSurface || isTelemetrySurface;
   const showChrome = appMode === 'ready';
   const shellPadding = isCompactSurface ? 'p-2 md:p-4' : 'p-3 md:p-6 lg:p-8';
-  const contentWidth = isCompactSurface ? 'max-w-none' : 'max-w-7xl';
+  const contentWidth = 'max-w-none';
+  const scrollSurfaceBleed = isCompactSurface
+    ? '-mx-2 px-6 md:-mx-4 md:px-8'
+    : '-mx-3 px-7 md:-mx-6 md:px-10 lg:-mx-8 lg:px-12';
 
   // Sync session data with BLE data
   useEffect(() => {
@@ -177,14 +183,14 @@ export default function App() {
       const response = await fetch('/api/auth/google/url');
       const { url } = await response.json();
       const authWindow = window.open(url, 'google_auth', 'width=600,height=700');
-      if (!authWindow) alert('Please allow popups to connect Google Fit');
+      if (!authWindow) alert(t('Please allow popups to connect Google Fit'));
     } catch (err) {
       console.error('Failed to get auth URL:', err);
     }
   };
 
   const handleDisconnectGoogle = async () => {
-    if (!confirm('Disconnect from Google Fit? You will need to reconnect to sync future workouts.')) return;
+    if (!confirm(t('Disconnect from Google Fit? You will need to reconnect to sync future workouts.'))) return;
     try {
       const res = await fetch('/api/auth/disconnect', { method: 'POST' });
       if (res.ok) {
@@ -204,7 +210,7 @@ export default function App() {
   };
 
   const handleStopRecording = () => {
-    if (confirm('Stop this workout session?')) {
+    if (confirm(t('Stop this workout session?'))) {
       toggleRecording();
     }
   };
@@ -348,7 +354,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
-              className="h-full flex flex-col space-y-6 overflow-y-auto no-scrollbar px-4 pb-8"
+              className={`h-full flex flex-col space-y-6 overflow-y-auto no-scrollbar pb-8 ${scrollSurfaceBleed}`}
             >
               {isReadySurface && (
                 <div className="grid grid-cols-1 gap-4 shrink-0">
@@ -454,8 +460,8 @@ export default function App() {
             }}
             type="button"
             onClick={handleStopRecording}
-            aria-label="Stop workout session"
-            title="Stop workout session"
+            aria-label={t('Stop workout session')}
+            title={t('Stop workout session')}
             className="vp-focus-ring fixed top-6 right-6 z-100 group flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-vp-danger/30 bg-vp-danger/10 text-vp-danger shadow-2xl backdrop-blur-sm transition-colors hover:border-vp-danger/60 hover:bg-vp-danger hover:text-white"
           >
             {/* The Stealth Dot (Normal state) */}

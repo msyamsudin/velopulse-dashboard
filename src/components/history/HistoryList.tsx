@@ -1,7 +1,8 @@
-import { Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff } from 'lucide-react';
+import { Activity, Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff } from 'lucide-react';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 import { EmptyState, StatusPill } from '../ui';
+import { calculateEdwardsTrimp } from '../../lib/training-load';
 
 interface HistoryListProps {
   sessions: any[];
@@ -66,10 +67,10 @@ export const HistoryList = ({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       {groupedSessions.map(group => (
-        <section key={group.key} className="flex flex-col gap-4">
-          <div className="sticky top-0 z-10 flex flex-col justify-between gap-2 rounded-lg border border-vp-border bg-vp-bg/90 px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center">
+        <section key={group.key} className="flex flex-col gap-3">
+          <div className="sticky top-0 z-10 flex flex-col justify-between gap-2 rounded-lg border border-vp-border bg-vp-bg/90 px-4 py-2.5 backdrop-blur-xl sm:flex-row sm:items-center">
             <div>
               <div className="text-sm font-bold font-mono uppercase tracking-[0.16em] text-vp-text">{group.label}</div>
               <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.2em] text-vp-muted">
@@ -88,6 +89,7 @@ export const HistoryList = ({
               const outcome = getSessionOutcome(session);
               const quality = getWorkoutQuality(session, maxHr);
               const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
+              const trainingLoad = calculateEdwardsTrimp(session.history || [], session.duration || 0, maxHr);
 
               return (
                 <div
@@ -163,6 +165,16 @@ export const HistoryList = ({
                       Avg HR <span className="text-vp-text">{outcome.avgHr}</span> BPM
                     </span>
                     <span>{session.stats.avgCadence || 0} RPM</span>
+                  </div>
+
+                  <div className="mb-3 flex items-center justify-between rounded border border-purple-400/15 bg-purple-400/5 px-2 py-1.5 text-[9px] font-mono uppercase tracking-widest">
+                    <span className="flex items-center gap-1.5 text-purple-300">
+                      <Activity size={10} />
+                      TRIMP Load
+                    </span>
+                    <span className="text-vp-text">
+                      {trainingLoad.score} <span className="text-purple-300/70">{trainingLoad.label}</span>
+                    </span>
                   </div>
 
                   {hrrScore !== null && (

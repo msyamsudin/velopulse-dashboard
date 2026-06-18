@@ -8,6 +8,7 @@ import { Download, RefreshCw, Search, Upload, X } from 'lucide-react';
 import type { ImportTcxResult } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
+import { useI18n } from '@/i18n';
 
 interface WorkoutHistoryProps {
   sessions: any[];
@@ -32,11 +33,12 @@ export const WorkoutHistory = ({
   isGoogleConnected,
   maxHr = 190
 }: WorkoutHistoryProps) => {
+  const { t } = useI18n();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'sessions' | 'summary'>('sessions');
+  const [viewMode, setViewMode] = useState<'sessions' | 'overview' | 'trends' | 'load'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
   const [summaryRange, setSummaryRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
-  const [weeklyMetric, setWeeklyMetric] = useState<'distance' | 'calories' | 'duration'>('distance');
+  const [weeklyMetric, setWeeklyMetric] = useState<'distance' | 'calories' | 'duration' | 'cadence' | 'trimp'>('distance');
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [showTotals, setShowTotals] = useState(false);
   const [offsetDays, setOffsetDays] = useState(0);
@@ -88,11 +90,11 @@ export const WorkoutHistory = ({
   }, [summaryRange]);
 
   const summaryInputSessions = useMemo(
-    () => viewMode === 'summary' ? sessions : [],
+    () => viewMode !== 'sessions' ? sessions : [],
     [viewMode, sessions]
   );
 
-  const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, weeklyDailyData } = useWorkoutHistoryData({
+  const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData } = useWorkoutHistoryData({
     sessions: summaryInputSessions,
     maxHr,
     summaryPeriod,
@@ -239,34 +241,36 @@ export const WorkoutHistory = ({
           exit={{ opacity: 0, scale: 0.98 }}
           className="fixed inset-0 z-100 flex flex-col overflow-y-auto bg-vp-bg/95 p-3 backdrop-blur-xl md:p-6"
         >
-          <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
+          <div className="flex h-full w-full flex-col">
             {/* Header */}
-            <div className="mb-5 flex flex-col gap-4 border-b border-vp-border pb-4 md:flex-row md:items-center md:justify-between">
+            <div className="mb-3 flex flex-col gap-4 border-b border-vp-border pb-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
-                <div className="vp-label">Review mode</div>
+                <div className="vp-label">{t('Review mode')}</div>
                 <h2 className="mt-2 text-2xl font-semibold tracking-normal text-vp-text">
-                  Training log
+                  {t('Training log')}
                 </h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <StatusPill label={`${sessions.length} sessions`} tone="neutral" />
+                  <StatusPill label={`${sessions.length} ${t('sessions')}`} tone="neutral" />
                   <StatusPill
-                    label={pendingSupabaseCount > 0 ? `${pendingSupabaseCount} pending sync` : 'Supabase synced'}
+                    label={pendingSupabaseCount > 0 ? `${pendingSupabaseCount} ${t('pending sync')}` : t('Supabase synced')}
                     tone={pendingSupabaseCount > 0 ? 'warning' : 'ready'}
                   />
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:justify-end">
                 <SegmentedControl
-                  ariaLabel="History view"
+                  ariaLabel={t('History view')}
                   value={viewMode}
                   options={[
-                    { label: 'Sessions', value: 'sessions' },
-                    { label: 'Summary', value: 'summary' },
+                    { label: t('Sessions'), value: 'sessions' },
+                    { label: t('Overview'), value: 'overview' },
+                    { label: t('Trends'), value: 'trends' },
+                    { label: t('Load'), value: 'load' },
                   ]}
-                  onChange={(value) => setViewMode(value as 'sessions' | 'summary')}
+                  onChange={(value) => setViewMode(value as typeof viewMode)}
                 />
-                <button type="button" onClick={onClose} className="vp-button vp-focus-ring" aria-label="Close training log">
-                  Close
+                <button type="button" onClick={onClose} className="vp-button vp-focus-ring" aria-label={t('Close training log')}>
+                  {t('Close')}
                 </button>
               </div>
             </div>
@@ -275,32 +279,32 @@ export const WorkoutHistory = ({
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Batch Export Control Panel */}
                 {sessions.length > 0 && (
-                  <div className="mb-5 flex flex-col gap-4 rounded-lg border border-vp-border bg-white/[0.03] p-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                      <div className="relative w-full lg:max-w-md">
+                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-vp-border bg-white/[0.03] p-2.5">
+                    <div className="contents">
+                      <div className="relative order-1 min-w-[260px] flex-1 lg:max-w-xl">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-vp-muted" />
                         <input
                           value={sessionSearch}
                           onChange={(event) => setSessionSearch(event.target.value)}
-                          placeholder="Search month, date, intensity, metric..."
+                          placeholder={t('Search month, date, intensity, metric...')}
                           className="vp-focus-ring w-full rounded-lg border border-vp-border bg-vp-bg/60 py-2.5 pl-9 pr-9 text-xs text-vp-text outline-none transition-colors placeholder:text-vp-muted focus:border-vp-accent/40 font-mono"
                         />
                         {sessionSearch && (
                           <IconButton
                             onClick={() => setSessionSearch('')}
                             className="absolute right-1.5 top-1/2 h-7 w-7 -translate-y-1/2"
-                            label="Clear search"
+                            label={t('Clear search')}
                             icon={<X size={13} />}
                           />
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusPill label={`Showing ${filteredSessions.length} of ${sessions.length}`} tone="neutral" />
+                      <div className="order-4 ml-auto flex flex-wrap items-center gap-2">
+                        <StatusPill label={`${t('Showing')} ${filteredSessions.length} ${t('of')} ${sessions.length}`} tone="neutral" />
                         {pendingSupabaseCount > 0 && onSyncSupabasePending && (
                           <IconButton
                             onClick={handleRetrySupabaseSync}
                             disabled={isSupabaseRetrying}
-                            label="Retry Supabase sync"
+                            label={t('Retry Supabase sync')}
                             icon={<RefreshCw size={13} className={isSupabaseRetrying ? 'animate-spin' : ''} />}
                             tone="primary"
                           />
@@ -308,8 +312,8 @@ export const WorkoutHistory = ({
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div className="flex items-center gap-3">
+                    <div className="contents">
+                      <div className="order-2 flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleToggleSelectionMode}
@@ -320,16 +324,16 @@ export const WorkoutHistory = ({
                             : ''
                         }`}
                       >
-                        {isSelectionMode ? 'Cancel Batch' : 'Batch Export'}
+                        {t(isSelectionMode ? 'Cancel Batch' : 'Batch Export')}
                       </button>
                       {isSelectionMode && (
                         <span className="text-[10px] font-mono uppercase text-vp-accent tracking-widest font-bold">
-                          {visibleSelectedCount} of {filteredSessions.length} visible selected
+                          {visibleSelectedCount} {t('of')} {filteredSessions.length} {t('visible selected')}
                         </span>
                       )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="order-3 flex flex-wrap items-center gap-2">
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -347,7 +351,7 @@ export const WorkoutHistory = ({
                             className="vp-button vp-focus-ring"
                           >
                             <Upload size={13} />
-                            {isImporting ? 'Importing' : 'Import TCX'}
+                            {t(isImporting ? 'Importing' : 'Import TCX')}
                           </button>
                         )}
                         {isSelectionMode && (
@@ -358,7 +362,7 @@ export const WorkoutHistory = ({
                             aria-label={visibleSelectedCount === filteredSessions.length ? 'Deselect visible sessions' : 'Select visible sessions'}
                             className="vp-button vp-focus-ring"
                           >
-                            {visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible'}
+                            {t(visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible')}
                           </button>
                           <button
                             type="button"
@@ -385,14 +389,14 @@ export const WorkoutHistory = ({
                       </div>
                     </div>
                     {importNotice && (
-                      <div className="rounded border border-vp-accent/20 bg-vp-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-vp-accent">
+                      <div className="order-5 basis-full rounded border border-vp-accent/20 bg-vp-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-vp-accent">
                         {importNotice}
                       </div>
                     )}
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-8">
+                <div className="-mx-3 flex-1 overflow-y-auto px-3 pb-8 custom-scrollbar md:-mx-6 md:px-6">
                   <HistoryList 
                     sessions={filteredSessions}
                     maxHr={maxHr} 
@@ -411,7 +415,7 @@ export const WorkoutHistory = ({
                         className="vp-button vp-focus-ring border-vp-accent/30 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
                       >
                         <RefreshCw size={12} className={isLoadingOlder ? 'animate-spin' : ''} />
-                        {isLoadingOlder ? 'Loading older' : 'Load older workouts'}
+                        {t(isLoadingOlder ? 'Loading older' : 'Load older workouts')}
                       </button>
                     </div>
                   )}
@@ -419,6 +423,7 @@ export const WorkoutHistory = ({
               </div>
             ) : (
               <HistorySummary 
+                section={viewMode}
                 sessions={sessions}
                 onSelectSession={setSelectedSessionId}
                 globalSummary={globalSummary}
@@ -435,6 +440,7 @@ export const WorkoutHistory = ({
                 normalizedChartData={normalizedChartData}
                 summaryInsights={summaryInsights}
                 comparisonSummary={comparisonSummary}
+                trainingLoadMetrics={trainingLoadMetrics}
                 weeklyDailyData={weeklyDailyData}
                 offsetDays={offsetDays}
                 setOffsetDays={setOffsetDays}

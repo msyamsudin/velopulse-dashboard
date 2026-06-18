@@ -3,10 +3,13 @@ import { ChevronLeft, ChevronRight, Activity, Download, Trophy } from 'lucide-re
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, LabelList } from 'recharts';
 import { generateSummaryInsights, getInsightToneClasses, getPersonalRecords } from '../../lib/workout-analysis';
 import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../../lib/export-service';
+import type { TrainingLoadMetrics } from '../../lib/training-load';
+import { useI18n } from '../../i18n';
 
-type MetricKey = 'distance' | 'calories' | 'duration' | 'cadence';
+type MetricKey = 'distance' | 'calories' | 'duration' | 'cadence' | 'trimp';
 
 interface HistorySummaryProps {
+  section: 'overview' | 'trends' | 'load';
   sessions: any[];
   onSelectSession?: (id: string) => void;
   globalSummary: any;
@@ -28,6 +31,7 @@ interface HistorySummaryProps {
     distance: number;
     calories: number;
     durationSeconds: number;
+    trimp: number;
     sessions: number;
     isToday: boolean;
     hasData: boolean;
@@ -51,19 +55,23 @@ interface HistorySummaryProps {
       calories: number;
       duration: number;
       sessions: number;
+      trimp: number;
     };
     deltas: {
       distance: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
       calories: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
       duration: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
       sessions: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
+      trimp: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
     };
   } | null;
+  trainingLoadMetrics: TrainingLoadMetrics;
   offsetDays: number;
   setOffsetDays: (offset: number) => void;
 }
 
 export const HistorySummary = ({
+  section,
   sessions,
   onSelectSession,
   globalSummary,
@@ -81,9 +89,11 @@ export const HistorySummary = ({
   weeklyDailyData,
   summaryInsights,
   comparisonSummary,
+  trainingLoadMetrics,
   offsetDays,
   setOffsetDays
 }: HistorySummaryProps) => {
+  const { locale, t } = useI18n();
   const [recordRange, setRecordRange] = useState<'30d' | '90d' | 'all'>('all');
   const [averageDisplayMode, setAverageDisplayMode] = useState<'hidden' | 'primary' | 'all'>('primary');
   const [averageStyle, setAverageStyle] = useState<'flat' | 'moving'>('flat');
@@ -108,6 +118,7 @@ export const HistorySummary = ({
     { value: 'calories', label: 'KCAL', name: 'Calories', unit: 'kcal', color: '#f472b6', colorRgba: '244,114,182' },
     { value: 'duration', label: 'MIN', name: 'Duration', unit: 'min', color: '#fbbf24', colorRgba: '251,191,36' },
     { value: 'cadence', label: 'RPM', name: 'Cadence', unit: 'rpm', color: '#00ffaa', colorRgba: '0,255,170' },
+    { value: 'trimp', label: 'TRIMP', name: 'Training Load', unit: 'pts', color: '#c084fc', colorRgba: '192,132,252' },
   ] as const;
   const metricConfigByKey = metricOptions.reduce((acc, option) => {
     acc[option.value] = option;
@@ -116,6 +127,20 @@ export const HistorySummary = ({
   const hasSelectedMetrics = selectedMetrics.length > 0;
   const primaryMetric = selectedMetrics.includes(weeklyMetric) ? weeklyMetric : selectedMetrics[0] ?? weeklyMetric;
   const formatChartMetric = (metric: MetricKey, value: number) => metric === 'distance' ? value.toFixed(1) : `${Math.round(value)}`;
+  const formatDailyMetric = (day: HistorySummaryProps['weeklyDailyData'][number]) => {
+    if (weeklyMetric === 'distance') return `${day.distance.toFixed(1)} km`;
+    if (weeklyMetric === 'calories') return `${day.calories} kcal`;
+    if (weeklyMetric === 'duration') return `${Math.round(day.durationSeconds / 60)} min`;
+    if (weeklyMetric === 'trimp') return `${day.trimp.toFixed(1)} pts`;
+    return `${day.sessions} sessions`;
+  };
+  const getDailyMetricIntensity = (day: HistorySummaryProps['weeklyDailyData'][number]) => {
+    if (weeklyMetric === 'distance') return day.distance;
+    if (weeklyMetric === 'calories') return day.calories / 100;
+    if (weeklyMetric === 'duration') return day.durationSeconds / 900;
+    if (weeklyMetric === 'trimp') return day.trimp / 25;
+    return 0;
+  };
   const toggleSelectedMetric = (metric: MetricKey) => {
     if (selectedMetrics.includes(metric)) {
       const next = selectedMetrics.filter(item => item !== metric);
@@ -358,14 +383,14 @@ export const HistorySummary = ({
       ? selectedMetrics.includes('cadence') ? 'running total / avg' : 'running total'
       : 'no metrics'
     : selectedMetrics.length > 1 ? 'multi metric' : hasSelectedMetrics ? primaryMetric : 'no metrics';
-  const periodLabel = summaryPeriod === 'daily'
+  const periodLabel = t(summaryPeriod === 'daily'
     ? 'Daily Trends'
     : summaryPeriod === 'weekly'
       ? 'Weekly Trends'
       : summaryPeriod === 'monthly'
         ? 'Monthly Trends'
-        : 'Yearly Trends';
-  const rangeLabel = summaryRange === '7d'
+        : 'Yearly Trends');
+  const rangeLabel = t(summaryRange === '7d'
     ? '7 days'
     : summaryRange === '30d'
       ? '30 days'
@@ -373,7 +398,7 @@ export const HistorySummary = ({
       ? '90 days'
       : summaryRange === '1y'
         ? '1 year'
-        : 'all time';
+        : 'all time');
   const periodOptions = ['daily', 'weekly', 'monthly', 'yearly'] as const;
   const shiftDays = summaryRange === '7d' ? 7 : summaryRange === '30d' ? 30 : summaryRange === '90d' ? 90 : summaryRange === '1y' ? 365 : 0;
   const autoInsights = useMemo(() => generateSummaryInsights({
@@ -382,7 +407,8 @@ export const HistorySummary = ({
     globalSummary,
     weeklyDailyData,
     rangeLabel,
-  }), [comparisonSummary, summaryInsights, globalSummary, weeklyDailyData, rangeLabel]);
+    translate: t,
+  }), [comparisonSummary, summaryInsights, globalSummary, weeklyDailyData, rangeLabel, t]);
   const recordRangeOptions = [
     { value: '30d', label: '30D' },
     { value: '90d', label: '90D' },
@@ -401,41 +427,220 @@ export const HistorySummary = ({
       return !Number.isNaN(sessionDate.getTime()) && sessionDate >= start;
     });
   }, [sessions, recordRange]);
-  const personalRecords = useMemo(() => getPersonalRecords(recordSessions), [recordSessions]);
+  const personalRecords = useMemo(() => getPersonalRecords(recordSessions, locale), [recordSessions, locale]);
+  const trainingLoadDelta = comparisonSummary?.deltas.trimp;
+  const trainingLoadChange = trainingLoadDelta?.hasBaseline
+    ? `${trainingLoadDelta.direction === 'up' ? '+' : ''}${trainingLoadDelta.value}%`
+    : globalSummary.totalTrainingLoad > 0 ? t('New baseline') : t('No load');
+  const loadComparisonMax = Math.max(trainingLoadMetrics.acuteLoad, trainingLoadMetrics.chronicLoad, 1);
+  const acuteLoadWidth = Math.max(2, (trainingLoadMetrics.acuteLoad / loadComparisonMax) * 100);
+  const chronicLoadWidth = Math.max(2, (trainingLoadMetrics.chronicLoad / loadComparisonMax) * 100);
+  const loadRatio = trainingLoadMetrics.acuteChronicRatio;
+  const loadRatioPosition = loadRatio === null ? 0 : Math.min(100, Math.max(0, (loadRatio / 2) * 100));
 
   return (
     <div className="pb-8 flex flex-col gap-4">
-      {globalSummary.hrrSessions > 0 && (
+      <div className="flex flex-col gap-3 rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-accent">
+            {t(section === 'overview' ? 'Overview' : section === 'trends' ? 'Trends' : 'Load')}
+          </div>
+          <div className="mt-1 text-[11px] text-white/50">
+            {t(section === 'overview'
+              ? 'Key results, records, and consistency'
+              : section === 'trends'
+                ? 'Progress over time and metric patterns'
+                : 'Training stress, recovery, and guidance')}
+          </div>
+        </div>
+        {section !== 'trends' && (
+          <div className="flex overflow-hidden rounded-lg border border-white/10 bg-black/20">
+            {rangeOptions.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setSummaryRange(option.value)}
+                className={`px-2.5 py-2 text-[9px] font-mono font-bold uppercase tracking-widest transition-colors ${summaryRange === option.value ? 'bg-white/10 text-white' : 'text-hw-muted hover:text-white'}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className={`${section === 'load' ? '' : 'hidden'} hardware-card border-purple-400/20 bg-purple-400/5 p-4`}>
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-purple-400/10 pb-3">
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.2em] text-purple-300">
+              <Activity size={12} />
+              {t('Training Load')}
+            </div>
+            <div className="mt-1 text-[11px] font-mono uppercase tracking-[0.12em] text-white/45">
+              {t('Edwards TRIMP from heart-rate zones')}
+            </div>
+          </div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">{rangeLabel}</div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: t('Period Load'), value: globalSummary.totalTrainingLoad, detail: `${globalSummary.totalSessions} ${t('sessions')}` },
+            { label: t('Avg / Session'), value: globalSummary.averageTrainingLoad, detail: t('TRIMP points') },
+            { label: t('7-Day Load'), value: globalSummary.sevenDayTrainingLoad, detail: t('Latest 7 days') },
+            { label: t('Vs Previous'), value: trainingLoadChange, detail: comparisonSummary?.label ?? t('No comparison') },
+          ].map(metric => (
+            <div key={metric.label} className="rounded-xl border border-purple-400/15 bg-black/20 px-4 py-3">
+              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{metric.label}</div>
+              <div className="mt-1 text-2xl font-bold font-mono text-purple-200 tabular-nums">{metric.value}</div>
+              <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/40">{metric.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`${section === 'load' ? '' : 'hidden'} hardware-card border-blue-400/20 bg-blue-400/5 p-4`}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-blue-400/10 pb-3">
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.2em] text-blue-300">
+              <Activity size={12} />
+              {t('Load Guidance')}
+            </div>
+            <div className="mt-1 text-[11px] font-mono uppercase tracking-[0.12em] text-white/45">
+              {t('7-day load compared with a 28-day baseline')}
+            </div>
+          </div>
+          <div className={`rounded border px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-[0.14em] ${
+            trainingLoadMetrics.recommendation === 'Recovery'
+              ? 'border-orange-400/30 bg-orange-400/10 text-orange-300'
+              : trainingLoadMetrics.recommendation === 'Build'
+                ? 'border-blue-400/30 bg-blue-400/10 text-blue-300'
+                : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+          }`}>
+            {t(trainingLoadMetrics.recommendation)}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: t('Chronic Load'), value: trainingLoadMetrics.chronicLoad, detail: t('28-day weekly avg') },
+            { label: t('Load Ratio'), value: trainingLoadMetrics.acuteChronicRatio?.toFixed(2) ?? '--', detail: t('Acute / chronic') },
+            { label: t('Monotony'), value: trainingLoadMetrics.monotony.toFixed(2), detail: t('7-day repetition') },
+            { label: t('Strain'), value: trainingLoadMetrics.strain, detail: t('Acute x monotony') },
+          ].map(metric => (
+            <div key={metric.label} className="rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
+              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{metric.label}</div>
+              <div className="mt-1 text-2xl font-bold font-mono text-blue-200 tabular-nums">{metric.value}</div>
+              <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/40">{metric.detail}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Load Balance')}</div>
+                <div className="mt-1 text-[10px] text-white/40">{t('Recent 7 days versus 28-day weekly baseline')}</div>
+              </div>
+              <div className="text-[9px] font-mono uppercase tracking-widest text-white/35">TRIMP</div>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-[9px] font-mono uppercase tracking-wider">
+                  <span className="text-white/55">{t('Acute load')}</span>
+                  <span className="font-bold text-blue-200">{trainingLoadMetrics.acuteLoad}</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-white/6">
+                  <div className="h-full rounded-full bg-blue-400 transition-[width] duration-500" style={{ width: `${acuteLoadWidth}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-[9px] font-mono uppercase tracking-wider">
+                  <span className="text-white/55">{t('Chronic baseline')}</span>
+                  <span className="font-bold text-purple-200">{trainingLoadMetrics.chronicLoad}</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-white/6">
+                  <div className="h-full rounded-full bg-purple-400 transition-[width] duration-500" style={{ width: `${chronicLoadWidth}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Load Ratio')}</div>
+                <div className="mt-1 text-[10px] text-white/40">{t('Balanced zone is 0.8 to 1.3')}</div>
+              </div>
+              <div className="font-mono text-xl font-bold tabular-nums text-white">
+                {loadRatio?.toFixed(2) ?? '--'}
+              </div>
+            </div>
+            <div className="relative mt-6 pb-5">
+              <div className="flex h-3 overflow-hidden rounded-full">
+                <div className="w-[40%] bg-blue-400/70" />
+                <div className="w-[25%] bg-emerald-400/80" />
+                <div className="w-[10%] bg-amber-400/80" />
+                <div className="w-[25%] bg-orange-500/80" />
+              </div>
+              {loadRatio !== null && (
+                <div
+                  className="absolute top-[-5px] h-5 w-1 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+                  style={{ left: `${loadRatioPosition}%` }}
+                  aria-label={`${t('Current load ratio')} ${loadRatio.toFixed(2)}`}
+                />
+              )}
+              <div className="mt-2 flex justify-between text-[8px] font-mono text-white/35">
+                <span>0</span>
+                <span>0.8</span>
+                <span>1.3</span>
+                <span>1.5</span>
+                <span>2+</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3">
+          <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Practical recommendation')}</div>
+          <p className="mt-2 text-sm leading-6 text-white/70">{t(trainingLoadMetrics.recommendationDetail)}</p>
+          <p className="mt-2 border-t border-white/6 pt-2 text-[10px] leading-5 text-white/40">
+            {t('Guidance is based only on recorded heart-rate load. Check your actual fatigue, sleep, soreness, illness, pain, and recovery before deciding how to train.')}
+          </p>
+        </div>
+      </div>
+
+      {section === 'load' && globalSummary.hrrSessions > 0 && (
         <div className="hardware-card border-emerald-400/20 bg-emerald-400/5 p-4">
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-emerald-400/10 pb-3">
             <div>
               <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-emerald-300 flex items-center gap-2">
                 <Activity size={12} />
-                Heart Rate Recovery
+                {t('Heart Rate Recovery')}
               </div>
               <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">
-                Recovery scores from workouts in the selected range
+                {t('Recovery scores from workouts in the selected range')}
               </div>
             </div>
             <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">
-              {globalSummary.hrrSessions}/{globalSummary.totalSessions} sessions
+              {globalSummary.hrrSessions}/{globalSummary.totalSessions} {t('sessions')}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-xl border border-emerald-400/15 bg-black/20 px-4 py-3">
-              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Avg HRR</div>
+              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Avg HRR')}</div>
               <div className="mt-1 text-2xl font-bold font-mono text-emerald-300 tabular-nums">
                 {globalSummary.avgHrr} <span className="text-[10px] font-normal text-white/40">BPM</span>
               </div>
             </div>
             <div className="rounded-xl border border-emerald-400/15 bg-black/20 px-4 py-3">
-              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Best HRR</div>
+              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Best HRR')}</div>
               <div className="mt-1 text-2xl font-bold font-mono text-white tabular-nums">
                 {globalSummary.bestHrr} <span className="text-[10px] font-normal text-white/40">BPM</span>
               </div>
             </div>
             <div className="rounded-xl border border-emerald-400/15 bg-black/20 px-4 py-3">
-              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Coverage</div>
+              <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Coverage')}</div>
               <div className="mt-1 text-2xl font-bold font-mono text-white tabular-nums">
                 {Math.round((globalSummary.hrrSessions / Math.max(1, globalSummary.totalSessions)) * 100)}
                 <span className="text-[10px] font-normal text-white/40">%</span>
@@ -445,37 +650,37 @@ export const HistorySummary = ({
         </div>
       )}
 
-      {showTotals && summaryInsights && (
+      {section === 'overview' && showTotals && summaryInsights && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Avg / Session</div>
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Avg / Session')}</div>
             <div className="mt-1 text-sm font-bold font-mono text-white">{summaryInsights.avgDistancePerSession} <span className="text-[9px] text-hw-muted">KM</span></div>
             <div className="text-[9px] font-mono text-white/45">{summaryInsights.avgDurationPerSession}</div>
           </div>
           <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Best Period</div>
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Best Period')}</div>
             <div className="mt-1 text-sm font-bold font-mono" style={{ color: metricColor }}>{summaryInsights.bestPeriodDistance} <span className="text-[9px] text-white/40">KM</span></div>
             <div className="text-[9px] font-mono text-white/45">{summaryInsights.bestPeriodLabel}</div>
           </div>
           <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Current Streak</div>
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Current Streak')}</div>
             <div className="mt-1 text-sm font-bold font-mono text-white">{summaryInsights.currentStreakLabel}</div>
-            <div className="text-[9px] font-mono text-white/45">{summaryInsights.activeDaysLabel} active</div>
+            <div className="text-[9px] font-mono text-white/45">{summaryInsights.activeDaysLabel} {t('active')}</div>
           </div>
           <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
-            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">Active Span</div>
+            <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Active Span')}</div>
             <div className="mt-1 text-sm font-bold font-mono text-white">{summaryInsights.activeSpanLabel}</div>
-            <div className="text-[9px] font-mono text-white/45">First to latest</div>
+            <div className="text-[9px] font-mono text-white/45">{t('First to latest')}</div>
           </div>
         </div>
       )}
 
-      {autoInsights.length > 0 && (
+      {section === 'overview' && autoInsights.length > 0 && (
         <div className="hardware-card border-hw-muted/20 p-4 bg-black/20">
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/5 pb-3">
             <div>
-              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">Automatic Insights</div>
-              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">Generated from range trends and consistency</div>
+              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Automatic Insights')}</div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">{t('Generated from range trends and consistency')}</div>
             </div>
             <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">{rangeLabel}</div>
           </div>
@@ -490,15 +695,15 @@ export const HistorySummary = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
+      <div className={`${section === 'overview' ? '' : 'hidden'} grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4`}>
         <div className="hardware-card border-hw-muted/20 p-4 bg-black/20">
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/5 pb-3">
             <div>
               <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted flex items-center gap-2">
                 <Trophy size={12} className="text-yellow-300" />
-                Personal Records
+                {t('Personal Records')}
               </div>
-              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">Best efforts from the selected period</div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">{t('Best efforts from the selected period')}</div>
             </div>
             <div className="flex rounded-lg border border-white/10 bg-white/5 p-1">
               {recordRangeOptions.map(option => (
@@ -520,21 +725,21 @@ export const HistorySummary = ({
                   onClick={() => onSelectSession?.(record.sessionId)}
                   className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:border-hw-accent/40 hover:bg-hw-accent/5"
                 >
-                  <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{record.title}</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{t(record.title)}</div>
                   <div className="mt-1 text-lg font-bold font-mono text-white tabular-nums">
                     {record.value} <span className="text-[10px] font-normal text-white/35">{record.unit}</span>
                   </div>
-                  <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{record.dateLabel}</div>
+                  <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{t(record.dateLabel)}</div>
                 </button>
               ))}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">No records in this period</div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">{t('No records in this period')}</div>
             </div>
           )}
           <div className="mt-3 text-[9px] font-mono uppercase tracking-[0.16em] text-white/35">
-            {recordSessions.length} sessions in record scope
+            {t('{count} sessions in record scope', { count: recordSessions.length })}
           </div>
         </div>
 
@@ -572,8 +777,8 @@ export const HistorySummary = ({
         </div>
       </div>
 
-      <div className="mt-2 flex flex-col gap-4">
-        <div className="hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25">
+      <div className={`${section === 'load' ? 'hidden' : ''} mt-2 flex flex-col gap-4`}>
+        <div className={`${section === 'trends' ? '' : 'hidden'} hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25`}>
           <div className="mb-5 flex flex-col gap-4 border-b border-white/5 pb-5">
             <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
               <div className="flex items-start gap-3 min-w-0">
@@ -581,16 +786,16 @@ export const HistorySummary = ({
                   <Activity size={14} className="text-hw-accent" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[9px] text-hw-muted uppercase font-mono tracking-[0.2em]">Training Progress</div>
+                  <div className="text-[9px] text-hw-muted uppercase font-mono tracking-[0.2em]">{t('Training Progress')}</div>
                   <div className="text-white font-bold text-sm font-mono mt-0.5">
                     {periodLabel}
                     <span className="ml-2 text-[10px] font-normal text-hw-accent/80">
-                      {activePeriods} active periods in {rangeLabel}
+                      {t('{count} active periods in {range}', { count: activePeriods, range: rangeLabel })}
                     </span>
                   </div>
                   {denseData && (
                     <div className="mt-2 text-[10px] font-mono uppercase tracking-[0.16em] text-hw-muted">
-                      Dense timeline detected. Showing line view for readability.
+                      {t('Dense timeline detected. Showing line view for readability.')}
                     </div>
                   )}
                 </div>
@@ -602,18 +807,18 @@ export const HistorySummary = ({
                     <button
                       onClick={() => setOffsetDays(offsetDays + shiftDays)}
                       className="p-1 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
-                      title="Previous Period"
+                      title={t('Previous Period')}
                     >
                       <ChevronLeft size={14} />
                     </button>
                     <div className="min-w-20 px-2 text-center text-[8px] font-mono uppercase text-white/45 tracking-widest border-x border-white/5">
-                      {offsetDays === 0 ? 'Current' : `${offsetDays}d back`}
+                      {offsetDays === 0 ? t('Current') : t('{days}d back', { days: offsetDays })}
                     </div>
                     <button
                       onClick={() => setOffsetDays(Math.max(0, offsetDays - shiftDays))}
                       disabled={offsetDays === 0}
                       className={`p-1 rounded transition-colors ${offsetDays === 0 ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
-                      title="Next Period"
+                      title={t('Next Period')}
                     >
                       <ChevronRight size={14} />
                     </button>
@@ -623,23 +828,23 @@ export const HistorySummary = ({
                   onClick={() => setShowTotals(!showTotals)}
                   className={`rounded-lg border px-3 py-2 text-[9px] font-mono uppercase tracking-widest transition-colors ${showTotals ? 'border-hw-accent/40 bg-hw-accent/10 text-hw-accent' : 'border-white/10 bg-white/5 text-white/45 hover:text-white'}`}
                 >
-                  {showTotals ? 'Compact' : 'Totals'}
+                  {showTotals ? t('Compact') : t('Totals')}
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-3">
-              <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Timeline</div>
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_1.1fr] gap-2">
-                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8 bg-black/20">
+            <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="w-16 shrink-0 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Timeline')}</div>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <div className="grid min-w-[220px] flex-1 grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-px overflow-hidden rounded-lg border border-white/8 bg-white/8 sm:max-w-md">
                     {periodOptions.map(p => (
                       <button
                         key={p}
                         onClick={() => setSummaryPeriod(p)}
-                        className={`px-2.5 py-2 text-[9px] font-mono uppercase tracking-widest font-bold transition-all ${summaryPeriod === p ? 'bg-white/10 text-white' : 'text-hw-muted hover:text-white'}`}
+                        className={`min-w-0 whitespace-nowrap bg-black/80 px-2 py-2 text-[9px] font-mono uppercase tracking-[0.08em] font-bold transition-all ${summaryPeriod === p ? 'bg-white/10 text-white' : 'text-hw-muted hover:bg-black/60 hover:text-white'}`}
                       >
-                        {p}
+                        {t(p)}
                       </button>
                     ))}
                   </div>
@@ -658,9 +863,11 @@ export const HistorySummary = ({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.03] p-2.5 xl:min-w-[560px]">
-                <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Display</div>
-                <div className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)_174px_120px_76px] gap-2">
+              <div className="h-px bg-white/6" />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="w-16 shrink-0 text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Display')}</div>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/8 bg-black/20">
                     <button
                       onClick={() => setChartType('bar')}
@@ -677,7 +884,7 @@ export const HistorySummary = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-white/8 bg-black/20">
+                  <div className="grid min-w-[260px] flex-1 grid-cols-5 overflow-hidden rounded-lg border border-white/8 bg-black/20 sm:max-w-md">
                     {metricOptions.map(option => (
                       <button
                         key={option.value}
@@ -729,8 +936,7 @@ export const HistorySummary = ({
                   >
                     TOTAL
                   </button>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
+                  <div className="mx-1 hidden h-5 w-px bg-white/10 sm:block" />
                   {selectedMetrics.map(metric => {
                     const config = metricConfigByKey[metric];
                     return (
@@ -1055,12 +1261,12 @@ export const HistorySummary = ({
 
         </div>
 
-        <div className="hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25">
+        <div className={`${section === 'overview' ? '' : 'hidden'} hardware-card border-hw-muted/20 p-5 flex flex-col bg-black/25`}>
           <div className="flex items-center justify-between gap-3 mb-4 border-b border-white/5 pb-3">
             <div>
-              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">Summary Insights</div>
+              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Summary Insights')}</div>
               <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-white/45 mt-1">
-                {comparisonSummary?.headline ?? 'Contextual stats for the selected range'}
+                {comparisonSummary?.headline ?? t('Contextual stats for the selected range')}
               </div>
             </div>
             <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-white/35">
@@ -1072,15 +1278,16 @@ export const HistorySummary = ({
             {comparisonSummary && (
               <div className="rounded-2xl border border-white/8 bg-white/2.5 px-4 py-3">
                 <div className="flex items-baseline justify-between gap-3 mb-3">
-                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">Range Comparison</div>
+                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Range Comparison')}</div>
                   <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/45">{comparisonSummary.label}</div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                   {[
                     { key: 'distance', label: 'Distance', unit: 'km' },
                     { key: 'sessions', label: 'Sessions', unit: '' },
                     { key: 'duration', label: 'Duration', unit: 'min' },
                     { key: 'calories', label: 'Calories', unit: 'kcal' },
+                    { key: 'trimp', label: 'TRIMP', unit: 'pts' },
                   ].map(item => {
                     const metric = comparisonSummary.metrics[item.key as keyof typeof comparisonSummary.metrics];
                     const delta = comparisonSummary.deltas[item.key as keyof typeof comparisonSummary.deltas];
@@ -1092,7 +1299,7 @@ export const HistorySummary = ({
 
                     return (
                       <div key={item.key} className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5">
-                        <div className="text-[8px] font-mono uppercase tracking-[0.16em] text-hw-muted">{item.label}</div>
+                        <div className="text-[8px] font-mono uppercase tracking-[0.16em] text-hw-muted">{t(item.label)}</div>
                         <div className="mt-1 text-sm font-bold font-mono text-white">
                           {item.key === 'distance' ? metric.toFixed(1) : Math.round(metric)}
                           {item.unit && <span className="ml-1 text-[9px] text-white/35">{item.unit}</span>}
@@ -1101,8 +1308,8 @@ export const HistorySummary = ({
                           {delta.hasBaseline
                             ? `${delta.direction === 'up' ? '+' : delta.direction === 'down' ? '' : ''}${delta.value}%`
                             : metric > 0
-                              ? 'new'
-                              : 'none'}
+                              ? t('new')
+                              : t('none')}
                         </div>
                       </div>
                     );
@@ -1114,34 +1321,34 @@ export const HistorySummary = ({
             {summaryInsights && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Avg / Session</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Avg / Session')}</div>
                   <div className="mt-1 text-base font-bold font-mono text-white">{summaryInsights.avgDistancePerSession} <span className="text-[9px] text-hw-muted">KM</span></div>
                   <div className="text-[9px] font-mono text-white/45 mt-1">{summaryInsights.avgDurationPerSession}</div>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Best Period</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Best Period')}</div>
                   <div className="mt-1 text-base font-bold font-mono" style={{ color: metricColor }}>{summaryInsights.bestPeriodDistance} <span className="text-[9px] text-white/40">KM</span></div>
                   <div className="text-[9px] font-mono text-white/45 mt-1">{summaryInsights.bestPeriodLabel}</div>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Last Workout</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Last Workout')}</div>
                   <div className="mt-1 text-base font-bold font-mono text-white">{summaryInsights.lastWorkoutLabel}</div>
-                  <div className="text-[9px] font-mono text-white/45 mt-1">Latest in range</div>
+                  <div className="text-[9px] font-mono text-white/45 mt-1">{t('Latest in range')}</div>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Current Streak</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Current Streak')}</div>
                   <div className="mt-1 text-base font-bold font-mono text-white">{summaryInsights.currentStreakLabel}</div>
-                  <div className="text-[9px] font-mono text-white/45 mt-1">{summaryInsights.activeDaysLabel} active</div>
+                  <div className="text-[9px] font-mono text-white/45 mt-1">{summaryInsights.activeDaysLabel} {t('active')}</div>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Longest Streak</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Longest Streak')}</div>
                   <div className="mt-1 text-base font-bold font-mono text-white">{summaryInsights.longestStreakLabel}</div>
-                  <div className="text-[9px] font-mono text-white/45 mt-1">Best run in this range</div>
+                  <div className="text-[9px] font-mono text-white/45 mt-1">{t('Best run in this range')}</div>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Active Span</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Active Span')}</div>
                   <div className="mt-1 text-base font-bold font-mono text-white">{summaryInsights.activeSpanLabel}</div>
-                  <div className="text-[9px] font-mono text-white/45 mt-1">First to latest</div>
+                  <div className="text-[9px] font-mono text-white/45 mt-1">{t('First to latest')}</div>
                 </div>
               </div>
             )}
@@ -1201,18 +1408,9 @@ export const HistorySummary = ({
                                 return <div key={`empty-${weekIndex}-${dayIndex}`} className="h-6 rounded-md bg-white/2" />;
                               }
 
-                              const intensity = Math.max(
-                                day.sessions,
-                                weeklyMetric === 'distance' ? day.distance : weeklyMetric === 'calories' ? day.calories / 100 : weeklyMetric === 'duration' ? day.durationSeconds / 900 : 0
-                              );
+                              const intensity = Math.max(day.sessions, getDailyMetricIntensity(day));
                               const opacity = day.hasData ? Math.min(0.95, 0.2 + intensity * 0.12) : 0.08;
-                              const tooltipValue = weeklyMetric === 'distance'
-                                ? `${day.distance.toFixed(1)} km`
-                                : weeklyMetric === 'calories'
-                                  ? `${day.calories} kcal`
-                                  : weeklyMetric === 'duration'
-                                    ? `${Math.round(day.durationSeconds / 60)} min`
-                                    : `${day.sessions} sessions`;
+                              const tooltipValue = formatDailyMetric(day);
 
                               return (
                                 <div key={day.date} className="group relative flex flex-col items-center gap-1">
@@ -1251,18 +1449,9 @@ export const HistorySummary = ({
                     ) : (
                       <div className="grid grid-cols-7 md:grid-cols-7 gap-2">
                         {weeklyDailyData.map(day => {
-                          const intensity = Math.max(
-                            day.sessions,
-                            weeklyMetric === 'distance' ? day.distance : weeklyMetric === 'calories' ? day.calories / 100 : weeklyMetric === 'duration' ? day.durationSeconds / 900 : 0
-                          );
+                          const intensity = Math.max(day.sessions, getDailyMetricIntensity(day));
                           const opacity = day.hasData ? Math.min(0.95, 0.2 + intensity * 0.12) : 0.08;
-                          const tooltipValue = weeklyMetric === 'distance'
-                            ? `${day.distance.toFixed(1)} km`
-                            : weeklyMetric === 'calories'
-                              ? `${day.calories} kcal`
-                              : weeklyMetric === 'duration'
-                                ? `${Math.round(day.durationSeconds / 60)} min`
-                                : `${day.sessions} sessions`;
+                          const tooltipValue = formatDailyMetric(day);
 
                           return (
                             <div key={day.date} className="group relative flex flex-col items-center gap-1.5">

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { CheckCircle, RefreshCw, UploadCloud, XCircle } from 'lucide-react';
 import { InlineNotice } from '../ui';
+import { useI18n } from '@/i18n';
 
 interface SyncActionBarProps {
   onSync: () => void;
@@ -10,6 +11,7 @@ interface SyncActionBarProps {
 }
 
 export const SyncActionBar = ({ onSync, isPending, isSuccess, isError }: SyncActionBarProps) => {
+  const { t } = useI18n();
   const noticeTone = isSuccess ? 'success' : isError ? 'danger' : 'info';
   const noticeIcon = isSuccess
     ? <CheckCircle size={13} />
@@ -26,10 +28,10 @@ export const SyncActionBar = ({ onSync, isPending, isSuccess, isError }: SyncAct
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <InlineNotice tone={noticeTone} icon={noticeIcon} className="md:flex-1">
           {isSuccess
-            ? 'Workout synced to Google Fit'
+            ? t('Workout synced to Google Fit')
             : isError
-              ? 'Sync failed. Try again when the connection is ready'
-              : 'Workout complete. Session data is ready to sync'}
+              ? t('Sync failed. Try again when the connection is ready')
+              : t('Workout complete. Session data is ready to sync')}
         </InlineNotice>
         <button
           type="button"
@@ -43,7 +45,7 @@ export const SyncActionBar = ({ onSync, isPending, isSuccess, isError }: SyncAct
           }`}
         >
           <RefreshCw size={13} className={isPending ? 'animate-spin' : ''} />
-          {isPending ? 'Syncing' : isSuccess ? 'Synced' : isError ? 'Retry Sync' : 'Sync Google Fit'}
+          {t(isPending ? 'Syncing' : isSuccess ? 'Synced' : isError ? 'Retry Sync' : 'Sync Google Fit')}
         </button>
       </div>
     </motion.div>

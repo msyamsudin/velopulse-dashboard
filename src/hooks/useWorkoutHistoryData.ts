@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
 import { formatDuration } from '../utils/formatters';
 import { HR_ZONES, getSafeMaxHr } from '@/lib/constants';
+import { calculateEdwardsTrimp, calculateTrainingLoadMetrics } from '@/lib/training-load';
+import { useI18n } from '@/i18n';
 
 interface UseWorkoutHistoryDataProps {
   sessions: any[];
   maxHr: number;
   summaryPeriod: 'yearly' | 'monthly' | 'weekly' | 'daily';
   summaryRange: '7d' | '30d' | '90d' | '1y' | 'all';
-  weeklyMetric: 'distance' | 'calories' | 'duration' | 'cadence';
+  weeklyMetric: 'distance' | 'calories' | 'duration' | 'cadence' | 'trimp';
   offsetDays?: number;
 }
 
@@ -54,6 +56,7 @@ const getPreviousRangeBounds = (range: UseWorkoutHistoryDataProps['summaryRange'
 };
 
 export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryRange, weeklyMetric, offsetDays = 0 }: UseWorkoutHistoryDataProps) => {
+  const { locale, t } = useI18n();
   
   const calculateFullStats = useMemo(() => (session: any) => {
     const history = session.history || [];
@@ -66,12 +69,14 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       avgResistance: 0,
       maxResistance: 0,
       moveMinutes: 0,
+      trainingLoad: calculateEdwardsTrimp([], session.duration || 0, maxHr),
       zones: []
     };
 
     if (history.length === 0) return statsTemplate;
 
     const safeMax = getSafeMaxHr(maxHr);
+    const trainingLoad = calculateEdwardsTrimp(history, session.duration || 0, safeMax);
 
     const activePoints = history.filter((h: any) => h.hr >= (safeMax * HR_ZONES[0].minPct)).length;
     const activeRatio = activePoints / history.length;
@@ -114,6 +119,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       avgResistance: Math.round(history.reduce((a: any, b: any) => a + b.resistance, 0) / history.length),
       maxResistance: Math.max(...history.map((h: any) => h.resistance)),
       moveMinutes,
+      trainingLoad,
       zones: zones.map(z => {
         const ratio = z.seconds / history.length;
         const allocatedSeconds = Math.round(ratio * session.duration);
@@ -171,13 +177,13 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         : new Date(endDate);
     startDate.setHours(0, 0, 0, 0);
 
-    const dayMap: Record<string, { distance: number; calories: number; duration: number; sessions: number; cadenceSum: number }> = {};
+    const dayMap: Record<string, { distance: number; calories: number; duration: number; trimp: number; sessions: number; cadenceSum: number }> = {};
 
     let current = new Date(startDate);
     // Use a while loop to increment days safely
     while (current <= endDate) {
       const key = getLocalDateKey(current);
-      dayMap[key] = { distance: 0, calories: 0, duration: 0, sessions: 0, cadenceSum: 0 };
+      dayMap[key] = { distance: 0, calories: 0, duration: 0, trimp: 0, sessions: 0, cadenceSum: 0 };
       current.setDate(current.getDate() + 1);
     }
 
@@ -188,6 +194,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         dayMap[key].distance += parseFloat(full.totalDistance as string) || 0;
         dayMap[key].calories += full.totalCalories || 0;
         dayMap[key].duration += session.duration || 0;
+        dayMap[key].trimp += full.trainingLoad.score || 0;
         dayMap[key].sessions += 1;
         dayMap[key].cadenceSum += session.stats.avgCadence || 0;
       }
@@ -205,6 +212,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         distance: parseFloat(data.distance.toFixed(2)),
         calories: data.calories,
         durationSeconds: data.duration,
+        trimp: Math.round(data.trimp * 10) / 10,
         sessions: data.sessions,
         cadence: data.sessions > 0 ? Math.round(data.cadenceSum / data.sessions) : 0,
         isToday,
@@ -212,6 +220,34 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       };
     });
   }, [filteredSessions, calculateFullStats, summaryRange, offsetDays]);
+
+  const trainingLoadMetrics = useMemo(() => {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - offsetDays);
+    endDate.setHours(23, 59, 59, 999);
+
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 27);
+    startDate.setHours(0, 0, 0, 0);
+
+    const dailyLoads = new Map<string, number>();
+    const cursor = new Date(startDate);
+    while (cursor <= endDate) {
+      dailyLoads.set(getLocalDateKey(cursor), 0);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    sessions.forEach(session => {
+      const sessionDate = new Date(session.date);
+      if (Number.isNaN(sessionDate.getTime()) || sessionDate < startDate || sessionDate > endDate) return;
+
+      const key = getLocalDateKey(sessionDate);
+      const load = calculateFullStats(session).trainingLoad.score || 0;
+      dailyLoads.set(key, (dailyLoads.get(key) || 0) + load);
+    });
+
+    return calculateTrainingLoadMetrics(Array.from(dailyLoads.values()));
+  }, [sessions, offsetDays, calculateFullStats]);
 
   const summaryData = useMemo(() => {
     if (filteredSessions.length === 0) return [];
@@ -222,6 +258,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         totalDistance: d.distance,
         totalCalories: d.calories,
         totalDuration: d.durationSeconds,
+        totalTrainingLoad: d.trimp,
         sessionCount: d.sessions,
       }));
     }
@@ -241,14 +278,14 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       } else if (summaryPeriod === 'monthly') {
         key = `${date.getFullYear()}-${date.getMonth()}`;
         sortKey = date.getFullYear() * 12 + date.getMonth();
-        label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        label = date.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
       } else if (summaryPeriod === 'weekly') {
         const startOfYear = new Date(date.getFullYear(), 0, 1);
         const pastDaysOfYear = (date.getTime() - startOfYear.getTime()) / 86400000;
         const weekNum = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
         key = `${date.getFullYear()}-W${weekNum}`;
         sortKey = date.getFullYear() * 100 + weekNum;
-        label = `Week ${weekNum}, ${date.getFullYear()}`;
+        label = t('Week {week}, {year}', { week: weekNum, year: date.getFullYear() });
       }
 
       const full = calculateFullStats(session);
@@ -261,6 +298,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
           totalDistance: 0,
           totalCalories: 0,
           totalDuration: 0,
+          totalTrainingLoad: 0,
           avgHrSum: 0,
           avgPowerSum: 0,
           avgCadenceSum: 0,
@@ -271,6 +309,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       groups[key].totalDistance += parseFloat(full.totalDistance) || 0;
       groups[key].totalCalories += full.totalCalories || 0;
       groups[key].totalDuration += session.duration || 0;
+      groups[key].totalTrainingLoad += full.trainingLoad.score || 0;
       groups[key].avgHrSum += session.stats.avgHr || 0;
       groups[key].avgPowerSum += session.stats.avgPower || 0;
       groups[key].avgCadenceSum += session.stats.avgCadence || 0;
@@ -285,8 +324,9 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         avgPower: Math.round(g.avgPowerSum / g.sessionCount),
         avgCadence: Math.round(g.avgCadenceSum / g.sessionCount),
         totalDistance: parseFloat(g.totalDistance.toFixed(2)),
+        totalTrainingLoad: Math.round(g.totalTrainingLoad * 10) / 10,
       }));
-  }, [filteredSessions, summaryPeriod, calculateFullStats, weeklyDailyData]);
+  }, [filteredSessions, summaryPeriod, calculateFullStats, weeklyDailyData, locale, t]);
 
   const globalSummary = useMemo(() => {
     if (summaryData.length === 0) return null;
@@ -296,17 +336,25 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     const avgHrr = hrrScores.length > 0
       ? Math.round(hrrScores.reduce((acc, score) => acc + score, 0) / hrrScores.length)
       : null;
+    const totalTrainingLoad = summaryData.reduce((acc, curr) => acc + (curr.totalTrainingLoad || 0), 0);
+    const totalSessions = summaryData.reduce((acc, curr) => acc + curr.sessionCount, 0);
+    const sevenDayTrainingLoad = weeklyDailyData
+      .slice(-7)
+      .reduce((acc, day) => acc + (day.trimp || 0), 0);
 
     return {
       totalDistance: summaryData.reduce((acc, curr) => acc + curr.totalDistance, 0).toFixed(2),
       totalCalories: summaryData.reduce((acc, curr) => acc + curr.totalCalories, 0),
       totalDuration: formatDuration(summaryData.reduce((acc, curr) => acc + curr.totalDuration, 0)),
-      totalSessions: summaryData.reduce((acc, curr) => acc + curr.sessionCount, 0),
+      totalSessions,
+      totalTrainingLoad: Math.round(totalTrainingLoad * 10) / 10,
+      averageTrainingLoad: totalSessions > 0 ? Math.round((totalTrainingLoad / totalSessions) * 10) / 10 : 0,
+      sevenDayTrainingLoad: Math.round(sevenDayTrainingLoad * 10) / 10,
       hrrSessions: hrrSessions.length,
       avgHrr,
       bestHrr,
     };
-  }, [summaryData, filteredSessions]);
+  }, [summaryData, filteredSessions, weeklyDailyData]);
 
   const summaryInsights = useMemo(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;
@@ -350,20 +398,20 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       avgDurationPerSession: totalSessions > 0 ? formatDuration(Math.round(totalDuration / totalSessions)) : '00:00',
       bestPeriodLabel: bestPeriod.label,
       bestPeriodDistance: bestPeriod.totalDistance.toFixed(1),
-      lastWorkoutLabel: lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      activeDaysLabel: `${activeDayCount}/${weeklyDailyData.length} days`,
-      currentStreakLabel: `${currentStreak} days`,
-      longestStreakLabel: `${longestStreak} days`,
+      lastWorkoutLabel: lastDate.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }),
+      activeDaysLabel: t('{active}/{total} days', { active: activeDayCount, total: weeklyDailyData.length }),
+      currentStreakLabel: t('{count} days', { count: currentStreak }),
+      longestStreakLabel: t('{count} days', { count: longestStreak }),
       activeSpanLabel: spanDays >= 365
-        ? `${(spanDays / 365).toFixed(1)} years`
+        ? t('{count} years', { count: (spanDays / 365).toFixed(1) })
         : spanDays >= 30
-          ? `${Math.round(spanDays / 30)} months`
-          : `${spanDays} days`,
+          ? t('{count} months', { count: Math.round(spanDays / 30) })
+          : t('{count} days', { count: spanDays }),
     };
-  }, [filteredSessions, summaryData, weeklyDailyData]);
+  }, [filteredSessions, summaryData, weeklyDailyData, locale, t]);
 
   const comparisonSummary = useMemo(() => {
-    const bounds = getPreviousRangeBounds(summaryRange);
+    const bounds = getPreviousRangeBounds(summaryRange, offsetDays);
     if (!bounds || filteredSessions.length === 0) return null;
 
     const summarizeSessions = (targetSessions: any[]) => {
@@ -372,9 +420,10 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         acc.distance += parseFloat(full.totalDistance) || 0;
         acc.calories += full.totalCalories || 0;
         acc.duration += session.duration || 0;
+        acc.trimp += full.trainingLoad.score || 0;
         acc.sessions += 1;
         return acc;
-      }, { distance: 0, calories: 0, duration: 0, sessions: 0 });
+      }, { distance: 0, calories: 0, duration: 0, trimp: 0, sessions: 0 });
     };
 
     const currentTotals = summarizeSessions(filteredSessions);
@@ -384,12 +433,14 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       calories: currentTotals.calories,
       duration: currentTotals.duration / 60,
       sessions: currentTotals.sessions,
+      trimp: currentTotals.trimp,
     };
     const previousMetrics = {
       distance: previousTotals.distance,
       calories: previousTotals.calories,
       duration: previousTotals.duration / 60,
       sessions: previousTotals.sessions,
+      trimp: previousTotals.trimp,
     };
 
     const getDelta = (current: number, previous: number) => {
@@ -409,6 +460,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       calories: getDelta(metrics.calories, previousMetrics.calories),
       duration: getDelta(metrics.duration, previousMetrics.duration),
       sessions: getDelta(metrics.sessions, previousMetrics.sessions),
+      trimp: getDelta(metrics.trimp, previousMetrics.trimp),
     };
 
     const rankedHeadline = [
@@ -416,29 +468,34 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       { label: 'sessions', delta: deltas.sessions },
       { label: 'duration', delta: deltas.duration },
       { label: 'calories', delta: deltas.calories },
+      { label: 'training load', delta: deltas.trimp },
     ]
       .filter(entry => entry.delta.hasBaseline && entry.delta.value !== null)
       .sort((a, b) => Math.abs(b.delta.value ?? 0) - Math.abs(a.delta.value ?? 0))[0];
 
     const headline = rankedHeadline
-      ? `${rankedHeadline.label} ${rankedHeadline.delta.direction === 'up' ? 'up' : rankedHeadline.delta.direction === 'down' ? 'down' : 'flat'} ${Math.abs(rankedHeadline.delta.value ?? 0)}%`
+      ? t('{metric} {direction} {value}%', {
+          metric: t(rankedHeadline.label),
+          direction: t(rankedHeadline.delta.direction === 'up' ? 'up' : rankedHeadline.delta.direction === 'down' ? 'down' : 'flat'),
+          value: Math.abs(rankedHeadline.delta.value ?? 0),
+        })
       : currentTotals.sessions > 0
-        ? 'new activity in this range'
-        : 'no activity in this range';
+        ? t('new activity in this range')
+        : t('no activity in this range');
 
     return {
-      label: summaryRange === '7d'
+      label: t(summaryRange === '7d'
         ? 'vs previous 7 days'
         : summaryRange === '30d'
           ? 'vs previous 30 days'
           : summaryRange === '90d'
             ? 'vs previous 90 days'
-            : 'vs previous year',
+            : 'vs previous year'),
       headline,
       metrics,
       deltas
     };
-  }, [summaryRange, filteredSessions, previousRangeSessions, calculateFullStats]);
+  }, [summaryRange, offsetDays, filteredSessions, previousRangeSessions, calculateFullStats, t]);
 
   const normalizedChartData = useMemo(() => {
     if (summaryPeriod === 'daily') {
@@ -452,6 +509,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
           distance: d.distance,
           calories: d.calories,
           cadence: d.cadence,
+          trimp: d.trimp,
         };
       });
     }
@@ -482,6 +540,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
           calories: d.totalCalories,
           duration: Math.round(d.totalDuration / 60),
           cadence: d.avgCadence,
+          trimp: d.totalTrainingLoad,
           sessions: d.sessionCount,
           hasData: d.sessionCount > 0,
           isHighlight: idx === arr.length - 1,
@@ -495,6 +554,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     normalizedChartData,
     summaryInsights,
     comparisonSummary,
+    trainingLoadMetrics,
     weeklyDailyData
   };
 };

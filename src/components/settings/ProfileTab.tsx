@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { Save, Target, User, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { calculateMaxHr } from '@/lib/constants';
+import { useI18n } from '@/i18n';
 
 interface UserProfile {
   age: number;
@@ -50,6 +51,7 @@ const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }:
 );
 
 export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileTabProps) => {
+  const { t } = useI18n();
   return (
     <motion.div
       key="profile"
@@ -59,36 +61,36 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileT
       className="space-y-6"
     >
       <div>
-        <div className="vp-label">Rider profile</div>
+        <div className="vp-label">{t('Rider profile')}</div>
         <p className="mt-2 text-sm leading-6 text-vp-muted">
-          These values calibrate heart-rate zones, power context, and ride summaries.
+          {t('These values calibrate heart-rate zones, power context, and ride summaries.')}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField
-          label="Age"
+          label={t('Age')}
           value={profile.age}
           icon={<User size={12} className="text-vp-accent" />}
-          suffix="Years"
+          suffix={t('Years')}
           onChange={(age) => setProfile({ ...profile, age, maxHr: calculateMaxHr(age) })}
         />
         <NumberField
-          label="Max Heart Rate"
+          label={t('Max Heart Rate')}
           value={profile.maxHr}
           icon={<Target size={12} className="text-vp-hr" />}
-          suffix="Auto"
+          suffix={t('Auto')}
           readOnly
         />
         <NumberField
           label="FTP"
           value={profile.ftp}
           icon={<Zap size={12} className="text-vp-power" />}
-          suffix="Watts"
+          suffix={t('Watts')}
           onChange={(ftp) => setProfile({ ...profile, ftp })}
         />
         <NumberField
-          label="Weight"
+          label={t('Weight')}
           value={profile.weight}
           icon={<User size={12} className="text-vp-speed" />}
           suffix="KG"
@@ -97,7 +99,7 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileT
       </div>
 
       <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
-        Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.
+        {t('Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.')}
       </div>
 
       <button
@@ -106,7 +108,7 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileT
         className="vp-focus-ring flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-50"
       >
         <Save size={18} />
-        {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved' : 'Save Profile'}
+        {t(saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved' : 'Save Profile')}
       </button>
     </motion.div>
   );

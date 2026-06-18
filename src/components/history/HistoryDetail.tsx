@@ -330,13 +330,14 @@ export const HistoryDetail = ({
                 <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-hw-accent">{zoneInsight}</div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
                 <MiniMetric label="Avg HR" value={session.stats.avgHr} unit="bpm" icon={<Heart size={11} />} colorClass="text-red-500" />
                 <MiniMetric label="Max HR" value={session.stats.maxHr} unit="bpm" icon={<Heart size={11} />} colorClass="text-red-500" />
                 <MiniMetric label="Cadence" value={session.stats.avgCadence} unit="rpm" icon={<Bike size={11} />} colorClass="text-hw-accent" />
                 <MiniMetric label="Resistance" value={fullStats.avgResistance} unit="lvl" icon={<Settings size={11} />} colorClass="text-orange-400" />
                 <MiniMetric label="Speed" value={fullStats.avgSpeed} unit="km/h" icon={<Activity size={11} />} colorClass="text-blue-400" />
                 <MiniMetric label="Move Min" value={fullStats.moveMinutes} unit="min" icon={<ChevronRight size={11} />} colorClass="text-purple-400" />
+                <MiniMetric label="TRIMP Load" value={fullStats.trainingLoad.score} unit={fullStats.trainingLoad.label} icon={<Activity size={11} />} colorClass="text-purple-300" />
               </div>
             </div>
 
@@ -459,6 +460,7 @@ export const HistoryDetail = ({
                 { label: 'Avg Power', current: session.stats.avgPower, previous: previousSession?.stats?.avgPower, unit: 'w', decimals: 0 },
                 { label: 'Avg HR', current: session.stats.avgHr, previous: previousSession?.stats?.avgHr, unit: 'bpm', decimals: 0 },
                 { label: 'Speed', current: toNumber(fullStats.avgSpeed), previous: previousFullStats ? toNumber(previousFullStats.avgSpeed) : undefined, unit: 'km/h', decimals: 1 },
+                { label: 'TRIMP Load', current: fullStats.trainingLoad.score, previous: previousFullStats?.trainingLoad?.score, unit: 'pts', decimals: 1 },
               ].map(item => {
                 const delta = getMetricDelta(item.current, item.previous);
                 return (

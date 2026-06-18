@@ -5,6 +5,7 @@ import { HrZoneBar } from '../HrZoneBar';
 import { PowerGauge } from '../PowerGauge';
 import { CadenceGauge } from '../CadenceGauge';
 import { StatusPill } from '../ui';
+import { useI18n } from '@/i18n';
 
 interface RecordingCockpitProps {
   currentData: any;
@@ -65,7 +66,9 @@ const MainMetric = ({
   visual,
   isWaiting = false,
   accentStyle
-}: MainMetricProps) => (
+}: MainMetricProps) => {
+  const { t } = useI18n();
+  return (
   <section
     className={`vp-panel-raised h-full min-h-[240px] flex flex-col ${isWaiting ? 'opacity-75' : ''}`}
     style={accentStyle}
@@ -88,13 +91,14 @@ const MainMetric = ({
       </div>
       {isWaiting && (
         <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-vp-muted">
-          Waiting signal
+          {t('Waiting signal')}
         </div>
       )}
       <div className="min-h-24">{visual}</div>
     </div>
   </section>
-);
+  );
+};
 
 const StripMetric = ({
   label,
@@ -135,13 +139,14 @@ const SignalPill = ({
   label: string;
   connected: boolean;
   icon: ReactNode;
-}) => (
-  <StatusPill
-    label={`${label} ${connected ? 'online' : 'offline'}`}
+}) => {
+  const { t } = useI18n();
+  return <StatusPill
+    label={`${label} ${t(connected ? 'online' : 'offline')}`}
     tone={connected ? 'ready' : 'neutral'}
     icon={icon}
-  />
-);
+  />;
+};
 
 export const RecordingCockpit = ({
   currentData,
@@ -156,6 +161,7 @@ export const RecordingCockpit = ({
   chartAvailable = false,
   onOpenChart
 }: RecordingCockpitProps) => {
+  const { t } = useI18n();
   const safeMaxHr = userProfile.maxHr > 0 ? userProfile.maxHr : 1;
   const hrPct = currentData.hr > 0 ? Math.round((currentData.hr / safeMaxHr) * 100) : 0;
   const distanceKm = currentData.distance ? (currentData.distance / 1000).toFixed(2) : '--';
@@ -184,11 +190,11 @@ export const RecordingCockpit = ({
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-2.5 w-2.5 rounded-full bg-vp-accent shadow-[0_0_12px_rgba(53,240,189,0.45)]" />
           <div>
-            <div className="vp-label">Recording</div>
+            <div className="vp-label">{t('Recording')}</div>
             <div className="flex items-center gap-2 text-sm font-semibold text-vp-text">
-              <span>Ride cockpit</span>
+              <span>{t('Ride cockpit')}</span>
               <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted">
-                Live
+                {t('Live')}
               </span>
             </div>
           </div>
@@ -207,7 +213,7 @@ export const RecordingCockpit = ({
               title={chartAvailable ? 'Open live telemetry chart' : 'Chart available after telemetry is recorded'}
             >
               <Activity size={12} />
-              Chart
+              {t('Chart')}
             </button>
           )}
           <button
@@ -223,7 +229,7 @@ export const RecordingCockpit = ({
           </button>
           <div className={`flex items-center gap-2 rounded-md border border-vp-border bg-white/[0.03] px-2.5 py-1.5 ${hrZoneColor}`}>
             <Radio size={12} />
-            <span className="text-[9px] font-mono uppercase tracking-[0.14em]">Zone {hrZoneLabel}</span>
+            <span className="text-[9px] font-mono uppercase tracking-[0.14em]">{t('Zone')} {hrZoneLabel}</span>
           </div>
           <div className="ml-auto flex items-center gap-3 text-vp-accent lg:ml-3">
             <Timer size={18} />
@@ -236,35 +242,35 @@ export const RecordingCockpit = ({
 
       <div className="grid flex-1 min-h-[560px] grid-cols-1 xl:grid-cols-3 gap-4">
         <MainMetric
-          label="Heart Rate"
+          label={t('Heart Rate')}
           value={currentData.hr || '--'}
           unit="BPM"
           icon={<Heart size={14} />}
           colorClass="text-red-400"
           subLabel="% Max"
-          subValue={currentData.hr ? `${hrPct}%` : 'Waiting'}
+          subValue={currentData.hr ? `${hrPct}%` : t('Waiting')}
           visual={<HrZoneBar currentHr={currentData.hr} maxHr={userProfile.maxHr} />}
           isWaiting={!currentData.hr}
           accentStyle={hrCardStyle}
         />
         <MainMetric
-          label="Power"
+          label={t('Power')}
           value={power || '--'}
           unit="W"
           icon={<Zap size={14} />}
           colorClass="text-yellow-300"
-          subLabel="Max"
+          subLabel={t('Max')}
           subValue={`${liveStats.maxPower || 0} W`}
           visual={<PowerGauge power={power} ftp={userProfile.ftp} weight={userProfile.weight} />}
           isWaiting={!power}
         />
         <MainMetric
-          label="Cadence"
+          label={t('Cadence')}
           value={cadence || '--'}
           unit="RPM"
           icon={<Bike size={14} />}
           colorClass="text-vp-cadence"
-          subLabel="Max"
+          subLabel={t('Max')}
           subValue={`${liveStats.maxCadence || 0} RPM`}
           visual={<CadenceGauge value={cadence} max={liveStats.maxCadence || 0} />}
           isWaiting={!cadence}
@@ -273,43 +279,43 @@ export const RecordingCockpit = ({
 
       <div className="grid shrink-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StripMetric
-          label="Speed"
+          label={t('Speed')}
           value={speed ? speed.toFixed(1) : '--'}
           unit="KM/H"
           icon={<Activity size={13} />}
           colorClass="text-blue-400"
           progress={(speed / Math.max(40, liveStats.maxSpeed + 10)) * 100}
-          detail={speed ? `avg ${liveStats.avgSpeed || 0}` : 'waiting'}
+          detail={speed ? `avg ${liveStats.avgSpeed || 0}` : t('waiting')}
           isWaiting={!speed}
         />
         <StripMetric
-          label="Distance"
+          label={t('Distance')}
           value={distanceKm}
           unit="KM"
           icon={<ChevronRight size={13} />}
           colorClass="text-vp-distance"
           progress={currentData.distance ? ((currentData.distance / 1000) % 10) * 10 : 0}
-          detail={speed > 0 ? `${speed.toFixed(1)} km/h` : 'waiting'}
+          detail={speed > 0 ? `${speed.toFixed(1)} km/h` : t('waiting')}
           isWaiting={!currentData.distance}
         />
         <StripMetric
-          label="Calories"
+          label={t('Calories')}
           value={calories || '--'}
           unit="KCAL"
           icon={<Zap size={13} />}
           colorClass="text-pink-400"
           progress={(calories % 500) / 5}
-          detail={power ? `${Math.round(power * 3.6)} kcal/hr` : 'waiting'}
+          detail={power ? `${Math.round(power * 3.6)} kcal/hr` : t('waiting')}
           isWaiting={!calories}
         />
         <StripMetric
-          label="Resistance"
+          label={t('Resistance')}
           value={resistance || '--'}
           unit="%"
           icon={<Settings size={13} />}
           colorClass="text-orange-400"
           progress={resistance}
-          detail={resistance > 70 ? 'climb' : resistance > 30 ? 'rolling' : resistance > 0 ? 'easy' : 'waiting'}
+          detail={t(resistance > 70 ? 'climb' : resistance > 30 ? 'rolling' : resistance > 0 ? 'easy' : 'waiting')}
           isWaiting={!resistance}
         />
       </div>

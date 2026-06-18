@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { useI18n } from '@/i18n';
 
 interface MasterLockProps {
   password: string;
@@ -8,19 +9,20 @@ interface MasterLockProps {
 }
 
 export const MasterLock = ({ password, setPassword, onUnlock, error }: MasterLockProps) => {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col items-center justify-center space-y-5 py-10 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-vp-accent/25 bg-vp-accent/10 text-vp-accent">
         <Lock size={28} />
       </div>
       <div>
-        <h3 className="text-lg font-semibold text-vp-text">Restricted access</h3>
-        <p className="mt-1 text-sm text-vp-muted">Enter the master password to modify system settings.</p>
+        <h3 className="text-lg font-semibold text-vp-text">{t('Restricted access')}</h3>
+        <p className="mt-1 text-sm text-vp-muted">{t('Enter the master password to modify system settings.')}</p>
       </div>
       <div className="w-full max-w-sm space-y-3">
         <input
           type="password"
-          placeholder="Master password"
+          placeholder={t('Master password')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onUnlock()}
@@ -31,7 +33,7 @@ export const MasterLock = ({ password, setPassword, onUnlock, error }: MasterLoc
           onClick={onUnlock}
           className="vp-button vp-focus-ring min-h-11 w-full"
         >
-          Unlock
+          {t('Unlock')}
         </button>
       </div>
     </div>

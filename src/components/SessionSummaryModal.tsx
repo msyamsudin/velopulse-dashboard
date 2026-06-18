@@ -3,6 +3,7 @@ import { Bike, ChevronRight, Download, Heart, Save, Timer, Trash2, Zap } from 'l
 import type { ReactNode } from 'react';
 import { downloadTCX } from '../lib/export-service';
 import { Panel, StatusPill } from './ui';
+import { useI18n } from '@/i18n';
 
 interface SessionSummaryModalProps {
   stats: {
@@ -53,6 +54,7 @@ export const SessionSummaryModal = ({
   onSave,
   onDiscard
 }: SessionSummaryModalProps) => {
+  const { t } = useI18n();
   const canExport = Boolean(history && sessionStartTime);
 
   const handleExport = () => {
@@ -79,7 +81,7 @@ export const SessionSummaryModal = ({
     downloadTCX(tempSession as any);
   };
   const handleDiscard = () => {
-    if (confirm('Discard this workout? Unsaved session data will be lost.')) {
+    if (confirm(t('Discard this workout? Unsaved session data will be lost.'))) {
       onDiscard();
     }
   };
@@ -94,28 +96,28 @@ export const SessionSummaryModal = ({
         <div className="space-y-6 p-5 md:p-7">
           <div className="flex flex-col gap-3 border-b border-vp-border pb-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="vp-label">Session complete</div>
+              <div className="vp-label">{t('Session complete')}</div>
               <h2 className="mt-2 text-2xl font-semibold tracking-normal text-vp-text">
-                Workout summary
+                {t('Workout summary')}
               </h2>
               <p className="mt-2 max-w-xl text-sm leading-6 text-vp-muted">
-                Review the telemetry snapshot before saving this ride.
+                {t('Review the telemetry snapshot before saving this ride.')}
               </p>
             </div>
-            <StatusPill label={`${history?.length || 0} points`} tone={history?.length ? 'ready' : 'neutral'} />
+            <StatusPill label={`${history?.length || 0} ${t('points')}`} tone={history?.length ? 'ready' : 'neutral'} />
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <ResultMetric icon={<Timer size={15} />} label="Duration" value={duration} tone="text-vp-speed" />
-            <ResultMetric icon={<ChevronRight size={15} />} label="Distance" value={`${(distance / 1000).toFixed(2)} KM`} tone="text-vp-distance" />
-            <ResultMetric icon={<Zap size={15} />} label="Calories" value={`${calories} KCAL`} tone="text-vp-calories" />
-            <ResultMetric icon={<Heart size={15} />} label="Avg HR" value={`${stats.avgHr} BPM`} tone="text-vp-hr" />
+            <ResultMetric icon={<Timer size={15} />} label={t('Duration')} value={duration} tone="text-vp-speed" />
+            <ResultMetric icon={<ChevronRight size={15} />} label={t('Distance')} value={`${(distance / 1000).toFixed(2)} KM`} tone="text-vp-distance" />
+            <ResultMetric icon={<Zap size={15} />} label={t('Calories')} value={`${calories} KCAL`} tone="text-vp-calories" />
+            <ResultMetric icon={<Heart size={15} />} label={t('Avg HR')} value={`${stats.avgHr} BPM`} tone="text-vp-hr" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <DetailMetric label="Avg Power" value={`${stats.avgPower} W`} subValue={`Max ${stats.maxPower} W`} tone="text-vp-power" />
-            <DetailMetric label="Avg Cadence" value={`${stats.avgCadence} RPM`} subValue={`Max ${stats.maxCadence} RPM`} tone="text-vp-cadence" />
-            <DetailMetric label="Avg Speed" value={`${stats.avgSpeed} KM/H`} subValue={`Max ${stats.maxSpeed} KM/H`} tone="text-vp-speed" />
+            <DetailMetric label={t('Avg Power')} value={`${stats.avgPower} W`} subValue={`${t('Max')} ${stats.maxPower} W`} tone="text-vp-power" />
+            <DetailMetric label={t('Avg Cadence')} value={`${stats.avgCadence} RPM`} subValue={`${t('Max')} ${stats.maxCadence} RPM`} tone="text-vp-cadence" />
+            <DetailMetric label={t('Avg Speed')} value={`${stats.avgSpeed} KM/H`} subValue={`${t('Max')} ${stats.maxSpeed} KM/H`} tone="text-vp-speed" />
           </div>
 
           {stats.hrrScore !== undefined && stats.hrrScore !== null && (
@@ -126,7 +128,7 @@ export const SessionSummaryModal = ({
                     <Heart size={20} fill="currentColor" />
                   </div>
                   <div>
-                    <div className="vp-label">Heart Rate Recovery</div>
+                    <div className="vp-label">{t('Heart Rate Recovery')}</div>
                     <div className="mt-1 text-sm font-semibold uppercase text-vp-accent">
                       {stats.hrrClassification}
                     </div>
@@ -134,7 +136,7 @@ export const SessionSummaryModal = ({
                 </div>
                 <div className="font-mono text-vp-text">
                   <span className="text-3xl font-black tabular-nums">{stats.hrrScore}</span>
-                  <span className="ml-1 text-xs text-vp-muted">BPM drop</span>
+                  <span className="ml-1 text-xs text-vp-muted">{t('BPM drop')}</span>
                 </div>
               </div>
             </Panel>
@@ -144,11 +146,11 @@ export const SessionSummaryModal = ({
             <button
               type="button"
               onClick={onSave}
-              aria-label="Save workout session"
+              aria-label={t('Save workout session')}
               className="vp-focus-ring flex min-h-12 items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90"
             >
               <Save size={18} />
-              Save
+              {t('Save')}
             </button>
             <button
               type="button"
@@ -158,16 +160,16 @@ export const SessionSummaryModal = ({
               className="vp-button vp-focus-ring min-h-12 text-vp-accent disabled:text-vp-muted"
             >
               <Download size={18} />
-              Export TCX
+              {t('Export TCX')}
             </button>
             <button
               type="button"
               onClick={handleDiscard}
-              aria-label="Discard unsaved workout session"
+              aria-label={t('Discard unsaved workout session')}
               className="vp-button vp-button-danger vp-focus-ring min-h-12"
             >
               <Trash2 size={18} />
-              Discard
+              {t('Discard')}
             </button>
           </div>
         </div>

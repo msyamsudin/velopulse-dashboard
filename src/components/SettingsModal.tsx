@@ -11,6 +11,7 @@ import { ProfileTab } from './settings/ProfileTab';
 import { SystemTab } from './settings/SystemTab';
 import { MasterLock } from './settings/MasterLock';
 import { IconButton, SegmentedControl } from './ui';
+import { useI18n } from '@/i18n';
 
 interface UserProfile {
   age: number;
@@ -25,6 +26,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
+  const { locale, setLocale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<'profile' | 'system'>('profile');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [password, setPassword] = useState('');
@@ -152,23 +154,23 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
         <IconButton
           onClick={onClose}
           className="absolute right-4 top-4 z-10"
-          label="Close settings"
+          label={t('Close settings')}
           icon={<X size={17} />}
         />
 
         <div className="border-b border-vp-border p-5 pr-16">
-          <div className="vp-label">Settings</div>
+          <div className="vp-label">{t('Settings')}</div>
           <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold tracking-normal text-vp-text">Configuration</h2>
-              <p className="mt-1 text-sm text-vp-muted">Profile calibration and integration settings.</p>
+              <h2 className="text-2xl font-semibold tracking-normal text-vp-text">{t('Configuration')}</h2>
+              <p className="mt-1 text-sm text-vp-muted">{t('Profile calibration and integration settings.')}</p>
             </div>
             <SegmentedControl
-              ariaLabel="Settings tab"
+              ariaLabel={t('Settings tab')}
               value={activeTab}
               options={[
-                { label: <span className="inline-flex items-center gap-2"><User size={13} /> Profile</span>, value: 'profile' },
-                { label: <span className="inline-flex items-center gap-2"><Settings size={13} /> System</span>, value: 'system' },
+                { label: <span className="inline-flex items-center gap-2"><User size={13} /> {t('Profile')}</span>, value: 'profile' },
+                { label: <span className="inline-flex items-center gap-2"><Settings size={13} /> {t('System')}</span>, value: 'system' },
               ]}
               onChange={(value) => setActiveTab(value as 'profile' | 'system')}
             />
@@ -176,6 +178,18 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
         </div>
 
         <div className="max-h-[calc(92dvh-132px)] overflow-y-auto p-5 custom-scrollbar md:p-7">
+          <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-vp-border bg-white/[0.025] p-3">
+            <label htmlFor="app-language" className="vp-label">{t('Language')}</label>
+            <select
+              id="app-language"
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as 'en' | 'id')}
+              className="vp-focus-ring rounded-md border border-vp-border bg-vp-bg px-3 py-2 text-xs text-vp-text outline-none"
+            >
+              <option value="en">{t('English')}</option>
+              <option value="id">{t('Indonesian')}</option>
+            </select>
+          </div>
           <AnimatePresence mode="wait">
             {activeTab === 'profile' ? (
               <ProfileTab 

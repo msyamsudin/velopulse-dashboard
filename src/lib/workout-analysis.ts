@@ -160,12 +160,17 @@ export const generateSummaryInsights = ({
   globalSummary,
   weeklyDailyData,
   rangeLabel,
+  translate = (key: string, values: Record<string, string | number> = {}) => Object.entries(values).reduce(
+    (result, [name, value]) => result.replaceAll(`{${name}}`, String(value)),
+    key
+  ),
 }: {
   comparisonSummary: any;
   summaryInsights: any;
   globalSummary: any;
   weeklyDailyData: any[];
   rangeLabel: string;
+  translate?: (key: string, values?: Record<string, string | number>) => string;
 }): TrainingInsight[] => {
   const insights: TrainingInsight[] = [];
   const activeDays = weeklyDailyData.filter(day => day.hasData).length;
@@ -179,31 +184,48 @@ export const generateSummaryInsights = ({
 
   if (bestDelta) {
     const [metric, delta] = bestDelta as [string, any];
+    const direction = delta.direction === 'up' ? 'up' : delta.direction === 'down' ? 'down' : 'flat';
+    const change = delta.direction === 'up' ? 'higher' : delta.direction === 'down' ? 'lower' : 'unchanged';
     insights.push({
-      title: `${metric} ${delta.direction === 'up' ? 'up' : delta.direction === 'down' ? 'down' : 'flat'}`,
-      body: `${metric} is ${Math.abs(delta.value)}% ${delta.direction === 'up' ? 'higher' : delta.direction === 'down' ? 'lower' : 'unchanged'} than the previous ${rangeLabel}.`,
+      title: translate('{metric} {direction}', { metric: translate(metric), direction: translate(direction) }),
+      body: translate('{metric} is {value}% {change} than the previous {range}.', {
+        metric: translate(metric),
+        value: Math.abs(delta.value),
+        change: translate(change),
+        range: rangeLabel,
+      }),
       tone: delta.direction === 'up' ? 'good' : delta.direction === 'down' ? 'watch' : 'neutral',
     });
   }
 
   if (summaryInsights) {
     insights.push({
-      title: 'Consistency',
-      body: `${summaryInsights.activeDaysLabel} active, current streak ${summaryInsights.currentStreakLabel}, longest streak ${summaryInsights.longestStreakLabel}.`,
+      title: translate('Consistency'),
+      body: translate('{activeDays} active, current streak {currentStreak}, longest streak {longestStreak}.', {
+        activeDays: summaryInsights.activeDaysLabel,
+        currentStreak: summaryInsights.currentStreakLabel,
+        longestStreak: summaryInsights.longestStreakLabel,
+      }),
       tone: activeRatio >= 0.45 ? 'good' : activeRatio >= 0.25 ? 'neutral' : 'watch',
     });
 
     insights.push({
-      title: 'Typical session',
-      body: `Average workout is ${summaryInsights.avgDistancePerSession} km and ${summaryInsights.avgDurationPerSession}.`,
+      title: translate('Typical session'),
+      body: translate('Average workout is {distance} km and {duration}.', {
+        distance: summaryInsights.avgDistancePerSession,
+        duration: summaryInsights.avgDurationPerSession,
+      }),
       tone: 'neutral',
     });
   }
 
   if (comparisonSummary?.metrics?.sessions > 0 && globalSummary) {
     insights.push({
-      title: 'Training volume',
-      body: `${globalSummary.totalDistance} km over ${comparisonSummary.metrics.sessions} sessions in this range.`,
+      title: translate('Training volume'),
+      body: translate('{distance} km over {sessions} sessions in this range.', {
+        distance: globalSummary.totalDistance,
+        sessions: comparisonSummary.metrics.sessions,
+      }),
       tone: comparisonSummary.metrics.sessions >= 3 ? 'good' : 'neutral',
     });
   }
@@ -211,7 +233,7 @@ export const generateSummaryInsights = ({
   return insights.slice(0, 4);
 };
 
-export const getPersonalRecords = (sessions: any[]): PersonalRecord[] => {
+export const getPersonalRecords = (sessions: any[], locale = 'en-US'): PersonalRecord[] => {
   if (sessions.length === 0) return [];
 
   const enriched = sessions.map(session => {
@@ -220,7 +242,7 @@ export const getPersonalRecords = (sessions: any[]): PersonalRecord[] => {
     const date = new Date(session.date);
     const dateLabel = Number.isNaN(date.getTime())
       ? 'Unknown date'
-      : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      : date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 
     return {
       session,

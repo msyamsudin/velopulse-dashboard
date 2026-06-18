@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { EmptyState, MetricCard, Panel, StatusPill } from '../ui';
+import { useI18n } from '@/i18n';
 
 interface PreRideCockpitProps {
   currentData: any;
@@ -82,18 +83,19 @@ export const PreRideCockpit = ({
   onStart,
   onDisconnect
 }: PreRideCockpitProps) => {
+  const { locale, t } = useI18n();
   const sensorCount = Number(hrConnected) + Number(bikeConnected);
   const hasSignal = Boolean(currentData.hr || currentData.cadence || currentData.power || currentData.speed);
   const lastSession = sessions[0];
   const profileReady = Boolean(userProfile.ftp && userProfile.maxHr && userProfile.weight);
-  const readinessLabel = sensorCount === 2 ? 'Ready to ride' : sensorCount === 1 ? 'Partial tracking' : 'Manual session';
+  const readinessLabel = t(sensorCount === 2 ? 'Ready to ride' : sensorCount === 1 ? 'Partial tracking' : 'Manual session');
   const startHint = sensorCount === 2
-    ? 'All core sensors are online.'
+    ? t('All core sensors are online.')
     : sensorCount === 1
-      ? 'One core sensor is online. You can start with partial telemetry.'
-      : 'You can start now, but live telemetry will be limited.';
+      ? t('One core sensor is online. You can start with partial telemetry.')
+      : t('You can start now, but live telemetry will be limited.');
   const handleDisconnect = () => {
-    if (confirm('Disconnect all devices? You will need to reconnect before recording live telemetry.')) {
+    if (confirm(t('Disconnect all devices? You will need to reconnect before recording live telemetry.'))) {
       onDisconnect();
     }
   };
@@ -105,16 +107,16 @@ export const PreRideCockpit = ({
           <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <div className="vp-label">Ready mode</div>
+                <div className="vp-label">{t('Ready mode')}</div>
                 <h2 className="mt-2 text-3xl font-semibold tracking-normal text-vp-text md:text-4xl">
                   {readinessLabel}
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-vp-muted">
-                  {startHint} Check signal stability, then start the session.
+                  {startHint} {t('Check signal stability, then start the session.')}
                 </p>
               </div>
               <StatusPill
-                label={hasSignal ? 'Signal detected' : 'Waiting signal'}
+                label={t(hasSignal ? 'Signal detected' : 'Waiting signal')}
                 tone={hasSignal ? 'ready' : 'neutral'}
                 icon={hasSignal ? <Radio size={13} /> : <WifiOff size={13} />}
               />
@@ -124,7 +126,7 @@ export const PreRideCockpit = ({
               <SummaryMetric label="FTP" value={`${userProfile.ftp || '--'} W`} tone="text-vp-power" />
               <SummaryMetric label="Max HR" value={`${userProfile.maxHr || '--'} BPM`} tone="text-vp-hr" />
               <SummaryMetric
-                label="Weight"
+                label={t('Weight')}
                 value={
                   <span className="inline-flex items-center gap-2">
                     <Scale size={15} />
@@ -138,28 +140,28 @@ export const PreRideCockpit = ({
 
           <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <div className="flex flex-wrap gap-2">
-              <StatusPill label={`${sensorCount}/2 sensors`} tone={sensorCount === 2 ? 'ready' : sensorCount === 1 ? 'warning' : 'neutral'} />
-              <StatusPill label={profileReady ? 'Profile ready' : 'Profile incomplete'} tone={profileReady ? 'ready' : 'warning'} />
-              <StatusPill label={isGoogleConnected ? 'Sync ready' : 'Sync offline'} tone={isGoogleConnected ? 'ready' : 'neutral'} />
+              <StatusPill label={`${sensorCount}/2 ${t('sensors')}`} tone={sensorCount === 2 ? 'ready' : sensorCount === 1 ? 'warning' : 'neutral'} />
+              <StatusPill label={t(profileReady ? 'Profile ready' : 'Profile incomplete')} tone={profileReady ? 'ready' : 'warning'} />
+              <StatusPill label={t(isGoogleConnected ? 'Sync ready' : 'Sync offline')} tone={isGoogleConnected ? 'ready' : 'neutral'} />
             </div>
             <div className="flex flex-col gap-2 sm:min-w-56">
               <button
                 type="button"
                 onClick={onStart}
-                aria-label="Start workout session"
+                aria-label={t('Start workout session')}
                 className="vp-focus-ring flex min-h-14 items-center justify-center gap-3 rounded-lg bg-vp-accent px-7 py-4 text-sm font-black uppercase tracking-[0.16em] text-vp-bg transition-colors hover:bg-vp-accent/90"
               >
                 <Play size={20} fill="currentColor" />
-                Start
+                {t('Start')}
               </button>
               {sensorCount > 0 && (
                 <button
                   type="button"
                   onClick={handleDisconnect}
-                  aria-label="Disconnect all connected devices"
+                  aria-label={t('Disconnect all connected devices')}
                   className="vp-button vp-button-danger vp-focus-ring"
                 >
-                  Disconnect devices
+                  {t('Disconnect devices')}
                 </button>
               )}
             </div>
@@ -168,7 +170,7 @@ export const PreRideCockpit = ({
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard
-            label="Heart Rate"
+            label={t('Heart Rate')}
             value={currentData.hr || '--'}
             unit="BPM"
             icon={<Heart size={13} />}
@@ -177,7 +179,7 @@ export const PreRideCockpit = ({
             waiting={!currentData.hr}
           />
           <MetricCard
-            label="Cadence"
+            label={t('Cadence')}
             value={currentData.cadence || '--'}
             unit="RPM"
             icon={<Bike size={13} />}
@@ -186,7 +188,7 @@ export const PreRideCockpit = ({
             waiting={!currentData.cadence}
           />
           <MetricCard
-            label="Power"
+            label={t('Power')}
             value={currentData.power || '--'}
             unit="W"
             icon={<Zap size={13} />}
@@ -195,7 +197,7 @@ export const PreRideCockpit = ({
             waiting={!currentData.power}
           />
           <MetricCard
-            label="Speed"
+            label={t('Speed')}
             value={currentData.speed ? currentData.speed.toFixed(1) : '--'}
             unit="KM/H"
             icon={<Activity size={13} />}
@@ -208,30 +210,30 @@ export const PreRideCockpit = ({
 
       <div className="grid min-h-0 grid-cols-1 gap-4">
         <Panel
-          title="Readiness checklist"
-          eyebrow="Session inputs"
+          title={t('Readiness checklist')}
+          eyebrow={t('Session inputs')}
           action={<Bluetooth size={18} className={hasSignal ? 'text-vp-accent' : 'text-vp-muted'} />}
         >
           <ReadinessRow
-            label="Heart Rate Monitor"
-            detail={hrConnected ? 'Live heart-rate stream' : 'Rockbros / Standard BLE'}
+            label={t('Heart Rate Monitor')}
+            detail={hrConnected ? t('Live heart-rate stream') : 'Rockbros / Standard BLE'}
             connected={hrConnected}
             icon={<Heart size={17} />}
           />
           <ReadinessRow
-            label="Stationary Bike"
-            detail={bikeConnected ? 'FTMS metrics stream' : 'Yesoul / FTMS service'}
+            label={t('Stationary Bike')}
+            detail={bikeConnected ? t('FTMS metrics stream') : 'Yesoul / FTMS service'}
             connected={bikeConnected}
             icon={<Bike size={17} />}
           />
           <ReadinessRow
             label="Google Fit"
-            detail={isGoogleConnected ? 'Workout sync enabled' : 'Can be connected later'}
+            detail={t(isGoogleConnected ? 'Workout sync enabled' : 'Can be connected later')}
             connected={isGoogleConnected}
             icon={<ShieldCheck size={17} />}
           />
           <ReadinessRow
-            label="Profile"
+            label={t('Profile')}
             detail={`${userProfile.ftp || 0} FTP / ${userProfile.maxHr || 0} max HR / ${userProfile.weight || 0} kg`}
             connected={profileReady}
             icon={<SlidersHorizontal size={17} />}
@@ -239,15 +241,15 @@ export const PreRideCockpit = ({
         </Panel>
 
         <Panel
-          title={lastSession ? new Date(lastSession.date).toLocaleDateString() : 'No ride logged yet'}
-          eyebrow="Last session"
+          title={lastSession ? new Date(lastSession.date).toLocaleDateString(locale) : t('No ride logged yet')}
+          eyebrow={t('Last session')}
           action={<Clock3 size={18} className="text-vp-muted" />}
         >
           {lastSession ? (
             <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-              <SummaryMetric label="Duration" value={formatDuration(lastSession.duration)} />
+              <SummaryMetric label={t('Duration')} value={formatDuration(lastSession.duration)} />
               <SummaryMetric
-                label="Distance"
+                label={t('Distance')}
                 value={
                   <span className="inline-flex items-center gap-2">
                     <Route size={16} />
@@ -256,13 +258,13 @@ export const PreRideCockpit = ({
                 }
                 tone="text-vp-distance"
               />
-              <SummaryMetric label="Avg HR" value={`${lastSession.stats?.avgHr || '--'} BPM`} tone="text-vp-hr" />
-              <SummaryMetric label="Avg Power" value={`${lastSession.stats?.avgPower || '--'} W`} tone="text-vp-power" />
+              <SummaryMetric label={t('Avg HR')} value={`${lastSession.stats?.avgHr || '--'} BPM`} tone="text-vp-hr" />
+              <SummaryMetric label={t('Avg Power')} value={`${lastSession.stats?.avgPower || '--'} W`} tone="text-vp-power" />
             </div>
           ) : (
             <EmptyState
-              title="First session ready"
-              detail="Your summary appears here after saving a workout"
+              title={t('First session ready')}
+              detail={t('Your summary appears here after saving a workout')}
               icon={<Check size={18} />}
             />
           )}

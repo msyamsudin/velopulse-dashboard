@@ -1,5 +1,6 @@
 import { Activity, Bug, History, LogOut, RefreshCcw, Settings } from 'lucide-react';
 import { IconButton, StatusPill } from '../ui';
+import { useI18n } from '@/i18n';
 
 interface DashboardHeaderProps {
   isGoogleConnected: boolean;
@@ -22,6 +23,7 @@ export const DashboardHeader = ({
   setShowDebug,
   setShowSettings
 }: DashboardHeaderProps) => {
+  const { t } = useI18n();
   return (
     <header className="mb-5 flex shrink-0 flex-col gap-4 border-b border-vp-border pb-4 md:flex-row md:items-center md:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -33,7 +35,7 @@ export const DashboardHeader = ({
             VeloPulse
           </h1>
           <p className="vp-label mt-1">
-            Training cockpit
+            {t('Training cockpit')}
           </p>
         </div>
       </div>
@@ -44,14 +46,14 @@ export const DashboardHeader = ({
             <StatusPill label="Google Fit" tone="ready" compact />
             <IconButton
               onClick={handleConnectGoogle}
-              label="Reconnect Google Fit"
+              label={t('Reconnect Google Fit')}
               icon={<RefreshCcw size={13} />}
               tone="primary"
               className="h-7 w-7"
             />
             <IconButton
               onClick={handleDisconnectGoogle}
-              label="Disconnect Google Fit"
+              label={t('Disconnect Google Fit')}
               icon={<LogOut size={13} />}
               tone="danger"
               className="h-7 w-7"
@@ -63,7 +65,7 @@ export const DashboardHeader = ({
             className="vp-button vp-focus-ring"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-vp-muted" />
-            Connect Google Fit
+            {t('Connect Google Fit')}
           </button>
         )}
         <button 
@@ -73,11 +75,11 @@ export const DashboardHeader = ({
           }`}
         >
           <History size={13} />
-          History
+          {t('History')}
         </button>
         <IconButton
           onClick={() => setShowSettings(true)}
-          label="Open settings"
+          label={t('Open settings')}
           icon={<Settings size={15} />}
         />
         <button 
@@ -87,7 +89,7 @@ export const DashboardHeader = ({
           }`}
         >
           <Bug size={13} />
-          Debug
+          {t('Debug')}
         </button>
       </div>
     </header>
