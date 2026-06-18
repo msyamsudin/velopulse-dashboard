@@ -134,13 +134,6 @@ export const HistorySummary = ({
     if (weeklyMetric === 'trimp') return `${day.trimp.toFixed(1)} pts`;
     return `${day.sessions} sessions`;
   };
-  const getDailyMetricIntensity = (day: HistorySummaryProps['weeklyDailyData'][number]) => {
-    if (weeklyMetric === 'distance') return day.distance;
-    if (weeklyMetric === 'calories') return day.calories / 100;
-    if (weeklyMetric === 'duration') return day.durationSeconds / 900;
-    if (weeklyMetric === 'trimp') return day.trimp / 25;
-    return 0;
-  };
   const toggleSelectedMetric = (metric: MetricKey) => {
     if (selectedMetrics.includes(metric)) {
       const next = selectedMetrics.filter(item => item !== metric);
@@ -1357,131 +1350,138 @@ export const HistorySummary = ({
           {summaryPeriod === 'daily' && weeklyDailyData.length > 0 && (
             <div className="mt-2 rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
               {(() => {
-                const extendedHeatmap = summaryRange === '30d' || summaryRange === '90d' || summaryRange === 'all';
+                type HeatmapDay = HistorySummaryProps['weeklyDailyData'][number];
 
-                // Align days correctly for the heatmap grid
-                const firstDayDate = weeklyDailyData.length > 0 ? new Date(weeklyDailyData[0].date) : null;
-                const offset = firstDayDate ? firstDayDate.getDay() : 0;
-                const paddedData = firstDayDate
-                  ? [...Array(offset).fill(null), ...weeklyDailyData]
-                  : weeklyDailyData;
+                const parseLocalDate = (date: string) => new Date(`${date}T00:00:00`);
+                const firstDay = parseLocalDate(weeklyDailyData[0].date);
+                const mondayOffset = (firstDay.getDay() + 6) % 7;
+                const paddedDays: Array<HeatmapDay | null> = [
+                  ...Array<HeatmapDay | null>(mondayOffset).fill(null),
+                  ...weeklyDailyData,
+                ];
+                const trailingDays = (7 - (paddedDays.length % 7)) % 7;
+                paddedDays.push(...Array<HeatmapDay | null>(trailingDays).fill(null));
 
-                const groupedWeeks = paddedData.reduce<Array<any[]>>((weeks, day, index) => {
-                  const weekIndex = Math.floor(index / 7);
-                  if (!weeks[weekIndex]) weeks[weekIndex] = [];
-                  weeks[weekIndex].push(day);
-                  return weeks;
-                }, []);
+                const weeks = Array.from({ length: paddedDays.length / 7 }, (_, index) =>
+                  paddedDays.slice(index * 7, index * 7 + 7)
+                );
+                const activeDays = weeklyDailyData.filter(day => day.hasData).length;
+                const totalSessions = weeklyDailyData.reduce((total, day) => total + day.sessions, 0);
+                const consistency = Math.round((activeDays / weeklyDailyData.length) * 100);
+                const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const sessionOpacity = (sessions: number) => {
+                  if (sessions >= 4) return 0.95;
+                  if (sessions === 3) return 0.75;
+                  if (sessions === 2) return 0.52;
+                  return 0.3;
+                };
+                const monthLabels = weeks.map((week, weekIndex) => {
+                  const firstDate = week.find((day): day is HeatmapDay => day !== null);
+                  if (!firstDate) return '';
+
+                  const month = parseLocalDate(firstDate.date).getMonth();
+                  const previousDate = weekIndex > 0
+                    ? weeks[weekIndex - 1].find((day): day is HeatmapDay => day !== null)
+                    : null;
+                  const previousMonth = previousDate ? parseLocalDate(previousDate.date).getMonth() : -1;
+
+                  return weekIndex === 0 || month !== previousMonth
+                    ? parseLocalDate(firstDate.date).toLocaleDateString(locale, { month: 'short' })
+                    : '';
+                });
 
                 return (
                   <>
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Consistency Map</div>
-                        <div className="text-[9px] font-mono uppercase tracking-[0.12em] text-white/40 mt-1">daily activity pattern</div>
-                      </div>
-                      <div className="flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.12em] text-white/35">
-                        <span>low</span>
-                        {[0.12, 0.28, 0.48, 0.72].map(opacity => (
-                          <span
-                            key={opacity}
-                            className="h-3 w-3 rounded-[4px] border"
-                            style={{
-                              background: `rgba(${metricColorRgba},${opacity})`,
-                              borderColor: `rgba(${metricColorRgba},${Math.min(0.8, opacity + 0.12)})`
-                            }}
-                          />
-                        ))}
-                        <span>high</span>
-                      </div>
-                    </div>
-                    {extendedHeatmap ? (
-                      <div className="flex flex-col gap-2">
-                        {groupedWeeks.map((week, weekIndex) => (
-                          <div key={`week-${weekIndex}`} className="grid grid-cols-[48px_repeat(7,minmax(0,1fr))] items-center gap-2">
-                            <div className="text-[8px] font-mono uppercase text-white/30">
-                              W{weekIndex + 1}
-                            </div>
-                            {Array.from({ length: 7 }).map((_, dayIndex) => {
-                              const day = week[dayIndex];
-                              if (!day) {
-                                return <div key={`empty-${weekIndex}-${dayIndex}`} className="h-6 rounded-md bg-white/2" />;
-                              }
-
-                              const intensity = Math.max(day.sessions, getDailyMetricIntensity(day));
-                              const opacity = day.hasData ? Math.min(0.95, 0.2 + intensity * 0.12) : 0.08;
-                              const tooltipValue = formatDailyMetric(day);
-
-                              return (
-                                <div key={day.date} className="group relative flex flex-col items-center gap-1">
-                                  <div
-                                    className="h-6 w-full rounded-md border transition-all"
-                                    style={{
-                                      background: day.hasData
-                                        ? `rgba(${metricColorRgba},${opacity})`
-                                        : 'rgba(255,255,255,0.04)',
-                                      borderColor: day.isToday
-                                        ? `rgba(${metricColorRgba},0.75)`
-                                        : day.hasData
-                                          ? `rgba(${metricColorRgba},0.28)`
-                                          : 'rgba(255,255,255,0.06)',
-                                      boxShadow: day.isToday ? `0 0 0 1px rgba(${metricColorRgba},0.35)` : 'none'
-                                    }}
-                                    title={`${day.label} ${day.shortDate} - ${day.sessions} sessions`}
-                                  />
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-32 -translate-x-1/2 rounded-xl border border-white/10 bg-[#111] px-2.5 py-2 text-[9px] font-mono uppercase shadow-xl group-hover:block">
-                                    <div className="text-white/55">{day.label} {day.shortDate}</div>
-                                    <div className="mt-1 text-white">{day.sessions} sessions</div>
-                                    <div className="mt-1" style={{ color: metricColor }}>{tooltipValue}</div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                        <div className="grid grid-cols-[48px_repeat(7,minmax(0,1fr))] gap-2">
-                          <div />
-                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                            <div key={day} className="text-center text-[8px] font-mono uppercase text-white/25">{day}</div>
-                          ))}
+                        <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/45">
+                          {activeDays} active days <span className="text-white/20">·</span> {totalSessions} sessions <span className="text-white/20">·</span> {consistency}% consistency
                         </div>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-7 md:grid-cols-7 gap-2">
-                        {weeklyDailyData.map(day => {
-                          const intensity = Math.max(day.sessions, getDailyMetricIntensity(day));
-                          const opacity = day.hasData ? Math.min(0.95, 0.2 + intensity * 0.12) : 0.08;
-                          const tooltipValue = formatDailyMetric(day);
-
-                          return (
-                            <div key={day.date} className="group relative flex flex-col items-center gap-1.5">
-                              <div className="text-[8px] font-mono uppercase text-white/35">{day.label.slice(0, 3)}</div>
-                              <div
-                                className="h-9 w-full rounded-lg border transition-all"
-                                style={{
-                                  background: day.hasData
-                                    ? `rgba(${metricColorRgba},${opacity})`
-                                    : 'rgba(255,255,255,0.04)',
-                                  borderColor: day.isToday
-                                    ? `rgba(${metricColorRgba},0.75)`
-                                    : day.hasData
-                                      ? `rgba(${metricColorRgba},0.28)`
-                                      : 'rgba(255,255,255,0.06)',
-                                  boxShadow: day.isToday ? `0 0 0 1px rgba(${metricColorRgba},0.35)` : 'none'
-                                }}
-                                title={`${day.label} ${day.shortDate} - ${day.sessions} sessions`}
-                              />
-                              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-32 -translate-x-1/2 rounded-xl border border-white/10 bg-[#111] px-2.5 py-2 text-[9px] font-mono uppercase shadow-xl group-hover:block">
-                                <div className="text-white/55">{day.label} {day.shortDate}</div>
-                                <div className="mt-1 text-white">{day.sessions} sessions</div>
-                                <div className="mt-1" style={{ color: metricColor }}>{tooltipValue}</div>
-                              </div>
-                              <div className="text-[8px] font-mono text-white/25">{day.shortDate}</div>
-                            </div>
-                          );
-                        })}
+                      <div className="flex items-center gap-1.5 text-[8px] font-mono uppercase tracking-[0.12em] text-white/35">
+                        <span className="mr-1">sessions</span>
+                        {[1, 2, 3, 4].map(count => (
+                          <span
+                            key={count}
+                            className="flex h-4 min-w-4 items-center justify-center rounded-[4px] border px-1 text-[7px] text-white/65"
+                            style={{
+                              background: `rgba(53,240,189,${sessionOpacity(count)})`,
+                              borderColor: `rgba(53,240,189,${Math.min(1, sessionOpacity(count) + 0.14)})`
+                            }}
+                          >
+                            {count === 4 ? '4+' : count}
+                          </span>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                    <div className="overflow-x-auto pb-2">
+                      <div className="grid min-w-max grid-cols-[32px_auto] gap-x-2">
+                        <div />
+                        <div
+                          className="mb-1 grid gap-1"
+                          style={{ gridTemplateColumns: `repeat(${weeks.length}, 18px)` }}
+                        >
+                          {monthLabels.map((month, index) => (
+                            <div key={`month-${index}`} className="h-4 whitespace-nowrap text-[8px] font-mono uppercase text-white/30">
+                              {month}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-rows-7 gap-1">
+                          {weekdayLabels.map((day, index) => (
+                            <div key={day} className="flex h-[18px] items-center text-[7px] font-mono uppercase text-white/25">
+                              {index % 2 === 0 ? day : ''}
+                            </div>
+                          ))}
+                        </div>
+                        <div
+                          className="grid grid-flow-col grid-rows-7 gap-1"
+                          style={{ gridTemplateColumns: `repeat(${weeks.length}, 18px)` }}
+                        >
+                          {weeks.flatMap((week, weekIndex) => week.map((day, dayIndex) => {
+                            if (!day) {
+                              return <div key={`empty-${weekIndex}-${dayIndex}`} className="h-[18px] w-[18px] rounded-[5px]" />;
+                            }
+
+                            const tooltipValue = formatDailyMetric(day);
+                            const opacity = sessionOpacity(day.sessions);
+
+                            return (
+                              <div key={day.date} className="group relative h-[18px] w-[18px]">
+                                <div
+                                  className="h-full w-full rounded-[5px] border transition-colors group-hover:border-white/40"
+                                  style={{
+                                    background: day.hasData
+                                      ? `rgba(53,240,189,${opacity})`
+                                      : 'rgba(255,255,255,0.035)',
+                                    borderColor: day.isToday
+                                      ? 'rgba(53,240,189,0.95)'
+                                      : day.hasData
+                                        ? `rgba(53,240,189,${Math.min(1, opacity + 0.12)})`
+                                        : 'rgba(255,255,255,0.055)',
+                                    outline: day.isToday ? '1px solid rgba(53,240,189,0.45)' : 'none',
+                                    outlineOffset: day.isToday ? '2px' : undefined,
+                                  }}
+                                  title={`${day.label} ${day.shortDate} - ${day.sessions} sessions`}
+                                />
+                                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-36 -translate-x-1/2 rounded-lg border border-white/10 bg-vp-surface-raised px-2.5 py-2 text-[9px] font-mono uppercase shadow-xl group-hover:block">
+                                  <div className="text-white/55">{day.label} · {day.shortDate}</div>
+                                  <div className="mt-1 text-white">{day.sessions} sessions</div>
+                                  <div className="mt-1" style={{ color: metricColor }}>{tooltipValue}</div>
+                                </div>
+                              </div>
+                            );
+                          }))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.12em] text-white/30">
+                      <span className="h-3 w-3 rounded-[4px] border border-vp-accent bg-transparent" />
+                      <span>Today</span>
+                      <span className="text-white/15">·</span>
+                      <span>Color intensity represents session count</span>
+                    </div>
                   </>
                 );
               })()}
