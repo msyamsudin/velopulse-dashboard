@@ -5,6 +5,7 @@ import {
   Check,
   Clock3,
   Heart,
+  MonitorPlay,
   Play,
   Radio,
   Route,
@@ -12,10 +13,12 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   WifiOff,
+  X,
   Zap
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { EmptyState, MetricCard, Panel, StatusPill } from '../ui';
+import { WorkoutJourney } from '../journey/WorkoutJourney';
 import { useI18n } from '@/i18n';
 
 interface PreRideCockpitProps {
@@ -84,10 +87,16 @@ export const PreRideCockpit = ({
   onDisconnect
 }: PreRideCockpitProps) => {
   const { locale, t } = useI18n();
+  const [showJourneyPreview, setShowJourneyPreview] = useState(false);
+  const [debugCadence, setDebugCadence] = useState(86);
+  const [debugPower, setDebugPower] = useState(215);
+  const [debugZone, setDebugZone] = useState(3);
   const sensorCount = Number(hrConnected) + Number(bikeConnected);
   const hasSignal = Boolean(currentData.hr || currentData.cadence || currentData.power || currentData.speed);
   const lastSession = sessions[0];
   const profileReady = Boolean(userProfile.ftp && userProfile.maxHr && userProfile.weight);
+  const debugMaxHeartRate = userProfile.maxHr || 190;
+  const debugHeartRate = Math.round(debugMaxHeartRate * (0.55 + (debugZone - 1) * 0.1));
   const readinessLabel = t(sensorCount === 2 ? 'Ready to ride' : sensorCount === 1 ? 'Partial tracking' : 'Manual session');
   const startHint = sensorCount === 2
     ? t('All core sensors are online.')
@@ -153,6 +162,15 @@ export const PreRideCockpit = ({
               >
                 <Play size={20} fill="currentColor" />
                 {t('Start')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowJourneyPreview(true)}
+                aria-label="Preview journey animation without starting a session"
+                className="vp-button vp-focus-ring flex items-center justify-center gap-2"
+              >
+                <MonitorPlay size={16} />
+                Preview animation
               </button>
               {sensorCount > 0 && (
                 <button
@@ -270,6 +288,114 @@ export const PreRideCockpit = ({
           )}
         </Panel>
       </div>
+
+      {showJourneyPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm md:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Journey animation debug preview"
+        >
+          <div className="relative h-[min(760px,90vh)] w-full max-w-6xl">
+            <WorkoutJourney
+              telemetry={{
+                heartRate: debugHeartRate,
+                cadence: debugCadence,
+                power: debugPower,
+                speed: Math.min(50, debugCadence * 0.36),
+                resistance: Math.min(100, 20 + debugZone * 10)
+              }}
+              elapsed={620}
+              maxHeartRate={debugMaxHeartRate}
+              bikeConnected
+            />
+            <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+              <span className="rounded-md border border-vp-accent/30 bg-black/70 px-3 py-2 text-[9px] font-mono uppercase tracking-[0.14em] text-vp-accent backdrop-blur-md">
+                Debug preview
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowJourneyPreview(false)}
+                aria-label="Close animation preview"
+                className="vp-focus-ring flex size-9 items-center justify-center rounded-md border border-white/15 bg-black/70 text-white transition-colors hover:bg-white/10"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="absolute right-3 top-16 z-10 w-[min(18rem,calc(100%-1.5rem))] rounded-lg border border-white/15 bg-black/75 p-4 text-white shadow-xl backdrop-blur-md">
+              <div className="mb-4 text-[10px] font-bold uppercase tracking-[0.16em] text-vp-accent">
+                Animation controls
+              </div>
+              <DebugRangeControl
+                label="Cadence"
+                value={debugCadence}
+                min={0}
+                max={130}
+                unit="RPM"
+                onChange={setDebugCadence}
+              />
+              <DebugRangeControl
+                label="Power"
+                value={debugPower}
+                min={0}
+                max={500}
+                step={5}
+                unit="W"
+                onChange={setDebugPower}
+              />
+              <label className="block">
+                <span className="mb-2 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.12em] text-white/65">
+                  Heart-rate zone
+                  <span className="text-vp-accent">Zone {debugZone} · {debugHeartRate} BPM</span>
+                </span>
+                <select
+                  value={debugZone}
+                  onChange={event => setDebugZone(Number(event.target.value))}
+                  className="vp-focus-ring w-full rounded-md border border-white/15 bg-black/70 px-3 py-2 text-sm text-white"
+                >
+                  {[1, 2, 3, 4, 5].map(zone => (
+                    <option key={zone} value={zone}>Zone {zone}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+const DebugRangeControl = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit,
+  onChange
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit: string;
+  onChange: (value: number) => void;
+}) => (
+  <label className="mb-4 block">
+    <span className="mb-2 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.12em] text-white/65">
+      {label}
+      <span className="text-vp-accent">{value} {unit}</span>
+    </span>
+    <input
+      type="range"
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      onChange={event => onChange(Number(event.target.value))}
+      className="vp-focus-ring w-full accent-[var(--color-vp-accent)]"
+    />
+  </label>
+);

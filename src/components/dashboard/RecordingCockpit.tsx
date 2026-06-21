@@ -1,11 +1,12 @@
-import { Activity, Bike, ChevronRight, Heart, Radio, Settings, Timer, Zap } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import { Activity, Bike, ChevronRight, Heart, Mountain, Radio, Settings, Timer, Zap } from 'lucide-react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
 import { HrZoneBar } from '../HrZoneBar';
 import { PowerGauge } from '../PowerGauge';
 import { CadenceGauge } from '../CadenceGauge';
 import { StatusPill } from '../ui';
 import { useI18n } from '@/i18n';
+import { WorkoutJourney } from '../journey/WorkoutJourney';
 
 interface RecordingCockpitProps {
   currentData: any;
@@ -162,6 +163,7 @@ export const RecordingCockpit = ({
   onOpenChart
 }: RecordingCockpitProps) => {
   const { t } = useI18n();
+  const [cockpitView, setCockpitView] = useState<'journey' | 'metrics'>('journey');
   const safeMaxHr = userProfile.maxHr > 0 ? userProfile.maxHr : 1;
   const hrPct = currentData.hr > 0 ? Math.round((currentData.hr / safeMaxHr) * 100) : 0;
   const distanceKm = currentData.distance ? (currentData.distance / 1000).toFixed(2) : '--';
@@ -218,6 +220,15 @@ export const RecordingCockpit = ({
           )}
           <button
             type="button"
+            onClick={() => setCockpitView(current => current === 'journey' ? 'metrics' : 'journey')}
+            className="vp-button vp-focus-ring border-vp-accent/25 bg-vp-accent/8 text-vp-accent hover:border-vp-accent/45 hover:bg-vp-accent/15"
+            aria-pressed={cockpitView === 'journey'}
+          >
+            <Mountain size={12} />
+            {cockpitView === 'journey' ? 'Metrics' : 'Journey'}
+          </button>
+          <button
+            type="button"
             onClick={onStartHrr}
             disabled={!canStartHrr || hrrInProgress}
             aria-label={hrrInProgress ? 'Heart rate recovery measurement running' : 'Start heart rate recovery measurement'}
@@ -240,6 +251,22 @@ export const RecordingCockpit = ({
         </div>
       </div>
 
+      {cockpitView === 'journey' ? (
+        <div className="flex-1 min-h-[560px]">
+          <WorkoutJourney
+            telemetry={{
+              heartRate: currentData.hr || 0,
+              cadence,
+              power,
+              speed,
+              resistance
+            }}
+            elapsed={workout.elapsed}
+            maxHeartRate={userProfile.maxHr}
+            bikeConnected={bikeConnected}
+          />
+        </div>
+      ) : (
       <div className="grid flex-1 min-h-[560px] grid-cols-1 xl:grid-cols-3 gap-4">
         <MainMetric
           label={t('Heart Rate')}
@@ -276,6 +303,7 @@ export const RecordingCockpit = ({
           isWaiting={!cadence}
         />
       </div>
+      )}
 
       <div className="grid shrink-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StripMetric
