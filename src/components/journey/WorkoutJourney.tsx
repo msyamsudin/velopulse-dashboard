@@ -12,14 +12,18 @@ interface WorkoutJourneyProps {
   bikeConnected: boolean;
 }
 
-const SKY_COLOR = 0x03060d;
-const FOG_COLOR = 0x050b12;
-const GROUND_COLOR = 0x05090b;
-const ENVIRONMENT_ACCENT = 0x35f0bd;
-const ACCENT_COLORS = [0x66828c, 0x35f0bd, 0xd9b83b, 0xe87935, 0xd94a5a];
-const SEGMENT_COUNT = 24;
+const SKY_COLOR = 0x030712;
+const FOG_COLOR = 0x07111d;
+const ROAD_COLOR = 0x07090d;
+const ASPHALT_COLOR = 0x111820;
+const CREAM = 0xe9d8bd;
+const WOOD = 0x70492e;
+const DARK_TRIM = 0x101923;
+const ROOF_COLORS = [0xa7433a, 0x1e4054, 0x8b3d4a, 0x2c3d46];
+const ACCENT_COLORS = [0x7690a4, 0x35f0bd, 0xf5c542, 0xfb923c, 0xf05252];
+const SEGMENT_COUNT = 18;
 const SEGMENT_LENGTH = 18;
-const FLIGHT_ALTITUDE = 10;
+const ROAD_HALF_WIDTH = 3.2;
 
 const disposeObject = (object: THREE.Object3D) => {
   object.traverse(child => {
@@ -29,10 +33,353 @@ const disposeObject = (object: THREE.Object3D) => {
       !(child instanceof THREE.Line) &&
       !(child instanceof THREE.LineSegments)
     ) return;
+
     child.geometry?.dispose();
     const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach(material => material?.dispose());
+    materials.forEach(material => {
+      const withMaps = material as THREE.Material & { map?: THREE.Texture };
+      withMaps.map?.dispose();
+      material?.dispose();
+    });
   });
+};
+
+const standardMaterial = (color: number, options: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
+  new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.62,
+    metalness: 0.04,
+    ...options
+  });
+
+const basicGlowMaterial = (color: number, opacity = 1) =>
+  new THREE.MeshBasicMaterial({
+    color,
+    transparent: opacity < 1,
+    opacity,
+    blending: THREE.AdditiveBlending
+  });
+
+const addBox = (
+  group: THREE.Group,
+  size: [number, number, number],
+  position: [number, number, number],
+  material: THREE.Material,
+  castShadow = true
+) => {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  mesh.position.set(...position);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  return mesh;
+};
+
+const createSignTexture = (label: string, color = '#17212c', background = '#f6e6cd', accent = '#d45a4d') => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, 0, 26, canvas.height);
+  ctx.fillRect(canvas.width - 26, 0, 26, canvas.height);
+  ctx.strokeStyle = 'rgba(23,33,44,0.24)';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(22, 22, canvas.width - 44, canvas.height - 44);
+  ctx.fillStyle = color;
+  ctx.font = '700 54px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+};
+
+const createMoonTexture = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const center = canvas.width / 2;
+  const radius = canvas.width * 0.47;
+  const base = ctx.createRadialGradient(center - 70, center - 80, 25, center, center, radius);
+  base.addColorStop(0, '#fff8ea');
+  base.addColorStop(0.48, '#dedbd2');
+  base.addColorStop(0.82, '#b4bac0');
+  base.addColorStop(1, '#7e8994');
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.arc(center, center, radius, 0, Math.PI * 2);
+  ctx.fillStyle = base;
+  ctx.fill();
+
+  const craters = [
+    [178, 178, 27, 0.18],
+    [315, 184, 36, 0.14],
+    [246, 273, 49, 0.12],
+    [350, 316, 22, 0.16],
+    [157, 320, 31, 0.13],
+    [285, 366, 19, 0.12],
+    [220, 130, 13, 0.12],
+    [386, 240, 15, 0.14],
+    [134, 246, 18, 0.12]
+  ] as const;
+
+  craters.forEach(([x, y, craterRadius, opacity]) => {
+    const crater = ctx.createRadialGradient(x - craterRadius * 0.28, y - craterRadius * 0.28, 2, x, y, craterRadius);
+    crater.addColorStop(0, `rgba(255,255,255,${opacity * 0.72})`);
+    crater.addColorStop(0.45, `rgba(83,92,102,${opacity * 0.72})`);
+    crater.addColorStop(1, 'rgba(95,103,112,0)');
+    ctx.fillStyle = crater;
+    ctx.beginPath();
+    ctx.arc(x, y, craterRadius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  const maria = [
+    [224, 218, 86, 42, -0.35, 0.11],
+    [318, 270, 72, 34, 0.28, 0.1],
+    [207, 346, 66, 26, 0.2, 0.08]
+  ] as const;
+
+  maria.forEach(([x, y, width, height, rotation, opacity]) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.scale(width / height, 1);
+    ctx.fillStyle = `rgba(82,91,102,${opacity * 0.72})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, height, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  const edge = ctx.createRadialGradient(center, center, radius * 0.58, center, center, radius);
+  edge.addColorStop(0, 'rgba(0,0,0,0)');
+  edge.addColorStop(0.78, 'rgba(0,0,0,0.05)');
+  edge.addColorStop(1, 'rgba(0,0,0,0.28)');
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = edge;
+  ctx.beginPath();
+  ctx.arc(center, center, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+};
+
+const addRoof = (group: THREE.Group, width: number, depth: number, y: number, color: number) => {
+  const roof = new THREE.Mesh(
+    new THREE.CylinderGeometry(0, width * 0.76, depth, 4, 1),
+    standardMaterial(color, { roughness: 0.78 })
+  );
+  roof.rotation.y = Math.PI / 4;
+  roof.scale.z = 0.42;
+  roof.position.y = y;
+  roof.castShadow = true;
+  roof.receiveShadow = true;
+  group.add(roof);
+
+  const ribMaterial = standardMaterial(0x7e2f2b, { roughness: 0.9 });
+  for (let i = -3; i <= 3; i += 1) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.045, depth * 0.96, 0.08), ribMaterial);
+    rib.rotation.x = Math.PI / 2;
+    rib.position.set(i * width * 0.14, 0.08, 0);
+    roof.add(rib);
+  }
+};
+
+const createStorefront = (label: string, width: number, depth: number, height: number, variant: number) => {
+  const group = new THREE.Group();
+  const wall = standardMaterial(variant % 2 ? 0xe2cfb7 : CREAM, { roughness: 0.82 });
+  const trim = standardMaterial(DARK_TRIM, { roughness: 0.74 });
+  const wood = standardMaterial(WOOD, { roughness: 0.74 });
+  const windowMat = standardMaterial(0xf5c98c, {
+    emissive: 0x8b4c21,
+    emissiveIntensity: 0.2,
+    roughness: 0.28
+  });
+
+  addBox(group, [width, height, depth], [0, height / 2, 0], wall);
+  addBox(group, [width + 0.28, 0.18, depth + 0.34], [0, height + 0.08, 0], trim);
+  addBox(group, [width + 0.18, 0.16, depth + 0.18], [0, 0.08, 0], trim);
+  addRoof(group, width + 0.62, depth + 0.72, height + 0.56, ROOF_COLORS[variant % ROOF_COLORS.length]);
+
+  const balconyY = Math.max(1.7, height * 0.44);
+  addBox(group, [width + 0.12, 0.12, 0.34], [0, balconyY, depth / 2 + 0.22], wood);
+  for (let i = 0; i < 6; i += 1) {
+    addBox(group, [0.06, 0.48, 0.07], [
+      -width / 2 + 0.32 + i * ((width - 0.64) / 5),
+      balconyY + 0.28,
+      depth / 2 + 0.36
+    ], wood);
+  }
+
+  const columns = Math.max(2, Math.floor(width / 0.88));
+  const floors = Math.max(1, Math.floor(height / 1.15) - 1);
+  for (let floor = 0; floor < floors; floor += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      addBox(group, [0.46, 0.38, 0.05], [
+        (column - (columns - 1) / 2) * 0.74,
+        1.35 + floor * 0.78,
+        depth / 2 + 0.03
+      ], windowMat, false);
+    }
+  }
+
+  const signTexture = createSignTexture(label);
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(width * 0.72, 0.62),
+    new THREE.MeshBasicMaterial({ map: signTexture || undefined, side: THREE.DoubleSide })
+  );
+  sign.position.set(0, 0.82, depth / 2 + 0.07);
+  group.add(sign);
+
+  return group;
+};
+
+const createPlant = (x: number, z: number, scale = 1) => {
+  const group = new THREE.Group();
+  addBox(group, [0.48, 0.22, 0.48], [0, 0.11, 0], standardMaterial(0x6b3c29));
+  const leafMaterial = standardMaterial(0x3e8f5a, { roughness: 0.92 });
+  for (let i = 0; i < 7; i += 1) {
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), leafMaterial);
+    leaf.scale.set(1.2, 0.68, 0.96);
+    leaf.position.set(Math.cos(i * 1.5) * 0.18, 0.36 + (i % 3) * 0.07, Math.sin(i * 1.9) * 0.18);
+    leaf.castShadow = true;
+    group.add(leaf);
+  }
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  return group;
+};
+
+const createSegment = (index: number) => {
+  const segment = new THREE.Group();
+
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROAD_HALF_WIDTH * 2, SEGMENT_LENGTH + 0.2),
+    standardMaterial(ASPHALT_COLOR, { roughness: 0.96 })
+  );
+  road.rotation.x = -Math.PI / 2;
+  road.receiveShadow = true;
+  segment.add(road);
+
+  const laneMat = basicGlowMaterial(0xe9f7ff, 0.22);
+  const lane = new THREE.Mesh(new THREE.PlaneGeometry(0.055, SEGMENT_LENGTH * 0.45), laneMat);
+  lane.rotation.x = -Math.PI / 2;
+  lane.position.set(0, 0.018, -SEGMENT_LENGTH * 0.14);
+  segment.add(lane);
+
+  const curbMat = standardMaterial(0xd7d2c7, { roughness: 0.9 });
+  addBox(segment, [0.1, 0.12, SEGMENT_LENGTH + 0.2], [-ROAD_HALF_WIDTH - 0.05, 0.06, 0], curbMat, false);
+  addBox(segment, [0.1, 0.12, SEGMENT_LENGTH + 0.2], [ROAD_HALF_WIDTH + 0.05, 0.06, 0], curbMat, false);
+
+  const labels = ['RAMEN', 'VELO', 'NEKO', 'CAFE', 'SUSHI', 'TOKYO'];
+  for (let side = -1; side <= 1; side += 2) {
+    const buildingCount = index % 3 === 0 ? 2 : 1;
+    for (let b = 0; b < buildingCount; b += 1) {
+      const width = 2.2 + ((index + b) % 3) * 0.48;
+      const depth = 2.0 + ((index + b * 2) % 3) * 0.34;
+      const height = 2.6 + ((index + b + (side > 0 ? 1 : 0)) % 4) * 0.55;
+      const building = createStorefront(labels[(index + b + (side > 0 ? 2 : 0)) % labels.length], width, depth, height, index + b);
+      building.position.set(side * (ROAD_HALF_WIDTH + 1.7 + b * 2.05), 0, -4.2 + b * 5.6 + (index % 2) * 1.4);
+      building.rotation.y = side > 0 ? -0.08 : 0.08;
+      segment.add(building);
+    }
+
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.08, 5.8, 9),
+      standardMaterial(0x51301e, { roughness: 0.8 })
+    );
+    pole.position.set(side * (ROAD_HALF_WIDTH + 0.52), 2.9, -6.2 + (index % 4) * 2.1);
+    pole.castShadow = true;
+    segment.add(pole);
+
+    segment.add(createPlant(side * (ROAD_HALF_WIDTH + 0.88), 5.2 - (index % 3) * 2.2, 0.72));
+  }
+
+  return segment;
+};
+
+const createBikeAvatar = () => {
+  const group = new THREE.Group();
+  const frameMat = standardMaterial(0x172434, { metalness: 0.62, roughness: 0.28 });
+  const accentMat = basicGlowMaterial(0x35f0bd, 0.94);
+  const tireMat = standardMaterial(0x05070a, { roughness: 0.5 });
+  const riderMat = standardMaterial(0xe7dccd, { roughness: 0.55 });
+
+  const wheelGeo = new THREE.TorusGeometry(0.48, 0.045, 10, 48);
+  const frontWheel = new THREE.Mesh(wheelGeo, tireMat);
+  const rearWheel = frontWheel.clone();
+  frontWheel.position.set(0.72, 0.52, 0);
+  rearWheel.position.set(-0.72, 0.52, 0);
+  frontWheel.rotation.y = Math.PI / 2;
+  rearWheel.rotation.y = Math.PI / 2;
+  frontWheel.castShadow = true;
+  rearWheel.castShadow = true;
+  group.add(frontWheel, rearWheel);
+
+  const tubeGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 8);
+  const makeTube = (from: THREE.Vector3, to: THREE.Vector3, material: THREE.Material) => {
+    const midpoint = from.clone().lerp(to, 0.5);
+    const direction = to.clone().sub(from);
+    const tube = new THREE.Mesh(tubeGeo, material);
+    tube.position.copy(midpoint);
+    tube.scale.y = direction.length();
+    tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    tube.castShadow = true;
+    group.add(tube);
+    return tube;
+  };
+
+  const rear = new THREE.Vector3(-0.72, 0.52, 0);
+  const front = new THREE.Vector3(0.72, 0.52, 0);
+  const seat = new THREE.Vector3(-0.23, 1.24, 0);
+  const handle = new THREE.Vector3(0.55, 1.18, 0);
+  const crank = new THREE.Vector3(-0.1, 0.74, 0);
+  makeTube(rear, seat, frameMat);
+  makeTube(front, handle, frameMat);
+  makeTube(seat, handle, frameMat);
+  makeTube(rear, crank, frameMat);
+  makeTube(front, crank, frameMat);
+  makeTube(crank, seat, frameMat);
+
+  const riderTorso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.58, 8, 12), riderMat);
+  riderTorso.position.set(-0.06, 1.55, 0);
+  riderTorso.rotation.z = -0.38;
+  riderTorso.castShadow = true;
+  const riderHead = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 12), riderMat);
+  riderHead.position.set(0.1, 1.98, 0);
+  riderHead.castShadow = true;
+  group.add(riderTorso, riderHead);
+
+  const light = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 10), accentMat);
+  light.position.set(0.92, 0.9, 0.02);
+  group.add(light);
+
+  group.userData.frontWheel = frontWheel;
+  group.userData.rearWheel = rearWheel;
+  group.userData.accentMat = accentMat;
+  group.userData.light = light;
+  group.position.set(0, 0.16, 5.2);
+  group.rotation.y = Math.PI;
+  group.scale.setScalar(1.15);
+
+  return group;
 };
 
 export const WorkoutJourney = ({
@@ -71,403 +418,111 @@ export const WorkoutJourney = ({
     }
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 520);
-    camera.position.set(0, FLIGHT_ALTITUDE + 4.2, 9);
-    camera.lookAt(0, FLIGHT_ALTITUDE + 1, -22);
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 420);
+    camera.position.set(0, 4.4, 10.4);
+    camera.lookAt(0, 1.6, -16);
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.65));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = false;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
-    const ambient = new THREE.HemisphereLight(0x54708f, 0x020405, 1.15);
-    const moonLight = new THREE.DirectionalLight(0x9bb9df, 1.35);
-    moonLight.position.set(-8, 14, 4);
-    scene.add(ambient, moonLight);
+    scene.background = new THREE.Color(SKY_COLOR);
+    scene.fog = new THREE.Fog(FOG_COLOR, 24, 150);
 
-    const roadMaterial = new THREE.MeshStandardMaterial({
-      color: 0x061713,
-      emissive: 0x061713,
-      emissiveIntensity: 0.75,
-      roughness: 0.65,
-      transparent: true,
-      opacity: 0.38,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x35f0bd });
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: GROUND_COLOR, roughness: 1 });
-    const mountainMaterials = [0x091210, 0x0c1815, 0x10211c].map(color =>
-      new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 1 })
+    const ambient = new THREE.HemisphereLight(0x6c86a6, 0x030507, 1.2);
+    const moonLight = new THREE.DirectionalLight(0xb7d5ff, 2.2);
+    moonLight.position.set(-9, 15, 7);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.set(1536, 1536);
+    moonLight.shadow.camera.left = -16;
+    moonLight.shadow.camera.right = 16;
+    moonLight.shadow.camera.top = 16;
+    moonLight.shadow.camera.bottom = -16;
+    const cityGlow = new THREE.PointLight(0x35f0bd, 1.6, 28, 1.8);
+    cityGlow.position.set(0, 4.2, -10);
+    scene.add(ambient, moonLight, cityGlow);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(90, 380),
+      standardMaterial(ROAD_COLOR, { roughness: 1 })
     );
-
-    const mountainWireframeMaterial = new THREE.LineBasicMaterial({
-      color: 0x35f0bd,
-      transparent: true,
-      opacity: 0.18
-    });
-    const treeColorMaterial = new THREE.MeshStandardMaterial({ color: 0x08150f, roughness: 1, flatShading: true });
-    const treeWireframeMaterial = new THREE.LineBasicMaterial({ color: 0x35f0bd, transparent: true, opacity: 0.28 });
-
-    // Continuous edge line constants
-    const EDGE_PTS = 165;
-    const EDGE_STEP = 1.12; // metres between each edge sample point
-    const ROAD_HALF_W = 3.45;
-    const DASH_INTERVAL = 9;  // metres between dash starts
-    const DASH_LEN = 3.5;     // metres length of each dash
-    const DASH_LINES = 22;    // number of dashes to draw ahead
-
-    const roadSegments: THREE.Group[] = [];
-    for (let index = 0; index < SEGMENT_COUNT; index += 1) {
-      const group = new THREE.Group();
-      const road = new THREE.Mesh(new THREE.PlaneGeometry(7, SEGMENT_LENGTH + 0.25), roadMaterial);
-      road.rotation.x = -Math.PI / 2;
-      // No box edges — replaced by continuous edge lines below
-      group.add(road);
-      group.position.set(0, FLIGHT_ALTITUDE, -index * SEGMENT_LENGTH);
-      scene.add(group);
-      roadSegments.push(group);
-    }
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(250, 580), groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.set(0, -8, -230);
+    ground.position.set(0, -0.03, -140);
+    ground.receiveShadow = true;
     scene.add(ground);
 
-    // Continuous road edge lines — single polyline per side, no gaps
-    const leftEdgeGeo = new THREE.BufferGeometry();
-    const rightEdgeGeo = new THREE.BufferGeometry();
-    const leftEdgePosArr = new Float32Array(EDGE_PTS * 3);
-    const rightEdgePosArr = new Float32Array(EDGE_PTS * 3);
-    leftEdgeGeo.setAttribute('position', new THREE.BufferAttribute(leftEdgePosArr, 3));
-    rightEdgeGeo.setAttribute('position', new THREE.BufferAttribute(rightEdgePosArr, 3));
-    const leftEdgeLine = new THREE.Line(leftEdgeGeo, edgeMaterial);
-    const rightEdgeLine = new THREE.Line(rightEdgeGeo, edgeMaterial);
-    scene.add(leftEdgeLine, rightEdgeLine);
-
-    // Center dashes — continuous, aligned to road curve
-    const centerDashGeo = new THREE.BufferGeometry();
-    const centerDashPosArr = new Float32Array(DASH_LINES * 2 * 3);
-    centerDashGeo.setAttribute('position', new THREE.BufferAttribute(centerDashPosArr, 3));
-    const centerDashMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.14
-    });
-    const centerDashLine = new THREE.LineSegments(centerDashGeo, centerDashMaterial);
-    scene.add(centerDashLine);
-
-    const mountains: THREE.Mesh[] = [];
-    const coneGeometry = new THREE.ConeGeometry(7, 15, 5);
-    const mountainWireframeGeo = new THREE.WireframeGeometry(coneGeometry);
-    for (let index = 0; index < 30; index += 1) {
-      const mountain = new THREE.Mesh(coneGeometry, mountainMaterials[index % mountainMaterials.length]);
-      const side = index % 2 === 0 ? -1 : 1;
-      mountain.position.set(side * (12 + (index % 5) * 5), -5 + (index % 3), -12 - index * 15);
-      mountain.scale.setScalar(0.7 + (index % 4) * 0.18);
-      mountain.rotation.y = index * 1.7;
-
-      const wireframe = new THREE.LineSegments(mountainWireframeGeo, mountainWireframeMaterial);
-      mountain.add(wireframe);
-
-      scene.add(mountain);
-      mountains.push(mountain);
+    const segments: THREE.Group[] = [];
+    for (let index = 0; index < SEGMENT_COUNT; index += 1) {
+      const segment = createSegment(index);
+      segment.position.z = -index * SEGMENT_LENGTH;
+      scene.add(segment);
+      segments.push(segment);
     }
+
+    const bike = createBikeAvatar();
+    scene.add(bike);
 
     const moonGroup = new THREE.Group();
-    const moonGeo = new THREE.CircleGeometry(14, 32);
+    const moonHaloMaterial = basicGlowMaterial(0xbed9ff, 0.06);
+    const moonHalo = new THREE.Mesh(new THREE.CircleGeometry(7.6, 64), moonHaloMaterial);
+    moonHalo.position.z = -0.04;
+    const moonTexture = createMoonTexture();
     const moonMaterial = new THREE.MeshBasicMaterial({
-      color: ENVIRONMENT_ACCENT,
+      map: moonTexture || undefined,
+      color: 0xdde6ef,
       transparent: true,
-      opacity: 0.8
-    });
-    const moonMesh = new THREE.Mesh(moonGeo, moonMaterial);
-    moonGroup.add(moonMesh);
-
-    const moonStripeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-    for (let i = -12; i < 4; i += 3.2) {
-      const stripeHeight = 0.5 + (4 - i) * 0.12;
-      const stripe = new THREE.Mesh(new THREE.PlaneGeometry(30, stripeHeight), moonStripeMaterial);
-      stripe.position.set(0, i, 0.05);
-      moonGroup.add(stripe);
-    }
-    moonGroup.position.set(0, 35, -240);
-    scene.add(moonGroup);
-
-    const createLowPolyTree = (treeColorMat: THREE.Material, treeWireframeMat: THREE.Material) => {
-      const group = new THREE.Group();
-      
-      const trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.2, 5);
-      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x080503, roughness: 1 });
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.y = 0.6;
-      group.add(trunk);
-
-      const leavesGroup = new THREE.Group();
-      const coneGeo1 = new THREE.ConeGeometry(0.9, 1.6, 5);
-      const coneGeo2 = new THREE.ConeGeometry(0.7, 1.3, 5);
-      const coneGeo3 = new THREE.ConeGeometry(0.5, 1.0, 5);
-
-      const leaf1 = new THREE.Mesh(coneGeo1, treeColorMat);
-      leaf1.position.y = 1.8;
-      const leaf2 = new THREE.Mesh(coneGeo2, treeColorMat);
-      leaf2.position.y = 2.6;
-      const leaf3 = new THREE.Mesh(coneGeo3, treeColorMat);
-      leaf3.position.y = 3.2;
-
-      const wf1 = new THREE.LineSegments(new THREE.WireframeGeometry(coneGeo1), treeWireframeMat);
-      leaf1.add(wf1);
-      const wf2 = new THREE.LineSegments(new THREE.WireframeGeometry(coneGeo2), treeWireframeMat);
-      leaf2.add(wf2);
-      const wf3 = new THREE.LineSegments(new THREE.WireframeGeometry(coneGeo3), treeWireframeMat);
-      leaf3.add(wf3);
-
-      leavesGroup.add(leaf1, leaf2, leaf3);
-      group.add(leavesGroup);
-      
-      const scale = 0.85 + Math.random() * 0.45;
-      group.scale.set(scale, scale, scale);
-
-      return group;
-    };
-
-    const trees: THREE.Group[] = [];
-    const treeCount = 16;
-    for (let i = 0; i < treeCount; i++) {
-      const tree = createLowPolyTree(treeColorMaterial, treeWireframeMaterial);
-      const side = i % 2 === 0 ? -1 : 1;
-      const zPos = -i * (180 / treeCount);
-      tree.position.set(side * (5.5 + (i % 4) * 1.5), -7.9, zPos);
-      scene.add(tree);
-      trees.push(tree);
-    }
-
-    // Neon energy ring portal (replaces rectangular gate)
-    const ringPortal = new THREE.Group();
-
-    const ringPortalMaterial = new THREE.MeshBasicMaterial({
-      color: ACCENT_COLORS[0],
-      transparent: true,
-      opacity: 0.92,
-      blending: THREE.AdditiveBlending
-    });
-    const ringInnerMaterial = new THREE.MeshBasicMaterial({
-      color: ACCENT_COLORS[0],
-      transparent: true,
-      opacity: 0.45,
-      blending: THREE.AdditiveBlending
-    });
-    const ringSpokeMaterial = new THREE.LineBasicMaterial({
-      color: ACCENT_COLORS[0],
-      transparent: true,
-      opacity: 0.22
-    });
-    const ringFaceMaterial = new THREE.MeshBasicMaterial({
-      color: ACCENT_COLORS[0],
-      transparent: true,
-      opacity: 0.04,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending
-    });
-
-    const outerTorusGeo = new THREE.TorusGeometry(3.6, 0.07, 8, 52);
-    const outerRingMesh = new THREE.Mesh(outerTorusGeo, ringPortalMaterial);
-    ringPortal.add(outerRingMesh);
-
-    const innerTorusGeo = new THREE.TorusGeometry(3.15, 0.038, 8, 52);
-    const innerRingMesh = new THREE.Mesh(innerTorusGeo, ringInnerMaterial);
-    ringPortal.add(innerRingMesh);
-
-    const spokeGeo = new THREE.WireframeGeometry(new THREE.TorusGeometry(3.38, 0.035, 4, 14));
-    const spokes = new THREE.LineSegments(spokeGeo, ringSpokeMaterial);
-    ringPortal.add(spokes);
-
-    const faceGeo = new THREE.CircleGeometry(3.5, 48);
-    const faceMesh = new THREE.Mesh(faceGeo, ringFaceMaterial);
-    ringPortal.add(faceMesh);
-
-    ringPortal.position.set(0, FLIGHT_ALTITUDE + 2.5, -200);
-    scene.add(ringPortal);
-
-    // Third-person hovercraft. Its restrained movement keeps the scene readable
-    // while still communicating speed, turns, effort and climb rate.
-    const craft = new THREE.Group();
-    const craftBodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x18232c,
-      metalness: 0.82,
-      roughness: 0.24
-    });
-    const craftAccentMaterial = new THREE.MeshBasicMaterial({ color: ENVIRONMENT_ACCENT });
-    const engineMaterial = new THREE.MeshBasicMaterial({
-      color: ENVIRONMENT_ACCENT,
-      transparent: true,
-      opacity: 0.9,
-      blending: THREE.AdditiveBlending
-    });
-    const fuselage = new THREE.Mesh(new THREE.ConeGeometry(0.48, 2.8, 8), craftBodyMaterial);
-    fuselage.rotation.x = -Math.PI / 2;
-    const cockpit = new THREE.Mesh(
-      new THREE.SphereGeometry(0.38, 12, 8),
-      new THREE.MeshStandardMaterial({ color: 0x183548, metalness: 0.45, roughness: 0.18 })
-    );
-    cockpit.scale.set(0.75, 0.48, 1.25);
-    cockpit.position.set(0, 0.24, -0.25);
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.08, 0.72), craftBodyMaterial);
-    wing.position.z = 0.45;
-    const leftTip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 1.2), craftAccentMaterial);
-    const rightTip = leftTip.clone();
-    leftTip.position.set(-1.5, 0, 0.3);
-    rightTip.position.set(1.5, 0, 0.3);
-    const engineGeometry = new THREE.SphereGeometry(0.2, 10, 6);
-    const leftEngine = new THREE.Mesh(engineGeometry, engineMaterial);
-    const rightEngine = leftEngine.clone();
-    leftEngine.position.set(-0.62, -0.03, 1.25);
-    rightEngine.position.set(0.62, -0.03, 1.25);
-    craft.add(fuselage, cockpit, wing, leftTip, rightTip, leftEngine, rightEngine);
-    craft.position.set(0, FLIGHT_ALTITUDE + 1.15, 3.2);
-    scene.add(craft);
-
-    const dustGeometry = new THREE.BufferGeometry();
-    const dustPositions = new Float32Array(150 * 3);
-    for (let index = 0; index < 150; index += 1) {
-      dustPositions[index * 3] = (Math.random() - 0.5) * 35;
-      dustPositions[index * 3 + 1] = FLIGHT_ALTITUDE - 4 + Math.random() * 12;
-      dustPositions[index * 3 + 2] = -Math.random() * 170;
-    }
-    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-    const dustMaterial = new THREE.PointsMaterial({ color: 0xb4d9cf, size: 0.055, transparent: true, opacity: 0.45 });
-    const dust = new THREE.Points(dustGeometry, dustMaterial);
-    scene.add(dust);
-
-    const starGeometry = new THREE.BufferGeometry();
-    const starPositions = new Float32Array(220 * 3);
-    for (let index = 0; index < 220; index += 1) {
-      starPositions[index * 3] = (Math.random() - 0.5) * 180;
-      starPositions[index * 3 + 1] = Math.random() * 55 + 10;
-      starPositions[index * 3 + 2] = -Math.random() * 260 + 30;
-    }
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starMaterial = new THREE.PointsMaterial({
-      color: 0x9fb9d4,
-      size: 0.16,
-      transparent: true,
-      opacity: 0.5,
+      opacity: 0.96,
       depthWrite: false
     });
+    const moon = new THREE.Mesh(new THREE.CircleGeometry(6.7, 72), moonMaterial);
+    moonGroup.add(moonHalo, moon);
+    moonGroup.position.set(-11.4, 20.8, -88);
+    scene.add(moonGroup);
+
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(190 * 3);
+    for (let i = 0; i < 190; i += 1) {
+      starPositions[i * 3] = (Math.random() - 0.5) * 90;
+      starPositions[i * 3 + 1] = 8 + Math.random() * 35;
+      starPositions[i * 3 + 2] = -Math.random() * 210 + 14;
+    }
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.PointsMaterial({ color: 0xaac6dd, size: 0.1, transparent: true, opacity: 0.58 });
     const stars = new THREE.Points(starGeometry, starMaterial);
     scene.add(stars);
 
-    const cloudMaterial = new THREE.MeshBasicMaterial({
-      color: 0x7893a8,
-      transparent: true,
-      opacity: 0.09,
-      depthWrite: false
-    });
-    const cloudGeometry = new THREE.IcosahedronGeometry(1.8, 1);
-    const clouds: THREE.Group[] = [];
-    for (let index = 0; index < 18; index += 1) {
-      const cloud = new THREE.Group();
-      for (let puff = 0; puff < 4; puff += 1) {
-        const mesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
-        mesh.position.set((puff - 1.5) * 1.7, Math.sin(puff * 1.8) * 0.45, (puff % 2) * 0.6);
-        mesh.scale.set(1.2 + puff * 0.12, 0.45 + (puff % 2) * 0.12, 0.9);
-        cloud.add(mesh);
-      }
-      const side = index % 2 === 0 ? -1 : 1;
-      cloud.position.set(side * (9 + (index % 4) * 5), 1 + (index % 5) * 1.1, -index * 22);
-      cloud.rotation.y = index * 0.7;
-      scene.add(cloud);
-      clouds.push(cloud);
+    const speedLineCount = 28;
+    const speedLineGeometry = new THREE.BufferGeometry();
+    const speedLinePositions = new Float32Array(speedLineCount * 2 * 3);
+    const speedLineSpeeds = new Float32Array(speedLineCount);
+    for (let i = 0; i < speedLineCount; i += 1) {
+      const x = (Math.random() - 0.5) * 18;
+      const y = 0.5 + Math.random() * 7;
+      const z = -Math.random() * 120;
+      speedLinePositions[i * 6] = x;
+      speedLinePositions[i * 6 + 1] = y;
+      speedLinePositions[i * 6 + 2] = z;
+      speedLinePositions[i * 6 + 3] = x;
+      speedLinePositions[i * 6 + 4] = y;
+      speedLinePositions[i * 6 + 5] = z - 3.2;
+      speedLineSpeeds[i] = 0.8 + Math.random() * 0.7;
     }
-
-    const warpCount = 30;
-    const warpGeometry = new THREE.BufferGeometry();
-    const warpPositions = new Float32Array(warpCount * 2 * 3);
-    const warpSpeeds = new Float32Array(warpCount);
-    const warpLength = 3.5;
-
-    for (let i = 0; i < warpCount; i++) {
-      const x = (Math.random() - 0.5) * 24;
-      const y = FLIGHT_ALTITUDE - 3 + Math.random() * 8;
-      const z = -Math.random() * 160;
-
-      warpPositions[i * 6] = x;
-      warpPositions[i * 6 + 1] = y;
-      warpPositions[i * 6 + 2] = z;
-
-      warpPositions[i * 6 + 3] = x;
-      warpPositions[i * 6 + 4] = y;
-      warpPositions[i * 6 + 5] = z - warpLength;
-
-      warpSpeeds[i] = 1.0 + Math.random() * 0.6;
-    }
-
-    warpGeometry.setAttribute('position', new THREE.BufferAttribute(warpPositions, 3));
-    const warpMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0
-    });
-    const warpLines = new THREE.LineSegments(warpGeometry, warpMaterial);
-    scene.add(warpLines);
-
-    const sparkCount = 50;
-    const sparkGeometry = new THREE.BufferGeometry();
-    const sparkPositions = new Float32Array(sparkCount * 3);
-    const sparkVelocities = new Float32Array(sparkCount * 3);
-    let sparkActive = false;
-    let sparkTime = 0;
-    let checkpointFlash = 0;
-
-    for (let i = 0; i < sparkCount; i++) {
-      sparkPositions[i * 3] = 0;
-      sparkPositions[i * 3 + 1] = -100;
-      sparkPositions[i * 3 + 2] = 0;
-    }
-    sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
-    const sparkMaterial = new THREE.PointsMaterial({
-      color: 0x35f0bd,
-      size: 0.25,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending
-    });
-    const sparkPoints = new THREE.Points(sparkGeometry, sparkMaterial);
-    scene.add(sparkPoints);
-
-    const triggerCheckpoint = () => {
-      checkpointFlash = 1.0;
-      sparkActive = true;
-      sparkTime = 0;
-      sparkMaterial.opacity = 1.0;
-      
-      const posAttr = sparkGeometry.getAttribute('position') as THREE.BufferAttribute;
-      const positions = posAttr.array as Float32Array;
-      
-      for (let i = 0; i < sparkCount; i++) {
-        const isLeft = i % 2 === 0;
-        const x = isLeft ? -3.5 : 3.5;
-        const y = FLIGHT_ALTITUDE + Math.random() * 5.0;
-        const z = 8.0;
-
-        positions[i * 3] = x;
-        positions[i * 3 + 1] = y;
-        positions[i * 3 + 2] = z;
-
-        sparkVelocities[i * 3] = (isLeft ? -1 : 1) * (1.5 + Math.random() * 6);
-        sparkVelocities[i * 3 + 1] = (Math.random() - 0.2) * 5;
-        sparkVelocities[i * 3 + 2] = (Math.random() - 0.5) * 4;
-      }
-      posAttr.needsUpdate = true;
-    };
+    speedLineGeometry.setAttribute('position', new THREE.BufferAttribute(speedLinePositions, 3));
+    const speedLineMaterial = new THREE.LineBasicMaterial({ color: 0x35f0bd, transparent: true, opacity: 0 });
+    const speedLines = new THREE.LineSegments(speedLineGeometry, speedLineMaterial);
+    scene.add(speedLines);
 
     const clock = new THREE.Clock();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let frame = 0;
     let elapsedTime = 0;
     let distance = 0;
     let smoothVelocity = 2.4;
     let smoothGrade = 0;
+    let checkpointFlash = 0;
     let animationFrame = 0;
 
     const resize = () => {
@@ -486,281 +541,109 @@ export const WorkoutJourney = ({
       animationFrame = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), 0.05);
       elapsedTime += delta;
+
       const latest = telemetryRef.current;
       const telemetryTarget = getJourneyVisualState(latest.telemetry, latest.maxHeartRate, latest.bikeConnected);
       const target = {
         ...telemetryTarget,
         velocity: Math.min(72, telemetryTarget.velocity * paceMultiplierRef.current)
       };
-      const smoothing = 1 - Math.exp(-delta * 2.2);
+      const smoothing = 1 - Math.exp(-delta * 2.4);
       smoothVelocity = THREE.MathUtils.lerp(smoothVelocity, target.velocity, smoothing);
       smoothGrade = THREE.MathUtils.lerp(smoothGrade, target.grade, smoothing);
       const movement = smoothVelocity * delta * (reducedMotion ? 0.35 : 1);
       distance += movement;
 
-      roadSegments.forEach((segment, index) => {
+      segments.forEach((segment, index) => {
+        const previousZ = segment.position.z;
         segment.position.z += movement;
         if (segment.position.z > SEGMENT_LENGTH) segment.position.z -= SEGMENT_COUNT * SEGMENT_LENGTH;
         const worldDistance = distance - segment.position.z;
-        segment.position.x = Math.sin(worldDistance * 0.013) * 1.35;
-        segment.rotation.z = Math.sin(worldDistance * 0.013) * 0.04;
-        segment.position.y = FLIGHT_ALTITUDE + Math.sin(worldDistance * 0.018) * 0.32 + smoothGrade * index * 0.035;
-      });
+        segment.position.x = Math.sin(worldDistance * 0.014) * 0.78;
+        segment.rotation.z = Math.sin(worldDistance * 0.014) * 0.018;
+        segment.position.y = Math.sin(worldDistance * 0.018) * 0.14 + smoothGrade * index * 0.018;
 
-      mountains.forEach(mountain => {
-        mountain.position.z += movement * 0.72;
-        if (mountain.position.z > 20) mountain.position.z -= 450;
-      });
-
-      clouds.forEach((cloud, index) => {
-        cloud.position.z += movement * (0.35 + (index % 3) * 0.04);
-        cloud.position.x += Math.sin(elapsedTime * 0.08 + index) * delta * 0.08;
-        if (cloud.position.z > 25) cloud.position.z -= 400;
-      });
-
-      trees.forEach((tree, index) => {
-        tree.position.z += movement;
-        if (tree.position.z > 15) {
-          tree.position.z -= 180;
+        if (previousZ < 4 && segment.position.z >= 4) {
+          checkpointFlash = 1;
         }
-        const side = index % 2 === 0 ? -1 : 1;
-        tree.position.x = side * (5.5 + (index % 4) * 1.5);
-        tree.position.y = -7.9;
       });
 
-      // Ring portal animation
-      const prevPortalZ = ringPortal.position.z;
-      ringPortal.position.z += movement;
-      if (ringPortal.position.z > 12) ringPortal.position.z -= 240;
-      const portalWorldDist = distance - ringPortal.position.z;
-      ringPortal.position.x = Math.sin(portalWorldDist * 0.013) * 1.35;
-      ringPortal.position.y = FLIGHT_ALTITUDE + 2.5 + Math.sin(portalWorldDist * 0.018) * 0.32 +
-        smoothGrade * (Math.abs(ringPortal.position.z) / SEGMENT_LENGTH) * 0.035;
-      // Slow spin — more dramatic when velocity is high
-      ringPortal.rotation.z += delta * (0.35 + smoothVelocity * 0.006);
-
-      if (prevPortalZ < 8 && ringPortal.position.z >= 8) {
-        triggerCheckpoint();
-      }
-
-      // ── Continuous road edge lines ──────────────────────────────────────
-      {
-        const leftAttr = leftEdgeGeo.getAttribute('position') as THREE.BufferAttribute;
-        const rightAttr = rightEdgeGeo.getAttribute('position') as THREE.BufferAttribute;
-        const lArr = leftAttr.array as Float32Array;
-        const rArr = rightAttr.array as Float32Array;
-
-        for (let i = 0; i < EDGE_PTS; i++) {
-          const s = i * EDGE_STEP;
-          const w = distance - s;
-          const cx = Math.sin(w * 0.013) * 1.35;
-          const cy = FLIGHT_ALTITUDE + Math.sin(w * 0.018) * 0.32 + smoothGrade * (s / SEGMENT_LENGTH) * 0.035;
-          const cz = 8 - s;
-
-          // Right-facing unit normal perpendicular to road tangent in xz-plane
-          // Tangent x-component: d(cx)/dw = cos(w*0.013)*0.013*1.35
-          // Normal (rotated 90° CW in xz): N = (1, cos*0.013*1.35) / len
-          const tDx = Math.cos(w * 0.013) * 0.013 * 1.35;
-          const tLen = Math.sqrt(tDx * tDx + 1.0);
-          const nX = 1.0 / tLen;
-          const nZ = -tDx / tLen;
-
-          lArr[i * 3]     = cx - nX * ROAD_HALF_W;
-          lArr[i * 3 + 1] = cy + 0.04;
-          lArr[i * 3 + 2] = cz - nZ * ROAD_HALF_W;
-
-          rArr[i * 3]     = cx + nX * ROAD_HALF_W;
-          rArr[i * 3 + 1] = cy + 0.04;
-          rArr[i * 3 + 2] = cz + nZ * ROAD_HALF_W;
-        }
-        leftAttr.needsUpdate = true;
-        rightAttr.needsUpdate = true;
-      }
-
-      // ── Center dashes ───────────────────────────────────────────────────
-      {
-        const dashAttr = centerDashGeo.getAttribute('position') as THREE.BufferAttribute;
-        const dArr = dashAttr.array as Float32Array;
-        const dashPhase = distance % DASH_INTERVAL;
-        for (let i = 0; i < DASH_LINES; i++) {
-          const s0 = i * DASH_INTERVAL + (DASH_INTERVAL - dashPhase);
-          const s1 = s0 + DASH_LEN;
-          for (let j = 0; j < 2; j++) {
-            const s = j === 0 ? s0 : s1;
-            const w = distance - s;
-            const cx = Math.sin(w * 0.013) * 1.35;
-            const cy = FLIGHT_ALTITUDE + Math.sin(w * 0.018) * 0.32 + smoothGrade * (s / SEGMENT_LENGTH) * 0.035;
-            dArr[(i * 2 + j) * 3]     = cx;
-            dArr[(i * 2 + j) * 3 + 1] = cy + 0.035;
-            dArr[(i * 2 + j) * 3 + 2] = 8 - s;
-          }
-        }
-        dashAttr.needsUpdate = true;
-      }
-
-      const bpm = latest.telemetry.heartRate || 70;
+      const bpm = latest.telemetry.heartRate || 72;
       const hrPeriod = 60 / bpm;
       const hrPulse = Math.pow(Math.sin((elapsedTime / hrPeriod) * Math.PI * 2) * 0.5 + 0.5, 4);
-
       const zone = target.hrZone < 0 ? 0 : target.hrZone;
-      const sky = new THREE.Color(SKY_COLOR);
-      const fog = new THREE.Color(FOG_COLOR);
-      const groundColor = new THREE.Color(GROUND_COLOR);
       const accent = new THREE.Color(ACCENT_COLORS[zone]);
-      const environmentAccent = new THREE.Color(ENVIRONMENT_ACCENT);
-      const nightPulse = 0.92 + Math.sin(elapsedTime * 0.08) * 0.08;
-      sky.multiplyScalar(nightPulse);
-      fog.multiplyScalar(0.94 + Math.sin(elapsedTime * 0.065 + 1.4) * 0.06);
-      groundColor.multiplyScalar(0.9 + Math.sin(elapsedTime * 0.055 + 2.2) * 0.1);
-      scene.background = scene.background instanceof THREE.Color ? scene.background.lerp(sky, delta * 0.4) : sky;
-      if (!scene.fog) scene.fog = new THREE.Fog(fog, 20, 165);
-      scene.fog.color.lerp(fog, delta * 0.5);
-      groundMaterial.color.lerp(groundColor, delta * 0.25);
-      
-      const pulsedAccent = environmentAccent.clone().multiplyScalar(0.76 + hrPulse * 0.24);
-      edgeMaterial.color.lerp(pulsedAccent, delta * 1.8);
-      roadMaterial.color.lerp(environmentAccent.clone().multiplyScalar(0.12), delta * 0.65);
-      roadMaterial.emissive.lerp(environmentAccent.clone().multiplyScalar(0.2), delta * 0.8);
-      roadMaterial.opacity = 0.28 + Math.min(target.intensity, 1) * 0.13;
-      craftAccentMaterial.color.lerp(environmentAccent, delta * 2.4);
-      engineMaterial.color.lerp(environmentAccent, delta * 3);
-      // Ring portal material — color + HR pulse scale
-      ringPortalMaterial.color.lerp(accent, delta * 1.8);
-      ringInnerMaterial.color.lerp(accent, delta * 1.8);
-      ringSpokeMaterial.color.lerp(accent, delta * 1.5);
-      ringFaceMaterial.color.lerp(accent, delta * 1.5);
-      ringPortalMaterial.opacity = 0.78 + hrPulse * 0.22;
-      ringInnerMaterial.opacity = 0.30 + hrPulse * 0.20;
-      const ringPulseScale = 1.0 + hrPulse * 0.055;
-      ringPortal.scale.set(ringPulseScale, ringPulseScale, 1);
 
-      mountainWireframeMaterial.color.lerp(environmentAccent, delta * 1.5);
-      treeWireframeMaterial.color.lerp(environmentAccent, delta * 1.5);
-      sparkMaterial.color.lerp(accent, delta * 2.5);
-      centerDashMaterial.color.lerp(environmentAccent, delta * 0.5);
+      const night = new THREE.Color(SKY_COLOR).multiplyScalar(0.9 + Math.sin(elapsedTime * 0.05) * 0.05);
+      scene.background = scene.background instanceof THREE.Color ? scene.background.lerp(night, delta * 0.3) : night;
+      scene.fog?.color.lerp(new THREE.Color(FOG_COLOR).multiplyScalar(0.95 + hrPulse * 0.05), delta * 0.5);
 
-      const leafBaseColor = new THREE.Color(0x08150f);
-      treeColorMaterial.color.lerp(leafBaseColor, delta * 0.4);
+      moonMaterial.color.lerp(new THREE.Color(0xdde6ef), delta * 0.9);
+      moonMaterial.opacity = 0.9 + hrPulse * 0.04;
+      moonHaloMaterial.color.lerp(accent.clone().lerp(new THREE.Color(0xbed9ff), 0.78), delta * 1.2);
+      moonHaloMaterial.opacity = 0.04 + hrPulse * 0.025;
+      moonGroup.scale.setScalar(1 + hrPulse * 0.012);
+      starMaterial.opacity = 0.45 + Math.sin(elapsedTime * 0.35) * 0.12;
+      cityGlow.color.lerp(accent, delta * 2);
+      cityGlow.intensity = 1.2 + target.intensity * 1.45 + hrPulse * 0.35 + checkpointFlash * 1.8;
 
-      moonMaterial.color.lerp(environmentAccent, delta * 1.5);
-      moonMaterial.opacity = (0.55 + hrPulse * 0.35) * (0.85 + Math.sin(elapsedTime * 0.3) * 0.05);
-      const moonPulseScale = 1.0 + hrPulse * 0.04;
-      moonGroup.scale.set(moonPulseScale, moonPulseScale, 1);
+      const frontWheel = bike.userData.frontWheel as THREE.Mesh;
+      const rearWheel = bike.userData.rearWheel as THREE.Mesh;
+      const accentMat = bike.userData.accentMat as THREE.MeshBasicMaterial;
+      const headLight = bike.userData.light as THREE.Mesh;
+      frontWheel.rotation.x -= movement * 1.8;
+      rearWheel.rotation.x -= movement * 1.8;
+      bike.position.x = Math.sin((distance + 8) * 0.014) * 0.45;
+      bike.position.y = 0.16 + Math.sin(elapsedTime * (2 + target.intensity)) * 0.035 + smoothGrade * 0.45;
+      bike.rotation.z = THREE.MathUtils.lerp(bike.rotation.z, -Math.cos(distance * 0.014) * 0.08, smoothing * 1.5);
+      accentMat.color.lerp(accent, delta * 2.2);
+      accentMat.opacity = 0.72 + Math.min(target.intensity, 1) * 0.22 + hrPulse * 0.06;
+      headLight.scale.setScalar(1 + target.intensity * 0.5 + hrPulse * 0.12);
 
-      dustMaterial.color.lerp(accent, delta * 0.5);
-      dustMaterial.opacity = 0.25 + Math.min(target.intensity, 1) * 0.35;
-      starMaterial.opacity = 0.38 + Math.sin(elapsedTime * 0.22) * 0.12;
-      cloudMaterial.color.lerp(new THREE.Color(0x7893a8), delta * 0.12);
-      cloudMaterial.opacity = 0.065 + Math.sin(elapsedTime * 0.1) * 0.015;
-
-      const warpPosAttr = warpGeometry.getAttribute('position') as THREE.BufferAttribute;
-      const warpPositionsArr = warpPosAttr.array as Float32Array;
-      const minWarpVel = 11;
-      const maxWarpVel = 56;
-      const warpFactor = THREE.MathUtils.clamp((smoothVelocity - minWarpVel) / (maxWarpVel - minWarpVel), 0, 1);
-      
-      warpMaterial.opacity = warpFactor * 0.5;
-      warpMaterial.color.lerp(accent, delta * 0.8);
-
-      for (let i = 0; i < warpCount; i++) {
-        let zStart = warpPositionsArr[i * 6 + 2];
-        zStart += movement * 1.9 * warpSpeeds[i];
-        
-        if (zStart > 10) {
-          zStart = -160 - Math.random() * 40;
-          const x = (Math.random() - 0.5) * 24;
-          const y = FLIGHT_ALTITUDE - 3 + Math.random() * 8;
-          
-          warpPositionsArr[i * 6] = x;
-          warpPositionsArr[i * 6 + 1] = y;
-          warpPositionsArr[i * 6 + 3] = x;
-          warpPositionsArr[i * 6 + 4] = y;
+      const speedAttr = speedLineGeometry.getAttribute('position') as THREE.BufferAttribute;
+      const speedArr = speedAttr.array as Float32Array;
+      const speedFactor = THREE.MathUtils.clamp((smoothVelocity - 8) / 18, 0, 1);
+      speedLineMaterial.color.lerp(accent, delta * 1.2);
+      speedLineMaterial.opacity = speedFactor * 0.55;
+      for (let i = 0; i < speedLineCount; i += 1) {
+        let zStart = speedArr[i * 6 + 2] + movement * 2.4 * speedLineSpeeds[i];
+        if (zStart > 9) {
+          zStart = -120 - Math.random() * 40;
+          const x = (Math.random() - 0.5) * 18;
+          const y = 0.7 + Math.random() * 7;
+          speedArr[i * 6] = x;
+          speedArr[i * 6 + 1] = y;
+          speedArr[i * 6 + 3] = x;
+          speedArr[i * 6 + 4] = y;
         }
-
-        warpPositionsArr[i * 6 + 2] = zStart;
-        warpPositionsArr[i * 6 + 5] = zStart - warpLength * (1 + warpFactor * 2.5);
+        speedArr[i * 6 + 2] = zStart;
+        speedArr[i * 6 + 5] = zStart - 3.2 * (1 + speedFactor * 1.8);
       }
-      warpPosAttr.needsUpdate = true;
+      speedAttr.needsUpdate = true;
 
-      if (checkpointFlash > 0) {
-        checkpointFlash = Math.max(0, checkpointFlash - delta * 2.4);
-        ambient.intensity = 1.15 + checkpointFlash * 2.2;
-        moonLight.intensity = 1.35 + checkpointFlash * 1.8;
-      } else {
-        ambient.intensity = 1.15;
-        moonLight.intensity = 1.35;
-      }
-
-      if (sparkActive) {
-        sparkTime += delta;
-        const posAttr = sparkGeometry.getAttribute('position') as THREE.BufferAttribute;
-        const positions = posAttr.array as Float32Array;
-
-        for (let i = 0; i < sparkCount; i++) {
-          positions[i * 3] += sparkVelocities[i * 3] * delta;
-          positions[i * 3 + 1] += sparkVelocities[i * 3 + 1] * delta - 4.5 * delta;
-          positions[i * 3 + 2] += sparkVelocities[i * 3 + 2] * delta;
-        }
-        posAttr.needsUpdate = true;
-        
-        sparkMaterial.opacity = Math.max(0, 1.0 - sparkTime * 1.0);
-        if (sparkTime >= 1.0) {
-          sparkActive = false;
-        }
-      }
-
-      const curveIntensity = Math.cos(distance * 0.013);
-      const targetRoll = -curveIntensity * 0.12;
-      let currentRoll = THREE.MathUtils.lerp(camera.rotation.z, targetRoll, smoothing);
+      checkpointFlash = Math.max(0, checkpointFlash - delta * 2.4);
+      ambient.intensity = 1.2 + checkpointFlash * 1.2;
+      moonLight.intensity = 2.2 + checkpointFlash * 1.4;
 
       let shakeX = 0;
       let shakeY = 0;
-      let shakeZ = 0;
-      const powerLimit = 240;
-      if (latest.telemetry.power > powerLimit) {
-        const powerExcess = latest.telemetry.power - powerLimit;
-        const shakeIntensity = Math.min(1.0, powerExcess / 260) * 0.065;
-        const shakeSpeed = 50;
-        shakeX = (Math.sin(elapsedTime * shakeSpeed) * Math.cos(elapsedTime * shakeSpeed * 1.1)) * shakeIntensity;
-        shakeY = (Math.cos(elapsedTime * shakeSpeed * 1.25) * Math.sin(elapsedTime * shakeSpeed * 0.95)) * shakeIntensity;
-        shakeZ = (Math.sin(elapsedTime * shakeSpeed * 1.45)) * shakeIntensity * 0.45;
-
-        currentRoll += (Math.sin(elapsedTime * 65) * 0.012) * Math.min(1.0, powerExcess / 260);
+      const powerExcess = Math.max(0, latest.telemetry.power - 240);
+      if (powerExcess > 0) {
+        const shakeIntensity = Math.min(1, powerExcess / 260) * 0.055;
+        shakeX = Math.sin(elapsedTime * 48) * shakeIntensity;
+        shakeY = Math.cos(elapsedTime * 41) * shakeIntensity * 0.65;
       }
 
-      const flightBob = Math.sin(elapsedTime * (1.25 + target.intensity * 0.35)) * 0.08;
-      const craftTargetX = Math.sin((distance + 7) * 0.013) * 0.85;
-      const craftTargetY = FLIGHT_ALTITUDE + 1.15 + smoothGrade * 1.8 + flightBob;
-      craft.position.x = THREE.MathUtils.lerp(craft.position.x, craftTargetX, smoothing * 1.4);
-      craft.position.y = THREE.MathUtils.lerp(craft.position.y, craftTargetY, smoothing * 1.2);
-      craft.rotation.z = THREE.MathUtils.lerp(craft.rotation.z, targetRoll * 2.8, smoothing * 1.5);
-      craft.rotation.x = THREE.MathUtils.lerp(craft.rotation.x, -smoothGrade * 0.13 + flightBob * 0.08, smoothing);
-      craft.rotation.y = THREE.MathUtils.lerp(craft.rotation.y, -targetRoll * 0.55, smoothing);
-      const engineScale = 0.85 + Math.min(target.intensity, 1.35) * 0.55 + Math.sin(elapsedTime * 8) * 0.06;
-      leftEngine.scale.set(1, 1, engineScale);
-      rightEngine.scale.copy(leftEngine.scale);
-      engineMaterial.opacity = 0.68 + Math.min(target.intensity, 1) * 0.25;
-
-      camera.position.z = 9 + shakeZ;
-      camera.position.x = THREE.MathUtils.lerp(camera.position.x, craft.position.x * 0.38, smoothing) + shakeX;
-      camera.position.y = THREE.MathUtils.lerp(
-        camera.position.y,
-        FLIGHT_ALTITUDE + 4.2 + smoothGrade * 1.35 + flightBob * 0.3,
-        smoothing
-      ) + shakeY;
-
+      camera.position.x = THREE.MathUtils.lerp(camera.position.x, bike.position.x * 0.42, smoothing) + shakeX;
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 4.4 + smoothGrade * 0.8, smoothing) + shakeY;
+      camera.position.z = THREE.MathUtils.lerp(camera.position.z, 10.4, smoothing);
       camera.lookAt(
-        Math.sin((distance + 28) * 0.013) * 1.1,
-        FLIGHT_ALTITUDE + 1 + smoothGrade * 2.2,
-        -24
+        Math.sin((distance + 28) * 0.014) * 0.8,
+        1.7 + smoothGrade,
+        -15
       );
-      camera.rotation.z = currentRoll;
 
-      dust.rotation.y += delta * 0.01;
-      stars.rotation.y = Math.sin(elapsedTime * 0.025) * 0.035;
-      stars.position.x = Math.sin(elapsedTime * 0.04) * 1.5;
-
-      frame += 1;
+      stars.rotation.y = Math.sin(elapsedTime * 0.03) * 0.04;
       renderer.render(scene, camera);
     };
     animate();
@@ -789,19 +672,19 @@ export const WorkoutJourney = ({
   return (
     <section className="relative min-h-[500px] h-full overflow-hidden rounded-lg border border-vp-border-strong bg-vp-surface shadow-[0_18px_48px_rgba(0,0,0,0.45)]">
       <div ref={mountRef} className="absolute inset-0" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,7,8,0.2),transparent_35%,rgba(6,7,8,0.72))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,18,0.16),transparent_34%,rgba(3,7,18,0.76))]" />
 
       <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-4">
-        <div className="rounded-md border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
+        <div className="rounded-md border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-md">
           <div className="flex items-center gap-2 text-vp-accent">
             <Zap size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em]">Midnight Skyway</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em]">Midnight Tokyo Ride</span>
           </div>
           <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.14em] text-white/55">
-            Air gate {Math.floor(elapsed / 300) + 1} · Flight live
+            Block {Math.floor(elapsed / 300) + 1} · Night session
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-3 py-1.5 backdrop-blur-md">
           <Radio size={11} className={visualState.hasBikeSignal ? 'text-vp-accent' : 'text-vp-muted'} />
           <span className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/70">
             {visualState.hasBikeSignal ? 'Sensor linked' : 'Fallback pace'}
@@ -809,7 +692,7 @@ export const WorkoutJourney = ({
         </div>
       </div>
 
-      <div className="absolute left-4 top-[82px] flex items-center gap-2 rounded-md border border-white/10 bg-black/45 p-2 backdrop-blur-md">
+      <div className="absolute left-4 top-[82px] flex items-center gap-2 rounded-md border border-white/10 bg-black/50 p-2 backdrop-blur-md">
         <Gauge size={13} className="text-vp-accent" />
         <label className="flex items-center gap-2">
           <span className="text-[9px] font-mono uppercase tracking-[0.12em] text-white/65">Visual speed</span>
@@ -833,7 +716,7 @@ export const WorkoutJourney = ({
         <JourneyMetric icon={<Bike size={12} />} label="Cadence" value={telemetry.cadence || '--'} unit="RPM" />
         <JourneyMetric icon={<Zap size={12} />} label="Power" value={telemetry.power || '--'} unit="W" />
         <JourneyMetric icon={<Heart size={12} />} label={zoneLabel} value={telemetry.heartRate || '--'} unit="BPM" />
-        <JourneyMetric icon={<Gauge size={12} />} label="Flight speed" value={adjustedVelocity.toFixed(1)} unit="M/S" />
+        <JourneyMetric icon={<Gauge size={12} />} label="City pace" value={adjustedVelocity.toFixed(1)} unit="M/S" />
       </div>
     </section>
   );
@@ -850,7 +733,7 @@ const JourneyMetric = ({
   value: string | number;
   unit: string;
 }) => (
-  <div className="rounded-md border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-md">
+  <div className="rounded-md border border-white/10 bg-black/50 px-3 py-2 backdrop-blur-md">
     <div className="flex items-center gap-1.5 text-[8px] font-mono uppercase tracking-[0.14em] text-white/55">
       <span className="text-vp-accent">{icon}</span>
       {label}
