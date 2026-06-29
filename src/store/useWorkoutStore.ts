@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { BluetoothData, useBluetoothStore } from './useBluetoothStore';
 import { getSupabaseClient } from '@/lib/supabase';
 import { parseTCXWorkoutSessions } from '@/lib/tcx-import-service';
+import { calcCaloriesFromPower } from '@/lib/physics';
 
 export interface HistoryData {
   time: string;
@@ -188,6 +189,21 @@ const calculateLiveStats = (
     },
     totals
   };
+};
+
+export const calculateSessionCalories = (
+  data: BluetoothData,
+  startCalories: number,
+  previousCalories: number,
+  durationSec = 1
+) => {
+  const powerCalories = calcCaloriesFromPower(data.power || 0, durationSec);
+  if (powerCalories > 0) {
+    return previousCalories + Math.round(powerCalories);
+  }
+
+  const sensorCalories = Math.max(0, (data.calories || 0) - startCalories);
+  return Math.max(previousCalories, Math.round(sensorCalories));
 };
 
 type ActiveSessionSnapshot = {
@@ -799,6 +815,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     if (lastPoint && lastPoint.time === timeStr) return;
 
     set((state) => {
+      const previousCalories = lastPoint?.calories || 0;
       const point = {
         time: timeStr,
         hr: data.heartRate || 0,
@@ -807,7 +824,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         speed: data.speed || 0,
         distance: Math.max(0, (data.distance || 0) - startDistance),
         resistance: data.resistance || 0,
-        calories: Math.max(0, (data.calories || 0) - startCalories)
+        calories: calculateSessionCalories(data, startCalories, previousCalories)
       };
       const newHistory = [...state.history, point];
       const nextTotals = {

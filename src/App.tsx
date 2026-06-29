@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBluetoothStore } from './store/useBluetoothStore';
-import { useWorkoutStore } from './store/useWorkoutStore';
+import { calculateSessionCalories, useWorkoutStore } from './store/useWorkoutStore';
 import { HR_ZONES, getActiveHrZoneIndex } from '@/lib/constants';
 
 // Hooks
@@ -215,6 +215,17 @@ export default function App() {
     }
   };
 
+  const latestHistoryPoint = workoutHistory[workoutHistory.length - 1];
+  const fallbackSessionCalories = Math.max(0, (bleData.calories || 0) - startCalories);
+  const currentSessionCalories = isRecording
+    ? calculateSessionCalories(
+        bleData,
+        startCalories,
+        latestHistoryPoint?.calories ?? fallbackSessionCalories,
+        0
+      )
+    : (bleData.calories || 0);
+
   const currentData = {
     hr: bleData.heartRate || 0,
     cadence: bleData.cadence || 0,
@@ -222,7 +233,7 @@ export default function App() {
     speed: bleData.speed || 0,
     distance: isRecording ? Math.max(0, (bleData.distance || 0) - startDistance) : (bleData.distance || 0),
     resistance: bleData.resistance || 0,
-    calories: isRecording ? Math.max(0, (bleData.calories || 0) - startCalories) : (bleData.calories || 0)
+    calories: currentSessionCalories
   };
 
   const getHrZone = (hr: number) => {

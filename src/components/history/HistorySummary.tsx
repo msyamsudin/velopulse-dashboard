@@ -111,8 +111,17 @@ export const HistorySummary = ({
   ] as const;
 
   const denseData = normalizedChartData.length > 45;
-  const barScrollable = normalizedChartData.length > 14;
-  const compactLabels = normalizedChartData.length > 20;
+  const compactLabels = normalizedChartData.length > 14;
+  const ultraDense = normalizedChartData.length > 45;
+  const labelInterval = normalizedChartData.length > 60
+    ? 14
+    : normalizedChartData.length > 45
+      ? 7
+      : normalizedChartData.length > 30
+        ? 5
+        : normalizedChartData.length > 20
+          ? 3
+          : 1;
   const metricOptions = [
     { value: 'distance', label: 'KM', name: 'Distance', unit: 'km', color: '#00d2ff', colorRgba: '0,210,255' },
     { value: 'calories', label: 'KCAL', name: 'Calories', unit: 'kcal', color: '#f472b6', colorRgba: '244,114,182' },
@@ -166,8 +175,8 @@ export const HistorySummary = ({
 
     const mappedData = normalizedChartData.map((point, index) => {
       const hasData = Boolean(point.hasData);
-      const showSubLabel = !compactLabels || hasData || point.isHighlight;
-      const showMainLabel = !compactLabels || hasData || point.isHighlight || index % 3 === 0;
+      const showSubLabel = !compactLabels || (hasData && index % labelInterval === 0) || point.isHighlight;
+      const showMainLabel = !compactLabels || hasData && index % labelInterval === 0 || point.isHighlight || (!compactLabels && index % 3 === 0);
       const metricValues = {} as Record<MetricKey, number>;
       const cumulativeValues = {} as Record<MetricKey, number>;
       const displayValues = {} as Record<MetricKey, number>;
@@ -425,11 +434,78 @@ export const HistorySummary = ({
   const trainingLoadChange = trainingLoadDelta?.hasBaseline
     ? `${trainingLoadDelta.direction === 'up' ? '+' : ''}${trainingLoadDelta.value}%`
     : globalSummary.totalTrainingLoad > 0 ? t('New baseline') : t('No load');
-  const loadComparisonMax = Math.max(trainingLoadMetrics.acuteLoad, trainingLoadMetrics.chronicLoad, 1);
-  const acuteLoadWidth = Math.max(2, (trainingLoadMetrics.acuteLoad / loadComparisonMax) * 100);
-  const chronicLoadWidth = Math.max(2, (trainingLoadMetrics.chronicLoad / loadComparisonMax) * 100);
+  const baselineDelta = trainingLoadMetrics.chronicLoad > 0
+    ? Math.round(((trainingLoadMetrics.acuteLoad - trainingLoadMetrics.chronicLoad) / trainingLoadMetrics.chronicLoad) * 100)
+    : null;
+  const baselineDeltaLabel = baselineDelta === null
+    ? '--'
+    : `${baselineDelta > 0 ? '+' : ''}${baselineDelta}%`;
   const loadRatio = trainingLoadMetrics.acuteChronicRatio;
-  const loadRatioPosition = loadRatio === null ? 0 : Math.min(100, Math.max(0, (loadRatio / 2) * 100));
+  const loadRatioValue = loadRatio ?? 0;
+  const loadRatioNeedle = Math.min(100, Math.max(0, (loadRatioValue / 2) * 100));
+  const loadRatioStatus = loadRatio === null
+    ? t('No baseline')
+    : loadRatio < 0.8
+      ? t('Low')
+      : loadRatio <= 1.3
+        ? t('Balanced')
+        : loadRatio <= 1.5
+          ? t('Elevated')
+          : t('High');
+  const loadRatioDelta = trainingLoadDelta?.hasBaseline && typeof trainingLoadDelta.value === 'number'
+    ? `${trainingLoadDelta.direction === 'up' ? '+' : trainingLoadDelta.direction === 'down' ? '-' : ''}${Math.abs(trainingLoadDelta.value)}%`
+    : '--';
+  const loadRatioChartData = weeklyDailyData.slice(-7);
+  const loadRatioChartMax = Math.max(
+    ...loadRatioChartData.map(day => day.trimp),
+    trainingLoadMetrics.chronicLoad,
+    1
+  );
+  const loadRatioDotCount = 37;
+  const loadRatioActiveDot = Math.round((loadRatioNeedle / 100) * (loadRatioDotCount - 1));
+  const loadRatioDots = Array.from({ length: loadRatioDotCount }, (_, index) => {
+    const progress = index / (loadRatioDotCount - 1);
+    const zoneColor = progress <= 0.4
+      ? '#5da8ff'
+      : progress <= 0.65
+        ? '#35f0bd'
+        : progress <= 0.75
+          ? '#f5c542'
+          : '#f05252';
+
+    return {
+      color: zoneColor,
+      isPast: loadRatio !== null && index <= loadRatioActiveDot,
+      isCurrent: loadRatio !== null && index === loadRatioActiveDot,
+    };
+  });
+  const loadAnalysisSummary = loadRatio === null
+    ? t('There is not enough baseline data yet.')
+    : loadRatio < 0.8
+      ? t('This week is lighter than your usual training load.')
+      : loadRatio <= 1.3
+        ? t('This week is close to your usual training load.')
+        : loadRatio <= 1.5
+          ? t('This week is above your usual load, so avoid another sharp increase.')
+          : t('This week is much higher than your usual load, so recovery should be prioritized.');
+  const loadAnalysisDetail = loadRatio === null
+    ? t('Keep adding easy sessions so the app can build a reliable 28-day baseline.')
+    : loadRatio < 0.8
+      ? t('If you feel recovered, you can build gradually; avoid jumping straight into a very hard week.')
+      : loadRatio <= 1.3
+        ? t('The load is balanced. A controlled next session is more useful than chasing a bigger spike.')
+        : loadRatio <= 1.5
+          ? t('Your recent load is ramping up. Keep volume steady and watch sleep, soreness, and fatigue.')
+          : t('The recent load spike is large. Prefer rest or an easy session unless you feel clearly recovered.');
+  const loadAnalysisText = loadRatio === null
+    ? t('This week is {acute} TRIMP, but the usual-week baseline is still not stable.', {
+      acute: trainingLoadMetrics.acuteLoad,
+    })
+    : t('This week is {acute} TRIMP versus your usual {chronic} TRIMP, so your load ratio is {ratio}.', {
+      acute: trainingLoadMetrics.acuteLoad,
+      chronic: trainingLoadMetrics.chronicLoad,
+      ratio: loadRatio.toFixed(2),
+    });
 
   return (
     <div className="pb-8 flex flex-col gap-4">
@@ -515,10 +591,10 @@ export const HistorySummary = ({
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: t('Chronic Load'), value: trainingLoadMetrics.chronicLoad, detail: t('28-day weekly avg') },
-            { label: t('Load Ratio'), value: trainingLoadMetrics.acuteChronicRatio?.toFixed(2) ?? '--', detail: t('Acute / chronic') },
-            { label: t('Monotony'), value: trainingLoadMetrics.monotony.toFixed(2), detail: t('7-day repetition') },
-            { label: t('Strain'), value: trainingLoadMetrics.strain, detail: t('Acute x monotony') },
+            { label: t('This week'), value: trainingLoadMetrics.acuteLoad, detail: t('Total load in the last 7 days') },
+            { label: t('Usual week'), value: trainingLoadMetrics.chronicLoad, detail: t('Your 28-day weekly baseline') },
+            { label: t('Load Ratio'), value: trainingLoadMetrics.acuteChronicRatio?.toFixed(2) ?? '--', detail: t('This week / usual week') },
+            { label: t('Recommendation'), value: t(trainingLoadMetrics.recommendation), detail: t('Suggested next training focus') },
           ].map(metric => (
             <div key={metric.label} className="rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
               <div className="text-[8px] text-hw-muted uppercase font-mono tracking-[0.2em]">{metric.label}</div>
@@ -532,66 +608,170 @@ export const HistorySummary = ({
           <div className="rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Load Balance')}</div>
-                <div className="mt-1 text-[10px] text-white/40">{t('Recent 7 days versus 28-day weekly baseline')}</div>
+                <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Week vs baseline')}</div>
+                <div className="mt-1 text-[10px] text-white/40">{t('Compare your last 7 days with your normal training week')}</div>
               </div>
               <div className="text-[9px] font-mono uppercase tracking-widest text-white/35">TRIMP</div>
             </div>
-            <div className="mt-4 space-y-3">
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-[9px] font-mono uppercase tracking-wider">
-                  <span className="text-white/55">{t('Acute load')}</span>
-                  <span className="font-bold text-blue-200">{trainingLoadMetrics.acuteLoad}</span>
+            <div className="mt-4 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-vp-muted">{t('Interpretation')}</div>
+                <div className="font-mono text-lg font-bold text-vp-text tabular-nums">{loadRatio?.toFixed(2) ?? '--'}x</div>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-white/55">
+                {t('A ratio near 1.0 means this week is close to your usual load. Above 1.3 means the week is ramping up.')}
+              </p>
+            </div>
+            <div className="mt-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="rounded-md border border-blue-400/15 bg-blue-400/8 px-3 py-2">
+                  <div className="text-[8px] font-mono uppercase tracking-[0.14em] text-blue-200">{t('This week')}</div>
+                  <div className="mt-1 flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-lg font-bold text-white tabular-nums">{trainingLoadMetrics.acuteLoad}</span>
+                    <span className="text-[9px] font-mono uppercase text-white/40">TRIMP</span>
+                  </div>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-white/6">
-                  <div className="h-full rounded-full bg-blue-400 transition-[width] duration-500" style={{ width: `${acuteLoadWidth}%` }} />
+                <div className="rounded-md border border-purple-400/15 bg-purple-400/8 px-3 py-2">
+                  <div className="text-[8px] font-mono uppercase tracking-[0.14em] text-purple-200">{t('Usual week')}</div>
+                  <div className="mt-1 flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-lg font-bold text-white tabular-nums">{trainingLoadMetrics.chronicLoad}</span>
+                    <span className="text-[9px] font-mono uppercase text-white/40">TRIMP</span>
+                  </div>
+                </div>
+                <div className="rounded-md border border-white/8 bg-white/[0.03] px-3 py-2">
+                  <div className="text-[8px] font-mono uppercase tracking-[0.14em] text-white/45">{t('Difference')}</div>
+                  <span className={`font-mono text-lg font-bold tabular-nums ${
+                    baselineDelta === null
+                      ? 'text-white/55'
+                      : baselineDelta > 30
+                        ? 'text-red-200'
+                        : baselineDelta > 0
+                          ? 'text-yellow-200'
+                          : 'text-blue-200'
+                  }`}>{baselineDeltaLabel}</span>
                 </div>
               </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-[9px] font-mono uppercase tracking-wider">
-                  <span className="text-white/55">{t('Chronic baseline')}</span>
-                  <span className="font-bold text-purple-200">{trainingLoadMetrics.chronicLoad}</span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-white/6">
-                  <div className="h-full rounded-full bg-purple-400 transition-[width] duration-500" style={{ width: `${chronicLoadWidth}%` }} />
-                </div>
-              </div>
+              <p className="mt-3 text-xs leading-5 text-white/50">
+                {t('This comparison only shows volume. Use Load Ratio for the training-status view.')}
+              </p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Load Ratio')}</div>
-                <div className="mt-1 text-[10px] text-white/40">{t('Balanced zone is 0.8 to 1.3')}</div>
+          <div className="overflow-hidden rounded-xl border border-blue-400/15 bg-black/20">
+            <div className="border-b border-blue-400/10 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Load Ratio')}</div>
+                  <div className="mt-1 text-[10px] text-white/40">{t('Balanced zone is 0.8 to 1.3')}</div>
+                </div>
+                <div className="rounded-md border border-blue-400/20 bg-blue-400/8 px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-blue-100">
+                  {loadRatioStatus}
+                </div>
               </div>
-              <div className="font-mono text-xl font-bold tabular-nums text-white">
-                {loadRatio?.toFixed(2) ?? '--'}
+
+              <div className="mx-auto mt-5 max-w-[520px]">
+                <div className="text-center">
+                  <div className="font-mono text-4xl font-bold leading-none tabular-nums text-vp-text drop-shadow">
+                    {loadRatio?.toFixed(2) ?? '--'}
+                  </div>
+                  <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.16em] text-vp-muted">
+                    {loadRatioDelta} {t('load change')}
+                  </div>
+                </div>
+
+                <div className="relative mt-5 px-1" role="img" aria-label={`${t('Current load ratio')} ${loadRatio?.toFixed(2) ?? '--'}`}>
+                  <div className="grid grid-cols-[repeat(37,minmax(0,1fr))] items-center gap-1.5">
+                    {loadRatioDots.map((dot, index) => (
+                      <div key={index} className="flex h-5 items-center justify-center">
+                        <span
+                          className="block rounded-full transition-all duration-300"
+                          style={{
+                            width: dot.isCurrent ? 14 : dot.isPast ? 9 : 7,
+                            height: dot.isCurrent ? 14 : dot.isPast ? 9 : 7,
+                            backgroundColor: dot.isPast ? dot.color : 'rgba(255,255,255,0.13)',
+                            border: dot.isCurrent ? '2px solid #f4f7f8' : '0 solid transparent',
+                            boxShadow: dot.isCurrent ? '0 0 0 6px rgba(244,247,248,0.08)' : 'none',
+                            opacity: dot.isCurrent ? 1 : dot.isPast ? 0.95 : 0.75,
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex justify-between text-[9px] font-mono text-white/45">
+                    <span>0</span>
+                    <span>0.8</span>
+                    <span>1.3</span>
+                    <span>1.5</span>
+                    <span>2+</span>
+                  </div>
+                  <div className="mt-2 flex justify-between text-[9px] font-mono uppercase tracking-wider text-vp-muted">
+                    <span>{t('Low')}</span>
+                    <span>{t('Balanced')}</span>
+                    <span>{t('High')}</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="relative mt-6 pb-5">
-              <div className="flex h-3 overflow-hidden rounded-full">
-                <div className="w-[40%] bg-blue-400/70" />
-                <div className="w-[25%] bg-emerald-400/80" />
-                <div className="w-[10%] bg-amber-400/80" />
-                <div className="w-[25%] bg-orange-500/80" />
+
+            <div className="px-4 py-3">
+              <div className="mb-2 flex items-center justify-between text-[9px] font-mono uppercase tracking-[0.14em] text-white/45">
+                <span>{t('7-day load chart')}</span>
+                <span>{t('TRIMP')}</span>
               </div>
-              {loadRatio !== null && (
-                <div
-                  className="absolute top-[-5px] h-5 w-1 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.7)]"
-                  style={{ left: `${loadRatioPosition}%` }}
-                  aria-label={`${t('Current load ratio')} ${loadRatio.toFixed(2)}`}
-                />
-              )}
-              <div className="mt-2 flex justify-between text-[8px] font-mono text-white/35">
-                <span>0</span>
-                <span>0.8</span>
-                <span>1.3</span>
-                <span>1.5</span>
-                <span>2+</span>
+              <div className="h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={loadRatioChartData} margin={{ top: 8, right: 6, bottom: 0, left: -24 }}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, loadRatioChartMax]} tick={{ fill: 'rgba(255,255,255,0.45)', fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ stroke: 'rgba(255,255,255,0.25)', strokeDasharray: '3 3' }}
+                      contentStyle={{ background: '#1f2022', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff' }}
+                      formatter={(value: number) => [value.toFixed(1), t('Training Load')]}
+                    />
+                    <ReferenceLine y={trainingLoadMetrics.chronicLoad} stroke="#a98cff" strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey="trimp" stroke="#5da8ff" strokeWidth={2.5} dot={{ r: 3, fill: '#35f0bd', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#f4f7f8', stroke: '#5da8ff' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-mono text-white/65">
+                  <span className="mr-1 inline-block h-2 w-2 rounded-full bg-vp-info" /> {t('Acute load')} <b className="float-right text-white">{trainingLoadMetrics.acuteLoad}</b>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-mono text-white/65">
+                  <span className="mr-1 inline-block h-2 w-2 rounded-full bg-vp-distance" /> {t('Chronic baseline')} <b className="float-right text-white">{trainingLoadMetrics.chronicLoad}</b>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-blue-400/15 bg-black/20 px-4 py-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Load analysis')}</div>
+              <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.12em] text-white/38">{t('Plain-language readout')}</div>
+            </div>
+            <div className={`rounded border px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-[0.14em] ${
+              loadRatio === null
+                ? 'border-white/12 bg-white/5 text-white/55'
+                : loadRatio < 0.8
+                  ? 'border-blue-400/25 bg-blue-400/10 text-blue-200'
+                  : loadRatio <= 1.3
+                    ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
+                    : loadRatio <= 1.5
+                      ? 'border-yellow-400/25 bg-yellow-400/10 text-yellow-200'
+                      : 'border-red-400/25 bg-red-400/10 text-red-200'
+            }`}>
+              {loadRatioStatus}
+            </div>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-vp-text">
+            {loadAnalysisText} <span className="text-white/70">{loadAnalysisSummary}</span>
+          </p>
+          <p className="mt-2 border-t border-white/6 pt-2 text-xs leading-5 text-white/50">
+            {loadAnalysisDetail}
+          </p>
         </div>
 
         <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3">
@@ -600,6 +780,26 @@ export const HistorySummary = ({
           <p className="mt-2 border-t border-white/6 pt-2 text-[10px] leading-5 text-white/40">
             {t('Guidance is based only on recorded heart-rate load. Check your actual fatigue, sleep, soreness, illness, pain, and recovery before deciding how to train.')}
           </p>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3">
+          <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-blue-300">{t('Advanced load signals')}</div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/50">{t('Repetition risk')}</div>
+                <div className="font-mono text-xl font-bold text-white tabular-nums">{trainingLoadMetrics.monotony.toFixed(2)}</div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-white/50">{t('Higher means your daily training load is very similar, with less easy/hard variation.')}</p>
+            </div>
+            <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/50">{t('Overall strain')}</div>
+                <div className="font-mono text-xl font-bold text-white tabular-nums">{trainingLoadMetrics.strain}</div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-white/50">{t('Combines weekly load and repetition risk; useful when deciding whether to back off.')}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -974,7 +1174,7 @@ export const HistorySummary = ({
                     tickMargin={10}
                     axisLine={false}
                     tickLine={false}
-                    interval={compactLabels ? 'preserveStartEnd' : 0}
+                    interval={compactLabels ? labelInterval - 1 : 0}
                   />
                   <Tooltip
                     cursor={{ stroke: '#ffffff30', strokeWidth: 1, strokeDasharray: '4 4' }}
@@ -1111,7 +1311,7 @@ export const HistorySummary = ({
                   </div>
                 )}
               </div>
-              <div className="relative flex items-end gap-2 min-h-[260px] h-[clamp(260px,40vh,420px)] w-full overflow-x-auto custom-scrollbar pb-2 pr-2">
+              <div className={`relative flex items-end min-h-[260px] h-[clamp(260px,40vh,420px)] w-full pb-2 ${ultraDense ? 'gap-px' : compactLabels ? 'gap-[2px]' : 'gap-1.5'}`}>
                 {averageStyle === 'flat' && averageLines.map((line, index) => (
                   <div
                     key={line.metric}
@@ -1169,14 +1369,11 @@ export const HistorySummary = ({
                 ))}
                 {chartData.map((day) => {
                   return (
-                    <div key={day.date} className="flex flex-col items-center justify-end gap-1.5 group h-full snap-end" style={{ minWidth: barScrollable ? '46px' : '0', flex: barScrollable ? '0 0 46px' : '1 1 0' }}>
-                      <div className={`text-[9px] font-mono tabular-nums transition-all duration-200 ${day.hasData ? 'text-white/70 group-hover:text-white' : 'text-transparent'}`}>
-                        {day.hasData
-                          ? selectedMetrics.length === 0 ? '' : selectedMetrics.length === 1 ? formatChartMetric(primaryMetric, day.displayValues[primaryMetric] || 0) : `${selectedMetrics.length}x`
-                          : ''}
-                      </div>
+                    <div key={day.date} className="flex flex-col items-center group" style={{ minWidth: 0, flex: '1 1 0', height: '100%' }}>
 
-                      <div className="w-full relative flex items-end gap-1 h-full max-h-full">
+                      {/* Bar area — flex-1 min-h-0 so it takes remaining height after labels */}
+                      <div className="w-full flex-1 min-h-0 relative flex items-end">
+                        {/* Tooltip */}
                         <div className="absolute bottom-full left-1/2 z-10 mb-2 hidden w-48 -translate-x-1/2 rounded-xl border border-white/10 bg-[#111] px-3 py-2 text-[10px] font-mono uppercase shadow-xl group-hover:block pointer-events-none">
                           <div className="text-white/60">{day.displayLabel} {day.subLabel}</div>
                           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
@@ -1201,49 +1398,53 @@ export const HistorySummary = ({
                             <div className="text-right text-white">{day.cadence} rpm</div>
                           </div>
                         </div>
-                        {selectedMetrics.map(metric => {
-                          const config = metricConfigByKey[metric];
-                          const pct = (day.scaledValues[metric] || 0) / 100;
-                          return (
-                            <div key={metric} className="flex-1 relative h-full min-w-0">
-                              <div className="absolute bottom-0 w-full" style={{ height: `${pct * 100}%`, minHeight: day.hasData ? '4px' : '2px' }}>
-                                {day.hasData ? (
-                                  <div
-                                    className="w-full h-full rounded-t-md transition-all duration-500 group-hover:opacity-90"
-                                    style={{
-                                      background: day.isHighlight ? config.color : `rgba(${config.colorRgba},0.42)`,
-                                      borderTop: `1px solid rgba(${config.colorRgba},0.3)`,
-                                      borderLeft: `1px solid rgba(${config.colorRgba},0.3)`,
-                                      borderRight: `1px solid rgba(${config.colorRgba},0.3)`,
-                                      boxShadow: day.isHighlight && metric === primaryMetric ? `0 0 12px rgba(${config.colorRgba},0.5)` : 'none',
-                                    }}
-                                  />
-                                ) : (
-                                  <div
-                                    className="w-full h-full rounded-t-sm"
-                                    style={{
-                                      background: 'rgba(255,255,255,0.04)',
-                                      borderTop: '1px solid rgba(255,255,255,0.06)',
-                                      borderLeft: '1px solid rgba(255,255,255,0.06)',
-                                      borderRight: '1px solid rgba(255,255,255,0.06)'
-                                    }}
-                                  />
-                                )}
+
+                        {/* Metric bars — each takes equal width, height = % of bar area */}
+                        <div className="w-full h-full relative flex items-end gap-px">
+                          {selectedMetrics.map(metric => {
+                            const config = metricConfigByKey[metric];
+                            const pct = (day.scaledValues[metric] || 0) / 100;
+                            return (
+                              <div key={metric} className="flex-1 h-full relative min-w-0">
+                                <div
+                                  className="absolute bottom-0 w-full"
+                                  style={{ height: `${pct * 100}%`, minHeight: day.hasData ? '3px' : '0px' }}
+                                >
+                                  {day.hasData ? (
+                                    <div
+                                      className="w-full h-full rounded-t-sm transition-all duration-500 group-hover:opacity-90"
+                                      style={{
+                                        background: day.isHighlight ? config.color : `rgba(${config.colorRgba},0.42)`,
+                                        borderTop: `1px solid rgba(${config.colorRgba},0.3)`,
+                                        borderLeft: `1px solid rgba(${config.colorRgba},0.3)`,
+                                        borderRight: `1px solid rgba(${config.colorRgba},0.3)`,
+                                        boxShadow: day.isHighlight && metric === primaryMetric ? `0 0 12px rgba(${config.colorRgba},0.5)` : 'none',
+                                      }}
+                                    />
+                                  ) : null}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
 
-                      <div className="w-full h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                      {/* Axis separator */}
+                      <div className="w-full h-px shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
 
-                      <div className={`text-[9px] font-mono font-bold uppercase tracking-wider mt-0.5 ${day.isHighlight ? 'text-white' : day.hasData ? 'text-white/50' : 'text-white/20'
-                        }`} style={day.isHighlight ? { color: metricColor } : {}}>
-                        {day.showMainLabel ? day.displayLabel : ''}
+                      {/* Date label */}
+                      <div
+                        className={`shrink-0 text-[9px] font-mono font-bold uppercase tracking-wider mt-0.5 ${
+                          day.isHighlight ? 'text-white' : day.hasData ? 'text-white/50' : 'text-white/20'
+                        }`}
+                        style={day.isHighlight ? { color: metricColor } : {}}
+                      >
+                        {day.showMainLabel ? day.displayLabel : '\u00a0'}
                       </div>
 
-                      <div className={`text-[8px] font-mono ${day.hasData ? 'text-white/25' : 'text-white/10'}`}>
-                        {day.showSubLabel ? day.subLabel : ''}
+                      {/* Sub label */}
+                      <div className={`shrink-0 text-[8px] font-mono leading-none ${day.hasData ? 'text-white/25' : 'text-white/10'}`}>
+                        {day.showSubLabel ? day.subLabel : '\u00a0'}
                       </div>
                     </div>
                   );
@@ -1348,139 +1549,176 @@ export const HistorySummary = ({
           </div>
 
           {summaryPeriod === 'daily' && weeklyDailyData.length > 0 && (
-            <div className="mt-2 rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
+            <div className="mt-2 rounded-2xl border border-white/8 bg-white/3 px-4 py-4">
               {(() => {
-                type HeatmapDay = HistorySummaryProps['weeklyDailyData'][number];
-
                 const parseLocalDate = (date: string) => new Date(`${date}T00:00:00`);
-                const firstDay = parseLocalDate(weeklyDailyData[0].date);
-                const mondayOffset = (firstDay.getDay() + 6) % 7;
-                const paddedDays: Array<HeatmapDay | null> = [
-                  ...Array<HeatmapDay | null>(mondayOffset).fill(null),
-                  ...weeklyDailyData,
-                ];
-                const trailingDays = (7 - (paddedDays.length % 7)) % 7;
-                paddedDays.push(...Array<HeatmapDay | null>(trailingDays).fill(null));
-
-                const weeks = Array.from({ length: paddedDays.length / 7 }, (_, index) =>
-                  paddedDays.slice(index * 7, index * 7 + 7)
-                );
                 const activeDays = weeklyDailyData.filter(day => day.hasData).length;
                 const totalSessions = weeklyDailyData.reduce((total, day) => total + day.sessions, 0);
                 const consistency = Math.round((activeDays / weeklyDailyData.length) * 100);
-                const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const peakSessions = Math.max(...weeklyDailyData.map(day => day.sessions), 1);
+                const isCompactMode = weeklyDailyData.length > 28;
                 const sessionOpacity = (sessions: number) => {
                   if (sessions >= 4) return 0.95;
                   if (sessions === 3) return 0.75;
                   if (sessions === 2) return 0.52;
                   return 0.3;
                 };
-                const monthLabels = weeks.map((week, weekIndex) => {
-                  const firstDate = week.find((day): day is HeatmapDay => day !== null);
-                  if (!firstDate) return '';
-
-                  const month = parseLocalDate(firstDate.date).getMonth();
-                  const previousDate = weekIndex > 0
-                    ? weeks[weekIndex - 1].find((day): day is HeatmapDay => day !== null)
-                    : null;
-                  const previousMonth = previousDate ? parseLocalDate(previousDate.date).getMonth() : -1;
-
-                  return weekIndex === 0 || month !== previousMonth
-                    ? parseLocalDate(firstDate.date).toLocaleDateString(locale, { month: 'short' })
-                    : '';
-                });
 
                 return (
                   <>
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                    {/* Header row */}
+                    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                       <div>
-                        <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">Consistency Map</div>
-                        <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/45">
-                          {activeDays} active days <span className="text-white/20">·</span> {totalSessions} sessions <span className="text-white/20">·</span> {consistency}% consistency
+                        <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Consistency Map')}</div>
+                        <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/40">
+                          {t('Daily activity pattern for the selected range')}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[8px] font-mono uppercase tracking-[0.12em] text-white/35">
-                        <span className="mr-1">sessions</span>
-                        {[1, 2, 3, 4].map(count => (
-                          <span
-                            key={count}
-                            className="flex h-4 min-w-4 items-center justify-center rounded-[4px] border px-1 text-[7px] text-white/65"
-                            style={{
-                              background: `rgba(53,240,189,${sessionOpacity(count)})`,
-                              borderColor: `rgba(53,240,189,${Math.min(1, sessionOpacity(count) + 0.14)})`
-                            }}
-                          >
-                            {count === 4 ? '4+' : count}
-                          </span>
+                      <div className="flex gap-2">
+                        {[
+                          { label: t('Active days'), value: `${activeDays}` },
+                          { label: t('Sessions'), value: `${totalSessions}` },
+                          { label: t('Consistency'), value: `${consistency}%` },
+                        ].map(item => (
+                          <div key={item.label} className="min-w-[60px] rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-center">
+                            <div className="whitespace-nowrap text-[7px] font-mono uppercase tracking-[0.12em] text-white/35">{item.label}</div>
+                            <div className="mt-1 font-mono text-base font-bold text-white tabular-nums">{item.value}</div>
+                          </div>
                         ))}
                       </div>
                     </div>
-                    <div className="overflow-x-auto pb-2">
-                      <div className="grid min-w-max grid-cols-[32px_auto] gap-x-2">
-                        <div />
-                        <div
-                          className="mb-1 grid gap-1"
-                          style={{ gridTemplateColumns: `repeat(${weeks.length}, 18px)` }}
-                        >
-                          {monthLabels.map((month, index) => (
-                            <div key={`month-${index}`} className="h-4 whitespace-nowrap text-[8px] font-mono uppercase text-white/30">
-                              {month}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="grid grid-rows-7 gap-1">
-                          {weekdayLabels.map((day, index) => (
-                            <div key={day} className="flex h-[18px] items-center text-[7px] font-mono uppercase text-white/25">
-                              {index % 2 === 0 ? day : ''}
-                            </div>
-                          ))}
-                        </div>
-                        <div
-                          className="grid grid-flow-col grid-rows-7 gap-1"
-                          style={{ gridTemplateColumns: `repeat(${weeks.length}, 18px)` }}
-                        >
-                          {weeks.flatMap((week, weekIndex) => week.map((day, dayIndex) => {
-                            if (!day) {
-                              return <div key={`empty-${weekIndex}-${dayIndex}`} className="h-[18px] w-[18px] rounded-[5px]" />;
-                            }
 
+                    {isCompactMode ? (
+                      /* ── Heatmap mode for large ranges (> 28 days) ── */
+                      <div className="overflow-x-auto pb-1">
+                        <div
+                          className="grid gap-1"
+                          style={{
+                            gridTemplateColumns: `repeat(${Math.min(weeklyDailyData.length, 52)}, minmax(18px, 1fr))`,
+                            minWidth: `${weeklyDailyData.length * 22}px`,
+                          }}
+                        >
+                          {weeklyDailyData.map(day => {
+                            const date = parseLocalDate(day.date);
                             const tooltipValue = formatDailyMetric(day);
                             const opacity = sessionOpacity(day.sessions);
-
                             return (
-                              <div key={day.date} className="group relative h-[18px] w-[18px]">
-                                <div
-                                  className="h-full w-full rounded-[5px] border transition-colors group-hover:border-white/40"
-                                  style={{
-                                    background: day.hasData
-                                      ? `rgba(53,240,189,${opacity})`
-                                      : 'rgba(255,255,255,0.035)',
-                                    borderColor: day.isToday
-                                      ? 'rgba(53,240,189,0.95)'
-                                      : day.hasData
-                                        ? `rgba(53,240,189,${Math.min(1, opacity + 0.12)})`
-                                        : 'rgba(255,255,255,0.055)',
-                                    outline: day.isToday ? '1px solid rgba(53,240,189,0.45)' : 'none',
-                                    outlineOffset: day.isToday ? '2px' : undefined,
-                                  }}
-                                  title={`${day.label} ${day.shortDate} - ${day.sessions} sessions`}
-                                />
-                                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-36 -translate-x-1/2 rounded-lg border border-white/10 bg-vp-surface-raised px-2.5 py-2 text-[9px] font-mono uppercase shadow-xl group-hover:block">
-                                  <div className="text-white/55">{day.label} · {day.shortDate}</div>
-                                  <div className="mt-1 text-white">{day.sessions} sessions</div>
-                                  <div className="mt-1" style={{ color: metricColor }}>{tooltipValue}</div>
+                              <div
+                                key={day.date}
+                                className={`group relative aspect-square rounded-sm transition-all ${
+                                  day.isToday
+                                    ? 'ring-1 ring-vp-accent'
+                                    : ''
+                                }`}
+                                style={{
+                                  backgroundColor: day.hasData
+                                    ? `color-mix(in srgb, var(--color-vp-accent) ${Math.round(opacity * 100)}%, transparent)`
+                                    : 'rgba(255,255,255,0.04)',
+                                }}
+                                title={`${date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })} — ${day.sessions} sessions`}
+                              >
+                                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-vp-surface-raised px-2.5 py-1.5 text-[9px] font-mono shadow-xl group-hover:block">
+                                  <div className="text-white/55">{date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                                  <div className="mt-0.5 text-white">{day.sessions} {t('sessions')}</div>
+                                  <div className="mt-0.5" style={{ color: metricColor }}>{tooltipValue}</div>
                                 </div>
                               </div>
                             );
-                          }))}
+                          })}
+                        </div>
+                        {/* Month labels for heatmap */}
+                        <div className="mt-1.5 flex gap-1 overflow-x-hidden text-[7px] font-mono text-white/25">
+                          {weeklyDailyData.reduce<{ label: string; idx: number }[]>((acc, day, idx) => {
+                            const d = parseLocalDate(day.date);
+                            if (idx === 0 || d.getDate() === 1) {
+                              acc.push({ label: d.toLocaleDateString(locale, { month: 'short' }), idx });
+                            }
+                            return acc;
+                          }, []).map(({ label, idx }) => (
+                            <span key={`${label}-${idx}`} style={{ marginLeft: idx === 0 ? 0 : `${(22 * (idx)) - (label.length * 4)}px` }}>{label}</span>
+                          ))}
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.12em] text-white/30">
-                      <span className="h-3 w-3 rounded-[4px] border border-vp-accent bg-transparent" />
-                      <span>Today</span>
+                    ) : (
+                      /* ── Card mode for short ranges (≤ 28 days) ── */
+                      <div
+                        className="grid gap-2"
+                        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))' }}
+                      >
+                        {weeklyDailyData.map(day => {
+                          const date = parseLocalDate(day.date);
+                          const tooltipValue = formatDailyMetric(day);
+                          const opacity = sessionOpacity(day.sessions);
+                          const heightPct = day.hasData ? Math.max(18, (day.sessions / peakSessions) * 100) : 0;
+
+                          return (
+                            <div
+                              key={day.date}
+                              className={`group relative flex min-h-[88px] flex-col rounded-xl border px-2.5 py-2.5 transition-colors ${
+                                day.isToday
+                                  ? 'border-vp-accent/70 bg-vp-accent/8'
+                                  : day.hasData
+                                    ? 'border-vp-accent/20 bg-vp-accent/7 hover:border-vp-accent/35'
+                                    : 'border-white/7 bg-white/[0.025] hover:border-white/14'
+                              }`}
+                              title={`${day.label} ${day.shortDate} - ${day.sessions} sessions`}
+                            >
+                              {/* Day + today badge */}
+                              <div className="flex items-start justify-between gap-1">
+                                <div className="min-w-0">
+                                  <div className="truncate text-[8px] font-mono uppercase tracking-[0.08em] text-white/35">
+                                    {date.toLocaleDateString(locale, { weekday: 'short' })}
+                                  </div>
+                                  <div className="mt-0.5 font-mono text-sm font-bold leading-none text-white/80 tabular-nums">
+                                    {date.getDate()}
+                                  </div>
+                                </div>
+                                {day.isToday && (
+                                  <div className="shrink-0 rounded border border-vp-accent/40 px-1 py-0.5 text-[6px] font-mono uppercase tracking-wider text-vp-accent">
+                                    {t('Today')}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="mt-auto pt-2">
+                                <div className="h-1.5 overflow-hidden rounded-full bg-white/7">
+                                  <div
+                                    className="h-full rounded-full bg-vp-accent transition-[width] duration-500"
+                                    style={{ width: `${heightPct}%`, opacity: day.hasData ? opacity : 0 }}
+                                  />
+                                </div>
+                                {/* Session count */}
+                                <div className="mt-1.5 flex items-center justify-between">
+                                  <span className="text-[7px] font-mono uppercase text-white/30">{t('ses.')}</span>
+                                  <span className={`font-mono text-xs font-bold tabular-nums ${
+                                    day.hasData ? 'text-vp-accent' : 'text-white/20'
+                                  }`}>
+                                    {day.sessions}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Tooltip */}
+                              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-40 -translate-x-1/2 rounded-lg border border-white/10 bg-vp-surface-raised px-2.5 py-2 text-[9px] font-mono shadow-xl group-hover:block">
+                                <div className="text-white/55">{day.label} · {day.shortDate}</div>
+                                <div className="mt-1 text-white">{day.sessions} {t('sessions')}</div>
+                                <div className="mt-1" style={{ color: metricColor }}>{tooltipValue}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Legend */}
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[8px] font-mono uppercase tracking-[0.12em] text-white/30">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-[3px] border border-vp-accent bg-vp-accent/15" />
+                        <span>{t('Today')}</span>
+                      </div>
                       <span className="text-white/15">·</span>
-                      <span>Color intensity represents session count</span>
+                      <span>{t('Bar length and color show session count')}</span>
                     </div>
                   </>
                 );
