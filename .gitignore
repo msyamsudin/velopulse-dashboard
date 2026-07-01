@@ -13,3 +13,4 @@ src/data/
 scratch/
 docs/
 next-env.d.ts
+*.test.*

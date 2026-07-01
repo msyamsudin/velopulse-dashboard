@@ -1,5 +1,6 @@
-import { motion } from 'motion/react';
-import { ShieldCheck, ArrowRight, Settings, Activity, Globe, Zap, Server, User } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ShieldCheck, ArrowRight, Settings, Activity, Globe, Zap, Server, User, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 interface SetupLandingProps {
@@ -10,6 +11,47 @@ interface SetupLandingProps {
 
 export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: SetupLandingProps) => {
   const { t } = useI18n();
+
+  // Restore states
+  const [isRestoreOpen, setIsRestoreOpen] = useState(false);
+  const [token, setToken] = useState('');
+  const [password, setPassword] = useState('');
+  const [showDecryptionPassword, setShowDecryptionPassword] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleRestore = async () => {
+    setIsRestoring(true);
+    setError('');
+    setSuccess(false);
+    try {
+      const res = await fetch('/api/config/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'import',
+          token,
+          decryptionPassword: password
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to restore configuration');
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      setError(err?.message || 'Restore failed');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-hw-bg overflow-hidden relative">
       <motion.div
@@ -64,15 +106,85 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
                 </div>
               </div>
 
-              <button
-                onClick={onInitialize}
-                className="group relative flex items-center gap-4 px-8 py-4 bg-hw-accent text-hw-bg font-black uppercase tracking-widest text-xs rounded-full overflow-hidden transition-all hover:scale-105 active:scale-95"
-              >
-                <span className="relative z-10 flex items-center gap-2">
-                  {t('Initialize System')} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                </span>
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              </button>
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={onInitialize}
+                  className="group relative flex items-center justify-center gap-4 px-8 py-4 bg-hw-accent text-hw-bg font-black uppercase tracking-widest text-xs rounded-full overflow-hidden transition-all hover:scale-105 active:scale-95 w-fit"
+                >
+                  <span className="relative z-10 flex items-center gap-2">
+                    {t('Initialize System')} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </span>
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                </button>
+
+                <div className="pt-4 border-t border-white/5 w-full">
+                  <button
+                    onClick={() => setIsRestoreOpen(!isRestoreOpen)}
+                    className="text-[10px] font-mono uppercase tracking-widest text-hw-accent/60 hover:text-hw-accent transition-colors flex items-center gap-2 outline-none"
+                  >
+                    <Server size={12} />
+                    {t('Or restore from a backup token')}
+                  </button>
+
+                  <AnimatePresence>
+                    {isRestoreOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden space-y-3 mt-4"
+                      >
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-mono uppercase tracking-widest text-hw-muted">{t('Paste encrypted configuration token')}</label>
+                          <textarea
+                            value={token}
+                            onChange={(e) => setToken(e.target.value)}
+                            placeholder="Paste token here..."
+                            rows={3}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 p-3 font-mono text-[9px] text-hw-text outline-none resize-none focus:border-hw-accent/30"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-mono uppercase tracking-widest text-hw-muted">{t('Decryption Password')}</label>
+                          <div className="relative">
+                            <input
+                              key={showDecryptionPassword ? 'dp-text' : 'dp-pass'}
+                              type={showDecryptionPassword ? "text" : "password"}
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder={t('Enter decryption password')}
+                              autoComplete="new-password"
+                              className="w-full rounded-xl border border-white/10 bg-white/5 p-3 pr-12 font-mono text-[9px] text-hw-text outline-none focus:border-hw-accent/30"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowDecryptionPassword(!showDecryptionPassword)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-hw-accent/60 hover:text-hw-accent transition-colors"
+                            >
+                              {showDecryptionPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleRestore}
+                          disabled={!token || !password || isRestoring}
+                          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-mono uppercase tracking-widest text-[10px] rounded-xl transition-all disabled:opacity-50"
+                        >
+                          {isRestoring ? <Loader2 size={12} className="animate-spin" /> : <Server size={12} />}
+                          {t('Restore Configuration')}
+                        </button>
+
+                        {error && (
+                          <p className="text-[10px] font-mono text-red-400 mt-2">{error}</p>
+                        )}
+                        {success && (
+                          <p className="text-[10px] font-mono text-hw-accent mt-2">Import success! Reloading...</p>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
 
             <div className="hidden lg:block">

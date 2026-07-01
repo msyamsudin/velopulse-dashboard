@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAppConfig } from '@/lib/config-helper';
+import { getAppConfig, verifyPassword } from '@/lib/config-helper';
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 // Password dikirim sebagai Authorization header (Bearer token), bukan body,
@@ -8,7 +8,7 @@ function verifyMasterPassword(req: Request): boolean {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const config = getAppConfig();
-  return !!token && token === config.MASTER_PASSWORD;
+  return !!token && verifyPassword(token, config.MASTER_PASSWORD || '');
 }
 
 export async function POST(req: Request) {
@@ -125,6 +125,9 @@ export async function POST(req: Request) {
       } catch (err: any) {
         return NextResponse.json({ valid: false, error: err?.message || 'Error saat validasi Supabase.' });
       }
+    }
+    if (type === 'master') {
+      return NextResponse.json({ valid: true });
     }
 
     return NextResponse.json({ valid: false, error: 'Tipe tidak diketahui.' }, { status: 400 });

@@ -29,6 +29,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
   const { locale, setLocale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<'profile' | 'system'>('profile');
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [password, setPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
   
@@ -38,7 +39,8 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     GOOGLE_CLIENT_ID: '',
     GOOGLE_CLIENT_SECRET: '',
     NEXT_PUBLIC_SUPABASE_URL: '',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
+    MASTER_PASSWORD: ''
   });
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -108,6 +110,16 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
       if (res.ok) {
         resetSupabaseClientCache();
         setSaveStatus('success');
+        
+        // If master password was changed, update local password state so validation/saving continues to work
+        if (sysConfig.MASTER_PASSWORD && sysConfig.MASTER_PASSWORD !== '●●●●●●●●●') {
+          setPassword(sysConfig.MASTER_PASSWORD);
+          setSysConfig(prev => ({
+            ...prev,
+            MASTER_PASSWORD: '●●●●●●●●●'
+          }));
+        }
+
         setTimeout(() => setSaveStatus('idle'), 2000);
       } else {
         const data = await res.json();
@@ -119,13 +131,70 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     }
   };
 
-  const handleUnlock = () => {
+  const handleExport = async (encryptionPassword: string): Promise<string> => {
+    const res = await fetch('/api/config/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'export',
+        password, // current master password to authorize
+        encryptionPassword
+      })
+    });
+    
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to export configuration');
+    }
+    return data.token;
+  };
+
+  const handleImport = async (token: string, decryptionPassword: string): Promise<boolean> => {
+    const res = await fetch('/api/config/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'import',
+        token,
+        decryptionPassword
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to import configuration');
+    }
+    return data.success || false;
+  };
+
+  const handleUnlock = async () => {
     if (!password) {
       setUnlockError('Password required');
       return;
     }
-    setIsUnlocked(true);
+    setIsUnlocking(true);
     setUnlockError('');
+    try {
+      const res = await fetch('/api/config/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${password}`
+        },
+        body: JSON.stringify({ type: 'master' })
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setIsUnlocked(true);
+        setUnlockError('');
+      } else {
+        setUnlockError(data.error || 'Incorrect master password');
+      }
+    } catch {
+      setUnlockError('Could not verify password. Check connection.');
+    } finally {
+      setIsUnlocking(false);
+    }
   };
 
   const handleValidateGoogle = async () => {
@@ -204,6 +273,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 setPassword={setPassword}
                 onUnlock={handleUnlock}
                 error={unlockError}
+                isUnlocking={isUnlocking}
               />
             ) : (
               <SystemTab 
@@ -217,6 +287,8 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 onValidateSupabase={handleValidateSupabase}
                 supabaseValidating={supabaseValidating}
                 supabaseValidStatus={supabaseValidStatus}
+                onExport={handleExport}
+                onImport={handleImport}
               />
             )}
           </AnimatePresence>

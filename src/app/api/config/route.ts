@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAppConfig, saveAppConfig, AppConfig } from '@/lib/config-helper';
+import { getAppConfig, saveAppConfig, verifyPassword, AppConfig } from '@/lib/config-helper';
 
 // GET: Returns current config (masked)
 export async function GET() {
@@ -24,9 +24,8 @@ export async function POST(request: NextRequest) {
 
     const currentConfig = getAppConfig();
 
-    // Simple password check (Master password)
-    // For local dev, we check against the config's master password
-    if (password !== currentConfig.MASTER_PASSWORD) {
+    // Verify master password
+    if (!password || !verifyPassword(password, currentConfig.MASTER_PASSWORD || '')) {
       return NextResponse.json({ error: 'Invalid master password' }, { status: 401 });
     }
 
