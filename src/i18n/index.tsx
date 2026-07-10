@@ -361,6 +361,19 @@ const id: Record<string, string> = {
   'Disconnect from Google Fit? You will need to reconnect to sync future workouts.': 'Putuskan dari Google Fit? Anda perlu menghubungkannya kembali untuk menyinkronkan latihan berikutnya.',
   'Loading panel': 'Memuat panel',
   'Preparing telemetry view': 'Menyiapkan tampilan telemetri',
+
+  'Resistance Plan': 'Rencana Resistensi',
+  'Resistance variation plan every 1 km to keep the workout interesting': 'Variasi resistensi setiap 1 km agar latihan tidak membosankan',
+  'Inactive': 'Nonaktif',
+  'Hide': 'Sembunyikan',
+  'Edit': 'Ubah',
+  'Reset': 'Reset',
+  '0–100% per km': '0–100% per km',
+  'Suggest': 'Saran',
+  'Suggested': 'Disarankan',
+  'Match!': 'Sesuai!',
+  'Next target': 'Target selanjutnya',
+  'km reached': 'km tercapai',
 };
 
 type I18nValue = {

@@ -19,6 +19,7 @@ import {
 import { useState, type ReactNode } from 'react';
 import { EmptyState, MetricCard, Panel, StatusPill } from '../ui';
 import { WorkoutJourney } from '../journey/WorkoutJourney';
+import { ResistancePlanPanel } from './ResistancePlanPanel';
 import { useI18n } from '@/i18n';
 
 interface PreRideCockpitProps {
@@ -287,6 +288,8 @@ export const PreRideCockpit = ({
             />
           )}
         </Panel>
+
+        <ResistancePlanPanel />
       </div>
 
       {showJourneyPreview && (

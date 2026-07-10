@@ -7,6 +7,7 @@ import { CadenceGauge } from '../CadenceGauge';
 import { StatusPill } from '../ui';
 import { useI18n } from '@/i18n';
 import { WorkoutJourney } from '../journey/WorkoutJourney';
+import { useResistanceAdvisor } from '@/hooks/useResistanceAdvisor';
 
 interface RecordingCockpitProps {
   currentData: any;
@@ -44,6 +45,20 @@ interface StripMetricProps {
   progress: number;
   detail: string;
   isWaiting?: boolean;
+}
+
+interface AdvisorInfo {
+  enabled: boolean;
+  suggestedResistance: number | null;
+  matched: boolean;
+  userChanged: boolean;
+  kmJustCrossed: boolean;
+  currentKmSegment: number;
+  hasMore: boolean;
+}
+
+interface ResistanceStripMetricProps extends StripMetricProps {
+  advisor: AdvisorInfo;
 }
 
 const clampPct = (value: number) => Math.min(100, Math.max(0, value));
@@ -132,6 +147,68 @@ const StripMetric = ({
   </section>
 );
 
+const ResistanceStripMetric = ({
+  label,
+  value,
+  unit,
+  icon,
+  colorClass,
+  progress,
+  detail,
+  isWaiting = false,
+  advisor
+}: ResistanceStripMetricProps) => {
+  const { t } = useI18n();
+  const targetPct = advisor.enabled && advisor.suggestedResistance !== null ? Math.min(100, Math.max(0, advisor.suggestedResistance)) : null;
+
+  const glowColor = advisor.matched
+    ? 'bg-green-400'
+    : advisor.userChanged
+      ? 'bg-blue-400'
+      : 'bg-yellow-400';
+
+  return (
+    <section className={`vp-panel min-h-[118px] flex flex-col justify-between relative overflow-hidden ${isWaiting ? 'opacity-70' : ''}`}>
+      {advisor.enabled && targetPct !== null && (
+        <div className={`absolute -top-6 -right-6 size-16 rounded-full opacity-[0.10] ${glowColor}`} />
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <div className="vp-label flex items-center gap-2">
+          <span className={colorClass}>{icon}</span>
+          {label}
+        </div>
+        <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted">{detail}</span>
+      </div>
+
+      <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <div className={`font-mono text-3xl md:text-4xl font-black leading-none tracking-normal tabular-nums ${colorClass}`}>
+            {value}
+            {unit && <span className="ml-2 text-xs font-normal text-vp-muted">{unit}</span>}
+          </div>
+          {advisor.enabled && targetPct !== null && (
+            <div className={`flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.14em] ${advisor.matched ? 'text-green-400' : advisor.userChanged ? 'text-blue-400' : 'text-yellow-400'}`}>
+              <span>{advisor.matched ? '✓' : '→'}</span>
+              <span className="text-vp-muted">{t('Suggest')}</span>
+              <span className="font-bold">{advisor.suggestedResistance}%</span>
+              {advisor.matched && <span className="text-green-400">{t('Match!')}</span>}
+            </div>
+          )}
+        </div>
+        <div className="relative w-20 md:w-28 h-1.5 rounded-full bg-vp-muted/15 overflow-hidden">
+          <div className={`h-full rounded-full bg-current ${colorClass}`} style={{ width: `${clampPct(progress)}%` }} />
+          {targetPct !== null && (
+            <div
+              className={`absolute top-0 h-full w-0.5 rounded-full transition-all ${glowColor}`}
+              style={{ left: `${targetPct}%`, transform: 'translateX(-50%)' }}
+            />
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const SignalPill = ({
   label,
   connected,
@@ -185,6 +262,7 @@ export const RecordingCockpit = ({
       }
     : undefined;
   const hrrInProgress = hrrStatus === 'buffer' || hrrStatus === 'measuring';
+  const advisor = useResistanceAdvisor(currentData.distance || 0, currentData.resistance || 0);
 
   return (
     <div className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-1 md:px-2 pb-4">
@@ -336,15 +414,16 @@ export const RecordingCockpit = ({
           detail={power ? `${Math.round(power * 3.6)} kcal/hr` : t('waiting')}
           isWaiting={!calories}
         />
-        <StripMetric
+        <ResistanceStripMetric
           label={t('Resistance')}
-          value={resistance || '--'}
+          value={resistance || 0}
           unit="%"
           icon={<Settings size={13} />}
           colorClass="text-orange-400"
           progress={resistance}
           detail={t(resistance > 70 ? 'climb' : resistance > 30 ? 'rolling' : resistance > 0 ? 'easy' : 'waiting')}
           isWaiting={!resistance}
+          advisor={advisor}
         />
       </div>
     </div>
