@@ -76,6 +76,8 @@ export default function App() {
   const startDistance = useWorkoutStore(state => state.startDistance);
   const startCalories = useWorkoutStore(state => state.startCalories);
   const liveStats = useWorkoutStore(state => state.liveStats);
+  const supabaseSyncError = useWorkoutStore(state => state.supabaseSyncError);
+  const clearSupabaseSyncError = useWorkoutStore(state => state.clearSupabaseSyncError);
 
   const bleData = useBluetoothStore(state => state.data);
   const bleRawLogs = useBluetoothStore(state => state.rawLogs);
@@ -90,6 +92,8 @@ export default function App() {
     userProfile,
     setUserProfile,
     profileStatus,
+    profileError,
+    retryProfile,
     sysConfigCheck,
     refetchAuth,
     refetchSysCheck,
@@ -253,6 +257,8 @@ export default function App() {
           onInitialize={() => setShowSettings(true)}
           missingFields={sysConfigCheck?.missingFields || []}
           isProfileMissing={profileStatus === 'new'}
+          connectionError={profileError}
+          onRetryConnection={retryProfile}
         />
         <AnimatePresence>
           {showSettings && (
@@ -322,6 +328,8 @@ export default function App() {
                 weight: userProfile.weight
               });
             }}
+            supabaseSyncError={supabaseSyncError}
+            onDismissSupabaseError={clearSupabaseSyncError}
           />
         )}
       </AnimatePresence>

@@ -16,6 +16,7 @@ interface ProfileTabProps {
   setProfile: (profile: UserProfile) => void;
   onSave: () => void;
   saveStatus: string;
+  saveError?: string;
 }
 
 interface NumberFieldProps {
@@ -50,7 +51,7 @@ const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }:
   </div>
 );
 
-export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileTabProps) => {
+export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError }: ProfileTabProps) => {
   const { t } = useI18n();
   return (
     <motion.div
@@ -101,6 +102,12 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus }: ProfileT
       <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
         {t('Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.')}
       </div>
+
+      {saveError && saveStatus === 'error' && (
+        <div className="rounded-lg border border-vp-danger/30 bg-vp-danger/10 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-danger">
+          {saveError}
+        </div>
+      )}
 
       <button
         onClick={onSave}

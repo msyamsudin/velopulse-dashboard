@@ -1,15 +1,32 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ArrowRight, Settings, Activity, Globe, Zap, Server, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Settings, Activity, Globe, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
+
+export interface ConnectionError {
+  code: string;
+  message: string;
+  userMessage: string;
+  retryable: boolean;
+}
 
 interface SetupLandingProps {
   onInitialize: () => void;
   missingFields: string[];
   isProfileMissing?: boolean;
+  connectionError?: ConnectionError | null;
+  onRetryConnection?: () => void;
 }
 
-export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: SetupLandingProps) => {
+const ERROR_TITLE: Record<string, string> = {
+  SUPABASE_PAUSED: 'Supabase database paused',
+  NETWORK_ERROR: 'Cloud database unreachable',
+  INVALID_CREDENTIALS: 'Supabase credentials invalid',
+  NOT_CONFIGURED: 'Supabase not configured',
+  UNKNOWN: 'Cloud database error',
+};
+
+export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, connectionError, onRetryConnection }: SetupLandingProps) => {
   const { t } = useI18n();
 
   // Restore states
@@ -92,6 +109,7 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
                     label={t('Supabase Cloud Database')}
                     icon={<Server size={14} />}
                     isMissing={missingFields.some(f => f.includes('SUPABASE'))}
+                    isError={!!connectionError}
                   />
                   <CheckItem
                     label={t('Application URL Configuration')}
@@ -105,6 +123,35 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
                   />
                 </div>
               </div>
+
+              {connectionError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-hw-danger/40 bg-hw-danger/10 p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-hw-danger" />
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-widest text-hw-danger">
+                        {t(ERROR_TITLE[connectionError.code] || 'Cloud database error')}
+                      </p>
+                      <p className="text-[11px] leading-relaxed text-hw-text/80">
+                        {connectionError.userMessage}
+                      </p>
+                      {connectionError.retryable && onRetryConnection && (
+                        <button
+                          onClick={onRetryConnection}
+                          className="inline-flex items-center gap-2 rounded-full border border-hw-danger/50 bg-hw-danger/10 px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-danger transition-colors hover:bg-hw-danger hover:text-white"
+                        >
+                          <RefreshCw size={12} />
+                          {t('Retry Connection')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               <div className="flex flex-col gap-4">
                 <button
@@ -214,15 +261,15 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing }: 
   );
 };
 
-const CheckItem = ({ label, icon, isMissing }: { label: string; icon: React.ReactNode; isMissing: boolean }) => (
-  <div className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isMissing ? 'bg-white/5 border-white/5 opacity-60' : 'bg-hw-accent/5 border-hw-accent/20'}`}>
+const CheckItem = ({ label, icon, isMissing, isError = false }: { label: string; icon: React.ReactNode; isMissing: boolean; isError?: boolean }) => (
+  <div className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isError ? 'bg-hw-danger/10 border-hw-danger/30 opacity-90' : isMissing ? 'bg-white/5 border-white/5 opacity-60' : 'bg-hw-accent/5 border-hw-accent/20'}`}>
     <div className="flex items-center gap-3">
-      <div className={`p-2 rounded-lg ${isMissing ? 'bg-white/5 text-hw-muted' : 'bg-hw-accent/10 text-hw-accent'}`}>
+      <div className={`p-2 rounded-lg ${isError ? 'bg-hw-danger/20 text-hw-danger' : isMissing ? 'bg-white/5 text-hw-muted' : 'bg-hw-accent/10 text-hw-accent'}`}>
         {icon}
       </div>
       <span className="text-[10px] font-mono uppercase tracking-widest leading-none">{label}</span>
     </div>
-    <div className={`w-1.5 h-1.5 rounded-full ${isMissing ? 'bg-hw-muted animate-pulse' : 'bg-hw-accent shadow-[0_0_10px_rgba(0,255,102,0.5)]'}`} />
+    <div className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-hw-danger animate-pulse' : isMissing ? 'bg-hw-muted animate-pulse' : 'bg-hw-accent shadow-[0_0_10px_rgba(0,255,102,0.5)]'}`} />
   </div>
 );
 

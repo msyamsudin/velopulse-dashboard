@@ -3,6 +3,7 @@ import { BluetoothData, useBluetoothStore } from './useBluetoothStore';
 import { getSupabaseClient } from '@/lib/supabase';
 import { parseTCXWorkoutSessions } from '@/lib/tcx-import-service';
 import { calcCaloriesFromPower } from '@/lib/physics';
+import { classifySupabaseError, SupabaseErrorInfo } from '@/lib/supabase-errors';
 
 export interface HistoryData {
   time: string;
@@ -36,6 +37,7 @@ export interface WorkoutSession {
   supabase_id?: string;
   supabase_synced_at?: string;
   supabase_sync_error?: string;
+  supabase_sync_error_code?: string;
 }
 
 export interface LiveWorkoutStats {
@@ -81,6 +83,7 @@ interface WorkoutState {
   liveStatsTotals: LiveWorkoutTotals;
   supabaseHistoryLoadedCount: number;
   hasMoreSupabaseHistory: boolean;
+  supabaseSyncError: SupabaseErrorInfo | null;
   
   // Actions
   toggleRecording: () => void;
@@ -96,6 +99,7 @@ interface WorkoutState {
   loadMoreHistoryFromSupabase: () => Promise<void>;
   markAsSynced: (startTime: number) => Promise<void>;
   formatTime: (seconds: number) => string;
+  clearSupabaseSyncError: () => void;
 }
 
 const SUPABASE_HISTORY_PAGE_SIZE = 50;
@@ -737,10 +741,12 @@ const syncSessionToSupabase = async (session: WorkoutSession): Promise<WorkoutSe
       supabase_sync_error: undefined
     };
   } catch (err: any) {
+    const info = classifySupabaseError(err);
     return {
       ...session,
       synced_to_supabase: false,
-      supabase_sync_error: err?.message || JSON.stringify(err) || 'Supabase sync failed'
+      supabase_sync_error: info.message || 'Supabase sync failed',
+      supabase_sync_error_code: info.code
     };
   }
 };
@@ -759,6 +765,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   liveStatsTotals: EMPTY_LIVE_TOTALS,
   supabaseHistoryLoadedCount: 0,
   hasMoreSupabaseHistory: false,
+  supabaseSyncError: null,
 
   toggleRecording: () => {
     const { isRecording } = get();
@@ -942,6 +949,19 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
         console.warn('[Supabase] Pending workout sync failed:', syncedSession.supabase_sync_error);
       }
+    }
+
+    const firstFailure = nextHistory.find(session =>
+      !session.synced_to_supabase && session.supabase_sync_error_code
+    );
+    if (firstFailure?.supabase_sync_error_code) {
+      const info = classifySupabaseError({
+        message: firstFailure.supabase_sync_error,
+        code: firstFailure.supabase_sync_error_code,
+      });
+      set({ supabaseSyncError: info });
+    } else {
+      set({ supabaseSyncError: null });
     }
   },
 
@@ -1146,12 +1166,15 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         set({
           sessionHistory: mergedSessions,
           supabaseHistoryLoadedCount: data.length,
-          hasMoreSupabaseHistory: data.length === SUPABASE_HISTORY_PAGE_SIZE
+          hasMoreSupabaseHistory: data.length === SUPABASE_HISTORY_PAGE_SIZE,
+          supabaseSyncError: null
         });
         persistSessionHistory(mergedSessions);
       }
     } catch (err: any) {
+      const info = classifySupabaseError(err);
       console.error('Failed to fetch from Supabase:', err?.message || JSON.stringify(err) || err);
+      set({ supabaseSyncError: info });
     }
   },
 
@@ -1178,11 +1201,14 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       set({
         sessionHistory: mergedSessions,
         supabaseHistoryLoadedCount: from + (data?.length || 0),
-        hasMoreSupabaseHistory: (data?.length || 0) === SUPABASE_HISTORY_PAGE_SIZE
+        hasMoreSupabaseHistory: (data?.length || 0) === SUPABASE_HISTORY_PAGE_SIZE,
+        supabaseSyncError: null
       });
       persistSessionHistory(mergedSessions);
     } catch (err: any) {
+      const info = classifySupabaseError(err);
       console.error('Failed to fetch older sessions from Supabase:', err?.message || JSON.stringify(err) || err);
+      set({ supabaseSyncError: info });
     }
   },
 
@@ -1209,6 +1235,10 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     } catch (err: any) {
       console.error('Failed to update sync status in Supabase:', err?.message || JSON.stringify(err) || err);
     }
+  },
+
+  clearSupabaseSyncError: () => {
+    set({ supabaseSyncError: null });
   },
 
   formatTime: (seconds: number) => {

@@ -44,6 +44,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
   });
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState('');
 
   const [googleValidating, setGoogleValidating] = useState(false);
   const [googleValidStatus, setGoogleValidStatus] = useState<{valid: boolean, msg: string} | null>(null);
@@ -76,6 +77,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
 
   const handleSaveProfile = async () => {
     setSaveStatus('saving');
+    setSaveErrorMessage('');
     try {
       const res = await fetch('/api/profile', {
         method: 'POST',
@@ -91,9 +93,18 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
           onClose();
         }, 1000);
       } else {
+        let errorMsg = 'Failed to save profile';
+        try {
+          const data = await res.json();
+          errorMsg = data.userMessage || data.error || errorMsg;
+        } catch {
+          errorMsg = `Failed to save profile (HTTP ${res.status})`;
+        }
+        setSaveErrorMessage(errorMsg);
         setSaveStatus('error');
       }
     } catch (err) {
+      setSaveErrorMessage('Could not reach the server. Check your internet connection.');
       setSaveStatus('error');
     }
   };
@@ -266,6 +277,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 setProfile={setProfile}
                 onSave={handleSaveProfile}
                 saveStatus={saveStatus}
+                saveError={saveErrorMessage}
               />
             ) : !isUnlocked ? (
               <MasterLock 

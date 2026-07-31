@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAppConfig } from '@/lib/config-helper';
+import { classifySupabaseError } from '@/lib/supabase-errors';
+
+const SUPABASE_FETCH_TIMEOUT_MS = 10_000;
 
 /**
  * Builds a Supabase client from the latest runtime config (config.json > .env).
@@ -11,7 +14,26 @@ function getServerSupabase() {
   const url = config.NEXT_PUBLIC_SUPABASE_URL || '';
   const key = config.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
   if (!url || !key) throw new Error('Supabase is not configured. Please set URL and key via Settings.');
-  return createClient(url, key);
+  return createClient(url, key, {
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        fetch(input, { ...init, signal: AbortSignal.timeout(SUPABASE_FETCH_TIMEOUT_MS) }),
+    },
+  });
+}
+
+function errorResponse(err: any) {
+  const info = classifySupabaseError(err);
+  console.error('Profile fetch error:', err);
+  return NextResponse.json(
+    {
+      error: info.message,
+      code: info.code,
+      userMessage: info.userMessage,
+      retryable: info.retryable,
+    },
+    { status: 500 }
+  );
 }
 
 const MASTER_PROFILE_ID = '00000000-0000-0000-0000-000000000000';
@@ -37,8 +59,7 @@ export async function GET() {
       weight: 75
     });
   } catch (err: any) {
-    console.error('Profile fetch error:', err);
-    return NextResponse.json({ error: err?.message || 'Failed to fetch profile' }, { status: 500 });
+    return errorResponse(err);
   }
 }
 
@@ -62,7 +83,6 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('Profile save error:', err);
-    return NextResponse.json({ error: err?.message || 'Failed to save profile' }, { status: 500 });
+    return errorResponse(err);
   }
 }

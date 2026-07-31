@@ -4,10 +4,11 @@ import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
-import { Download, RefreshCw, Search, Upload, X } from 'lucide-react';
+import { Download, RefreshCw, Search, Upload, X, AlertTriangle } from 'lucide-react';
 import type { ImportTcxResult } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
+import type { SupabaseErrorInfo } from '../lib/supabase-errors';
 import { useI18n } from '@/i18n';
 
 interface WorkoutHistoryProps {
@@ -20,6 +21,8 @@ interface WorkoutHistoryProps {
   hasMoreSupabaseHistory?: boolean;
   isGoogleConnected?: boolean;
   maxHr?: number;
+  supabaseSyncError?: SupabaseErrorInfo | null;
+  onDismissSupabaseError?: () => void;
 }
 
 export const WorkoutHistory = ({
@@ -31,7 +34,9 @@ export const WorkoutHistory = ({
   onImportTCX,
   hasMoreSupabaseHistory = false,
   isGoogleConnected,
-  maxHr = 190
+  maxHr = 190,
+  supabaseSyncError,
+  onDismissSupabaseError
 }: WorkoutHistoryProps) => {
   const { t } = useI18n();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -274,6 +279,38 @@ export const WorkoutHistory = ({
                 </button>
               </div>
             </div>
+
+            {supabaseSyncError && (
+              <div className="mb-3 flex flex-wrap items-start gap-3 rounded-lg border border-vp-warning/40 bg-vp-warning/10 px-3 py-2.5">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0 text-vp-warning" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-vp-warning">
+                    {t('History sync unavailable')}
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-vp-text/80">
+                    {supabaseSyncError.userMessage}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {onSyncSupabasePending && (
+                    <IconButton
+                      onClick={handleRetrySupabaseSync}
+                      disabled={isSupabaseRetrying}
+                      label={t('Retry Supabase sync')}
+                      icon={<RefreshCw size={13} className={isSupabaseRetrying ? 'animate-spin' : ''} />}
+                      tone="primary"
+                    />
+                  )}
+                  {onDismissSupabaseError && (
+                    <IconButton
+                      onClick={onDismissSupabaseError}
+                      label={t('Close')}
+                      icon={<X size={13} />}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
 
             {viewMode === 'sessions' ? (
               <div className="flex-1 flex flex-col overflow-hidden">
