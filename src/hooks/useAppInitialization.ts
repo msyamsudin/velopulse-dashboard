@@ -98,11 +98,6 @@ export const useAppInitialization = () => {
     return () => clearInterval(interval);
   }, [clearStaleData]);
 
-  const { data: authStatus, refetch: refetchAuth } = useQuery({
-    queryKey: ['authStatus'],
-    queryFn: () => fetch('/api/auth/status').then(res => res.json()),
-  });
-
   const { data: sysConfigCheck, refetch: refetchSysCheck } = useQuery({
     queryKey: ['sysConfigCheck'],
     queryFn: () => fetch('/api/config/check').then(res => res.json()),
@@ -112,26 +107,13 @@ export const useAppInitialization = () => {
     loadHistory();
   }, [loadHistory]);
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
-        refetchAuth();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [refetchAuth]);
-
   return {
     userProfile,
     setUserProfile,
     profileStatus,
     profileError,
     retryProfile: loadProfile,
-    authStatus,
     sysConfigCheck,
-    refetchAuth,
     refetchSysCheck,
-    isGoogleConnected: authStatus?.connected || false
   };
 };

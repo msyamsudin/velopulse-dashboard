@@ -205,11 +205,6 @@ export const HistoryList = ({
                           Pending
                         </div>
                       )}
-                      {session.synced_to_google ? (
-                        <div className="flex text-[9px] text-green-500 font-mono uppercase tracking-widest items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded">
-                          Google Fit
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                 </div>

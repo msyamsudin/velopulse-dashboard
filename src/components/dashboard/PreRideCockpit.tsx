@@ -10,7 +10,6 @@ import {
   Radio,
   Route,
   Scale,
-  ShieldCheck,
   SlidersHorizontal,
   WifiOff,
   X,
@@ -28,7 +27,6 @@ interface PreRideCockpitProps {
   sessions: any[];
   hrConnected: boolean;
   bikeConnected: boolean;
-  isGoogleConnected: boolean;
   onStart: () => void;
   onDisconnect: () => void;
 }
@@ -83,7 +81,6 @@ export const PreRideCockpit = ({
   sessions,
   hrConnected,
   bikeConnected,
-  isGoogleConnected,
   onStart,
   onDisconnect
 }: PreRideCockpitProps) => {
@@ -152,7 +149,6 @@ export const PreRideCockpit = ({
             <div className="flex flex-wrap gap-2">
               <StatusPill label={`${sensorCount}/2 ${t('sensors')}`} tone={sensorCount === 2 ? 'ready' : sensorCount === 1 ? 'warning' : 'neutral'} />
               <StatusPill label={t(profileReady ? 'Profile ready' : 'Profile incomplete')} tone={profileReady ? 'ready' : 'warning'} />
-              <StatusPill label={t(isGoogleConnected ? 'Sync ready' : 'Sync offline')} tone={isGoogleConnected ? 'ready' : 'neutral'} />
             </div>
             <div className="flex flex-col gap-2 sm:min-w-56">
               <button
@@ -244,12 +240,6 @@ export const PreRideCockpit = ({
             detail={bikeConnected ? t('FTMS metrics stream') : 'Yesoul / FTMS service'}
             connected={bikeConnected}
             icon={<Bike size={17} />}
-          />
-          <ReadinessRow
-            label="Google Fit"
-            detail={t(isGoogleConnected ? 'Workout sync enabled' : 'Can be connected later')}
-            connected={isGoogleConnected}
-            icon={<ShieldCheck size={17} />}
           />
           <ReadinessRow
             label={t('Profile')}

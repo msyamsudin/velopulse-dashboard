@@ -3,9 +3,6 @@ import { getAppConfig, saveAppConfig, verifyPassword, AppConfig } from '@/lib/co
 import { encrypt, decrypt } from '@/lib/crypto';
 
 const CONFIG_KEYS: (keyof AppConfig)[] = [
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'APP_URL',
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'MASTER_PASSWORD'

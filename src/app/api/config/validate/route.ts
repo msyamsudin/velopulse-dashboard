@@ -21,56 +21,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { type } = body;
 
-    // ─── Google ───────────────────────────────────────────────────────────────
-    if (type === 'google') {
-      const { clientId, clientSecret } = body;
-      if (!clientId || !clientSecret) {
-        return NextResponse.json({ valid: false, error: 'Client ID & Secret harus diisi.' }, { status: 400 });
-      }
-
-      // Jika secret masih masked → credential sudah pernah disimpan → anggap valid.
-      // Tidak perlu fetch ulang; ini juga mencegah attacker menguji clientId orang lain
-      // dengan masked secret milik kita.
-      if (clientSecret === '●●●●●●●●●') {
-        return NextResponse.json({ valid: true });
-      }
-
-      let googleData: any;
-      try {
-        const res = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            grant_type: 'authorization_code',
-            code: 'dummy_code'
-          })
-        });
-        googleData = await res.json();
-      } catch {
-        return NextResponse.json({
-          valid: false,
-          error: 'Tidak bisa menghubungi server Google. Periksa koneksi internet.'
-        });
-      }
-
-      // "invalid_client"  → credentials salah
-      // "invalid_grant"   → Google kenali client, dummy code ditolak → credentials OK
-      // error lain        → tak terduga, tampilkan ke user
-      if (googleData.error === 'invalid_client') {
-        return NextResponse.json({ valid: false, error: 'Client ID atau Secret Google tidak valid.' });
-      }
-      if (googleData.error && googleData.error !== 'invalid_grant') {
-        return NextResponse.json({
-          valid: false,
-          error: `Respon tidak diketahui dari Google: ${googleData.error}`
-        });
-      }
-
-      return NextResponse.json({ valid: true });
-    }
-
     // ─── Supabase ─────────────────────────────────────────────────────────────
     if (type === 'supabase') {
       const { url, key } = body;

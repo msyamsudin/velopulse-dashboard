@@ -14,12 +14,10 @@ import { useI18n } from '@/i18n';
 interface WorkoutHistoryProps {
   sessions: any[];
   onClose: () => void;
-  onSyncSession?: (session: any) => void;
   onSyncSupabasePending?: () => Promise<void>;
   onLoadMoreSupabaseHistory?: () => Promise<void>;
   onImportTCX?: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
   hasMoreSupabaseHistory?: boolean;
-  isGoogleConnected?: boolean;
   maxHr?: number;
   supabaseSyncError?: SupabaseErrorInfo | null;
   onDismissSupabaseError?: () => void;
@@ -28,12 +26,10 @@ interface WorkoutHistoryProps {
 export const WorkoutHistory = ({
   sessions,
   onClose,
-  onSyncSession,
   onSyncSupabasePending,
   onLoadMoreSupabaseHistory,
   onImportTCX,
   hasMoreSupabaseHistory = false,
-  isGoogleConnected,
   maxHr = 190,
   supabaseSyncError,
   onDismissSupabaseError
@@ -496,8 +492,6 @@ export const WorkoutHistory = ({
           previousSession={previousSession}
           previousFullStats={previousFullStats}
           maxHr={maxHr}
-          isGoogleConnected={isGoogleConnected}
-          onSyncSession={onSyncSession}
           onBack={() => setSelectedSessionId(null)}
           onClose={onClose}
         />

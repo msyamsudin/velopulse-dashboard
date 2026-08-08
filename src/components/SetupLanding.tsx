@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ArrowRight, Settings, Activity, Globe, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Settings, Activity, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 export interface ConnectionError {
@@ -101,20 +101,10 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                 <h3 className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">{t('Connection Checklist:')}</h3>
                 <div className="grid grid-cols-1 gap-3">
                   <CheckItem
-                    label={t('Google Fit Integration')}
-                    icon={<Globe size={14} />}
-                    isMissing={missingFields.some(f => f.includes('GOOGLE'))}
-                  />
-                  <CheckItem
                     label={t('Supabase Cloud Database')}
                     icon={<Server size={14} />}
                     isMissing={missingFields.some(f => f.includes('SUPABASE'))}
                     isError={!!connectionError}
-                  />
-                  <CheckItem
-                    label={t('Application URL Configuration')}
-                    icon={<ShieldCheck size={14} />}
-                    isMissing={missingFields.includes('APP_URL')}
                   />
                   <CheckItem
                     label={t('User Profile Setup (Age, Weight, FTP)')}

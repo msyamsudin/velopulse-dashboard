@@ -1,11 +1,8 @@
-import { Activity, Bug, History, LogOut, RefreshCcw, Settings } from 'lucide-react';
-import { IconButton, StatusPill } from '../ui';
+import { Activity, Bug, History, Settings } from 'lucide-react';
+import { IconButton } from '../ui';
 import { useI18n } from '@/i18n';
 
 interface DashboardHeaderProps {
-  isGoogleConnected: boolean;
-  handleConnectGoogle: () => void;
-  handleDisconnectGoogle: () => void;
   showHistory: boolean;
   setShowHistory: (show: boolean) => void;
   showDebug: boolean;
@@ -14,9 +11,6 @@ interface DashboardHeaderProps {
 }
 
 export const DashboardHeader = ({
-  isGoogleConnected,
-  handleConnectGoogle,
-  handleDisconnectGoogle,
   showHistory,
   setShowHistory,
   showDebug,
@@ -41,33 +35,6 @@ export const DashboardHeader = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 md:justify-end">
-        {isGoogleConnected ? (
-          <div className="flex items-center gap-1 rounded-lg border border-vp-accent/25 bg-vp-accent/5 p-1">
-            <StatusPill label="Google Fit" tone="ready" compact />
-            <IconButton
-              onClick={handleConnectGoogle}
-              label={t('Reconnect Google Fit')}
-              icon={<RefreshCcw size={13} />}
-              tone="primary"
-              className="h-7 w-7"
-            />
-            <IconButton
-              onClick={handleDisconnectGoogle}
-              label={t('Disconnect Google Fit')}
-              icon={<LogOut size={13} />}
-              tone="danger"
-              className="h-7 w-7"
-            />
-          </div>
-        ) : (
-          <button 
-            onClick={handleConnectGoogle}
-            className="vp-button vp-focus-ring"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-vp-muted" />
-            {t('Connect Google Fit')}
-          </button>
-        )}
         <button 
           onClick={() => setShowHistory(!showHistory)}
           className={`vp-button vp-focus-ring ${

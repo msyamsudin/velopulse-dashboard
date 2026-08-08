@@ -97,7 +97,6 @@ interface WorkoutState {
   loadHistory: () => void;
   loadHistoryFromSupabase: () => Promise<void>;
   loadMoreHistoryFromSupabase: () => Promise<void>;
-  markAsSynced: (startTime: number) => Promise<void>;
   formatTime: (seconds: number) => string;
   clearSupabaseSyncError: () => void;
 }
@@ -1209,31 +1208,6 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       const info = classifySupabaseError(err);
       console.error('Failed to fetch older sessions from Supabase:', err?.message || JSON.stringify(err) || err);
       set({ supabaseSyncError: info });
-    }
-  },
-
-  markAsSynced: async (startTime: number) => {
-    try {
-      const client = await getSupabaseClient();
-      if (!client) {
-        console.warn('[Supabase] Client not available. Skipping markAsSynced (config not set).');
-        return;
-      }
-
-      await client
-        .from('workouts')
-        .update({ synced_to_google: true })
-        .eq('session_start_time', startTime);
-      
-      // Also update local state if needed
-      set((state) => ({
-        sessionHistory: state.sessionHistory.map(s => 
-          s.sessionStartTime === startTime ? { ...s, synced_to_google: true } : s
-        )
-      }));
-      persistSessionHistory(get().sessionHistory);
-    } catch (err: any) {
-      console.error('Failed to update sync status in Supabase:', err?.message || JSON.stringify(err) || err);
     }
   },
 

@@ -9,7 +9,6 @@ import { HR_ZONES, getActiveHrZoneIndex } from '@/lib/constants';
 
 // Hooks
 import { useAppInitialization } from './hooks/useAppInitialization';
-import { useGoogleFitSync } from './hooks/useGoogleFitSync';
 
 // Components
 import { DevicePanel } from './components/DevicePanel';
@@ -19,7 +18,6 @@ import { SetupLanding } from './components/SetupLanding';
 // Layout & Dashboard Components
 import { DashboardHeader } from './components/layout/DashboardHeader';
 import { DashboardFooter } from './components/layout/DashboardFooter';
-import { SyncActionBar } from './components/dashboard/SyncActionBar';
 import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
 import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
 import { useHeartRateRecovery } from './hooks/useHeartRateRecovery';
@@ -95,9 +93,7 @@ export default function App() {
     profileError,
     retryProfile,
     sysConfigCheck,
-    refetchAuth,
     refetchSysCheck,
-    isGoogleConnected
   } = useAppInitialization();
 
   const [viewMode, setViewMode] = useState<'grid' | 'telemetry'>('grid');
@@ -179,31 +175,6 @@ export default function App() {
       setWasRecording(false);
     }
   }, [isRecording, wasRecording, workoutHistory.length, discardSession]);
-
-  const { syncMutation, handleSyncGoogle } = useGoogleFitSync(isGoogleConnected, userProfile, liveStats);
-
-  const handleConnectGoogle = async () => {
-    try {
-      const response = await fetch('/api/auth/google/url');
-      const { url } = await response.json();
-      const authWindow = window.open(url, 'google_auth', 'width=600,height=700');
-      if (!authWindow) alert(t('Please allow popups to connect Google Fit'));
-    } catch (err) {
-      console.error('Failed to get auth URL:', err);
-    }
-  };
-
-  const handleDisconnectGoogle = async () => {
-    if (!confirm(t('Disconnect from Google Fit? You will need to reconnect to sync future workouts.'))) return;
-    try {
-      const res = await fetch('/api/auth/disconnect', { method: 'POST' });
-      if (res.ok) {
-        refetchAuth();
-      }
-    } catch (err) {
-      console.error('Failed to disconnect:', err);
-    }
-  };
 
   const copyLogs = () => {
     const logText = bleRawLogs.join('\n');
@@ -288,9 +259,6 @@ export default function App() {
             transition={{ duration: 0.3 }}
           >
             <DashboardHeader
-              isGoogleConnected={isGoogleConnected}
-              handleConnectGoogle={handleConnectGoogle}
-              handleDisconnectGoogle={handleDisconnectGoogle}
               showHistory={showHistory}
               setShowHistory={setShowHistory}
               showDebug={showDebug}
@@ -311,23 +279,11 @@ export default function App() {
           <WorkoutHistory
             sessions={sessionHistory}
             onClose={() => setShowHistory(false)}
-            isGoogleConnected={isGoogleConnected}
             maxHr={userProfile.maxHr}
             onSyncSupabasePending={syncPendingSupabaseSessions}
             onLoadMoreSupabaseHistory={loadMoreHistoryFromSupabase}
             hasMoreSupabaseHistory={hasMoreSupabaseHistory}
             onImportTCX={importTCX}
-            onSyncSession={(session) => {
-              const startTime = session.sessionStartTime || new Date(session.date).getTime();
-              syncMutation.mutate({
-                startTime: startTime,
-                endTime: startTime + session.duration * 1000,
-                stats: session.stats,
-                history: session.history,
-                maxHr: userProfile.maxHr,
-                weight: userProfile.weight
-              });
-            }}
             supabaseSyncError={supabaseSyncError}
             onDismissSupabaseError={clearSupabaseSyncError}
           />
@@ -394,15 +350,6 @@ export default function App() {
                 </div>
               )}
 
-              {isReadySurface && workoutHistory.length > 0 && isGoogleConnected && (
-                <SyncActionBar
-                  onSync={handleSyncGoogle}
-                  isPending={syncMutation.isPending}
-                  isSuccess={syncMutation.isSuccess}
-                  isError={syncMutation.isError}
-                />
-              )}
-
               <div className="flex-1 min-h-0">
                 {isRideSurface ? (
                   <RecordingCockpit
@@ -433,7 +380,6 @@ export default function App() {
                     sessions={sessionHistory}
                     hrConnected={hrConnected}
                     bikeConnected={bikeConnected}
-                    isGoogleConnected={isGoogleConnected}
                     onStart={toggleRecording}
                     onDisconnect={disconnect}
                   />

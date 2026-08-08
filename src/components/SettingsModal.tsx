@@ -4,7 +4,7 @@ import { Settings, User, X } from 'lucide-react';
 import { AppConfig } from '@/lib/config-helper';
 import { resetSupabaseClientCache } from '@/lib/supabase';
 import { DEFAULT_PROFILE } from '@/lib/constants';
-import { validateGoogleConfig, validateSupabaseConfig } from '@/lib/config-validator';
+import { validateSupabaseConfig } from '@/lib/config-validator';
 
 // Components
 import { ProfileTab } from './settings/ProfileTab';
@@ -35,9 +35,6 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
   
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [sysConfig, setSysConfig] = useState<Partial<AppConfig>>({
-    APP_URL: '',
-    GOOGLE_CLIENT_ID: '',
-    GOOGLE_CLIENT_SECRET: '',
     NEXT_PUBLIC_SUPABASE_URL: '',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
     MASTER_PASSWORD: ''
@@ -45,9 +42,6 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveErrorMessage, setSaveErrorMessage] = useState('');
-
-  const [googleValidating, setGoogleValidating] = useState(false);
-  const [googleValidStatus, setGoogleValidStatus] = useState<{valid: boolean, msg: string} | null>(null);
 
   const [supabaseValidating, setSupabaseValidating] = useState(false);
   const [supabaseValidStatus, setSupabaseValidStatus] = useState<{valid: boolean, msg: string} | null>(null);
@@ -208,14 +202,6 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     }
   };
 
-  const handleValidateGoogle = async () => {
-    setGoogleValidating(true);
-    setGoogleValidStatus(null);
-    const result = await validateGoogleConfig(password, sysConfig.GOOGLE_CLIENT_ID, sysConfig.GOOGLE_CLIENT_SECRET);
-    setGoogleValidStatus(result);
-    setGoogleValidating(false);
-  };
-
   const handleValidateSupabase = async () => {
     setSupabaseValidating(true);
     setSupabaseValidStatus(null);
@@ -293,9 +279,6 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 setSysConfig={setSysConfig}
                 onSave={handleSaveSystem}
                 saveStatus={saveStatus}
-                onValidateGoogle={handleValidateGoogle}
-                googleValidating={googleValidating}
-                googleValidStatus={googleValidStatus}
                 onValidateSupabase={handleValidateSupabase}
                 supabaseValidating={supabaseValidating}
                 supabaseValidStatus={supabaseValidStatus}

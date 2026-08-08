@@ -12,9 +12,6 @@ if (!fs.existsSync(CONFIG_DIR)) {
 }
 
 export interface AppConfig {
-  GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
-  APP_URL?: string;
   NEXT_PUBLIC_SUPABASE_URL?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   MASTER_PASSWORD?: string;
@@ -51,9 +48,6 @@ export function getAppConfig(): AppConfig {
   const masterPassword = fileConfig.MASTER_PASSWORD || 'admin';
 
   return {
-    GOOGLE_CLIENT_ID: fileConfig.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET: fileConfig.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
-    APP_URL: fileConfig.APP_URL || process.env.APP_URL,
     NEXT_PUBLIC_SUPABASE_URL: fileConfig.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: fileConfig.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     MASTER_PASSWORD: masterPassword
@@ -80,8 +74,6 @@ export function saveAppConfig(newConfig: Partial<AppConfig>) {
 export function isSystemConfigured(): { configured: boolean; missingFields: string[] } {
   const config = getAppConfig();
   const requiredFields: (keyof AppConfig)[] = [
-    'GOOGLE_CLIENT_ID',
-    'GOOGLE_CLIENT_SECRET',
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY'
   ];

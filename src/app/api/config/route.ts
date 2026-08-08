@@ -8,7 +8,6 @@ export async function GET() {
   // Mask sensitive values
   const maskedConfig: Partial<AppConfig> = {
     ...config,
-    GOOGLE_CLIENT_SECRET: config.GOOGLE_CLIENT_SECRET ? '●●●●●●●●●' : '',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: config.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '●●●●●●●●●' : '',
     MASTER_PASSWORD: '●●●●●●●●●'
   };
@@ -30,7 +29,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Don't overwrite with masked values
-    if (newConfig.GOOGLE_CLIENT_SECRET === '●●●●●●●●●') delete newConfig.GOOGLE_CLIENT_SECRET;
     if (newConfig.NEXT_PUBLIC_SUPABASE_ANON_KEY === '●●●●●●●●●') delete newConfig.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (newConfig.MASTER_PASSWORD === '●●●●●●●●●') delete newConfig.MASTER_PASSWORD;
 

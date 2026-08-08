@@ -14,8 +14,6 @@ interface HistoryDetailProps {
   previousSession?: any;
   previousFullStats?: any;
   maxHr?: number;
-  isGoogleConnected?: boolean;
-  onSyncSession?: (session: any) => void;
   onBack: () => void;
   onClose: () => void;
 }
@@ -167,8 +165,6 @@ export const HistoryDetail = ({
   previousSession,
   previousFullStats,
   maxHr = 190,
-  isGoogleConnected,
-  onSyncSession,
   onBack,
   onClose
 }: HistoryDetailProps) => {
@@ -240,14 +236,6 @@ export const HistoryDetail = ({
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {isGoogleConnected && !session.synced_to_google && onSyncSession && (
-            <button
-              onClick={() => onSyncSession(session)}
-              className="px-4 py-2 rounded border border-hw-accent text-hw-accent hover:bg-hw-accent hover:text-hw-bg font-mono text-[10px] uppercase tracking-widest transition-all"
-            >
-              Sync to Google Fit
-            </button>
-          )}
           <button
             onClick={() => downloadTCX(session)}
             className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-accent hover:text-hw-accent font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
