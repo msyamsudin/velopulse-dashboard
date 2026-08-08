@@ -362,6 +362,8 @@ const id: Record<string, string> = {
   'Edit': 'Ubah',
   'Reset': 'Reset',
   '0–100% per km': '0–100% per km',
+  'Average': 'Rerata',
+  'Peak': 'Puncak',
   'Suggest': 'Saran',
   'Suggested': 'Disarankan',
   'Match!': 'Sesuai!',
