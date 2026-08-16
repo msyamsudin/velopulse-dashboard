@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { computeRmssd, parseHeartRateMeasurement, recordHrvReading, type ReadinessLevel } from '@/lib/hrv';
+import { clearSavedDevice, loadSavedDevice, saveSavedDevice } from '@/lib/saved-devices';
 
 export interface BluetoothData {
   heartRate?: number;
@@ -52,11 +54,17 @@ interface BluetoothState {
   // Wheel circumference in meters; 0 disables CSC speed estimation (needs profile setting)
   wheelCircumferenceM: number;
 
+  // HRV (from RR-intervals in the Heart Rate Measurement characteristic)
+  rrIntervals: number[];
+  hrvRmssd: number | null;
+  hrvReadiness: ReadinessLevel | null;
+
   // Actions
   addLog: (message: string) => void;
   setError: (error: string | null) => void;
   connectHeartRate: () => Promise<void>;
   connectBike: () => Promise<void>;
+  reconnectSavedDevices: () => Promise<{ hr: boolean; bike: boolean }>;
   disconnect: () => void;
   clearStaleData: () => void;
 }
@@ -67,6 +75,40 @@ type BluetoothSetState = (
 
 const getCharacteristicValue = (event: Event): DataView | null =>
   (event.target as BluetoothRemoteGATTCharacteristic).value;
+
+/** RR-intervals kept for the live RMSSD window (~1 min at 1 interval/s). */
+const HRV_WINDOW_SIZE = 60;
+
+/**
+ * Shared handler for Heart Rate Measurement notifications (both the initial
+ * connect and the auto-reconnect path): parses HR + RR-intervals, updates the
+ * rolling RMSSD window and the daily readiness classification.
+ */
+const handleHeartRateValue = (value: DataView, set: BluetoothSetState, get: () => BluetoothState) => {
+  const { heartRate, rrIntervalsMs } = parseHeartRateMeasurement(value);
+  if (!heartRate || heartRate <= 0) return;
+
+  const now = Date.now();
+  const prev = get();
+
+  const patch: Partial<BluetoothState> = {
+    data: { ...prev.data, heartRate },
+    lastUpdate: { ...prev.lastUpdate, heartRate: now },
+  };
+
+  if (rrIntervalsMs.length > 0) {
+    const rrIntervals = [...prev.rrIntervals, ...rrIntervalsMs].slice(-HRV_WINDOW_SIZE);
+    patch.rrIntervals = rrIntervals;
+
+    const rmssd = computeRmssd(rrIntervals);
+    if (rmssd !== null) {
+      patch.hrvRmssd = Math.round(rmssd);
+      patch.hrvReadiness = recordHrvReading(rmssd, now);
+    }
+  }
+
+  set(patch);
+};
 
 export const parseFtmsIndoorBikeData = (
   value: DataView,
@@ -263,9 +305,176 @@ const handleCscMeasurement = (value: DataView, setState: BluetoothSetState) => {
   });
 };
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY_MS = 2000;
+
+/**
+ * Full connection + notification setup for a heart-rate device, including the
+ * auto-reconnect-on-disconnect loop. Shared by the pairing flow and the
+ * saved-device auto-reconnect.
+ */
+const attachHrDevice = async (device: BluetoothDevice, set: BluetoothSetState, get: () => BluetoothState) => {
+  const { addLog } = get();
+
+  const onHrDisconnect = async () => {
+    addLog("HR device disconnected. Attempting to reconnect...");
+    set({ hrConnected: false });
+
+    let attempts = 0;
+    const attemptReconnect = async () => {
+      // Stop if the device object was cleared (manual disconnect)
+      if (!get().hrDevice) {
+        addLog("HR auto-reconnect aborted (manually disconnected).");
+        return;
+      }
+
+      try {
+        attempts++;
+        addLog(`HR Reconnect attempt ${attempts}/${MAX_RECONNECT_ATTEMPTS}...`);
+        const server = await get().hrDevice?.gatt?.connect();
+        const service = await server?.getPrimaryService('heart_rate');
+        const characteristic = await service?.getCharacteristic('heart_rate_measurement');
+
+        await characteristic?.startNotifications();
+        addLog("Notifications started for Heart Rate");
+
+        characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+          const value = getCharacteristicValue(event);
+          if (!value) return;
+          handleHeartRateValue(value, set, get);
+        });
+
+        addLog("HR reconnected successfully!");
+        set({ hrConnected: true, error: null });
+      } catch (err) {
+        addLog(`HR Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
+        if (attempts < MAX_RECONNECT_ATTEMPTS && get().hrDevice) {
+          setTimeout(attemptReconnect, RECONNECT_DELAY_MS + 1000);
+        } else {
+          set({ error: "HR connection lost. Please reconnect manually." });
+        }
+      }
+    };
+
+    setTimeout(attemptReconnect, RECONNECT_DELAY_MS);
+  };
+
+  addLog(`Connecting to ${device.name || 'heart rate device'}...`);
+  const server = await device.gatt?.connect();
+  const service = await server?.getPrimaryService('heart_rate');
+  const characteristic = await service?.getCharacteristic('heart_rate_measurement');
+
+  await characteristic?.startNotifications();
+  addLog("Notifications started for Heart Rate");
+
+  characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+    const value = getCharacteristicValue(event);
+    if (!value) return;
+    handleHeartRateValue(value, set, get);
+  });
+
+  device.addEventListener('gattserverdisconnected', onHrDisconnect);
+
+  set({ hrDevice: device, hrConnected: true, error: null });
+  saveSavedDevice('hr', { id: device.id, name: device.name ?? '' });
+};
+
+/** Same as attachHrDevice, for the bike: FTMS Indoor Bike Data with CSC fallback. */
+const attachBikeDevice = async (device: BluetoothDevice, set: BluetoothSetState, get: () => BluetoothState) => {
+  const { addLog } = get();
+
+  const onBikeDisconnect = async () => {
+    addLog("Bike device disconnected. Attempting to reconnect...");
+    set({ bikeConnected: false });
+
+    let attempts = 0;
+    const attemptReconnect = async () => {
+      if (!get().bikeDevice) {
+        addLog("Bike auto-reconnect aborted (manually disconnected).");
+        return;
+      }
+
+      try {
+        attempts++;
+        addLog(`Bike Reconnect attempt ${attempts}/${MAX_RECONNECT_ATTEMPTS}...`);
+        const server = await get().bikeDevice?.gatt?.connect();
+
+        try {
+          const service = await server?.getPrimaryService('fitness_machine');
+          const characteristic = await service?.getCharacteristic('indoor_bike_data');
+          await characteristic?.startNotifications();
+          addLog("Notifications started for FTMS Indoor Bike Data");
+
+          characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+            const value = getCharacteristicValue(event);
+            if (!value) return;
+            handleFtmsIndoorBikeNotification(value, Date.now(), set);
+          });
+        } catch {
+          addLog("FTMS not found on reconnect, trying CSC service...");
+          const service = await server?.getPrimaryService('cycling_speed_and_cadence');
+          const characteristic = await service?.getCharacteristic('csc_measurement');
+          await characteristic?.startNotifications();
+          characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+            const value = getCharacteristicValue(event);
+            if (!value) return;
+            handleCscMeasurement(value, set);
+          });
+        }
+
+        addLog("Bike reconnected successfully!");
+        set({ bikeConnected: true, error: null });
+      } catch (err) {
+        addLog(`Bike Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
+        if (attempts < MAX_RECONNECT_ATTEMPTS && get().bikeDevice) {
+          setTimeout(attemptReconnect, RECONNECT_DELAY_MS + 1000);
+        } else {
+          set({ error: "Bike connection lost. Please reconnect manually." });
+        }
+      }
+    };
+
+    setTimeout(attemptReconnect, RECONNECT_DELAY_MS);
+  };
+
+  addLog(`Connecting to ${device.name || 'bike device'}...`);
+  const server = await device.gatt?.connect();
+
+  try {
+    const service = await server?.getPrimaryService('fitness_machine');
+    const characteristic = await service?.getCharacteristic('indoor_bike_data');
+    await characteristic?.startNotifications();
+    addLog("Notifications started for FTMS Indoor Bike Data");
+
+    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+      const value = getCharacteristicValue(event);
+      if (!value) return;
+      handleFtmsIndoorBikeNotification(value, Date.now(), set);
+    });
+  } catch {
+    addLog("FTMS not found, trying CSC service...");
+    const service = await server?.getPrimaryService('cycling_speed_and_cadence');
+    const characteristic = await service?.getCharacteristic('csc_measurement');
+    await characteristic?.startNotifications();
+    characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+      const value = getCharacteristicValue(event);
+      if (!value) return;
+      handleCscMeasurement(value, set);
+    });
+  }
+
+  device.addEventListener('gattserverdisconnected', onBikeDisconnect);
+
+  set({ bikeDevice: device, bikeConnected: true, error: null });
+  saveSavedDevice('bike', { id: device.id, name: device.name ?? '' });
+};
+
 export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   hrConnected: false,
   bikeConnected: false,
+  rrIntervals: [],
+  hrvRmssd: null,
+  hrvReadiness: null,
   data: {},
   error: null,
   rawLogs: [],
@@ -300,81 +509,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ services: ['heart_rate'] }],
       });
-      
-      const onHrDisconnect = async () => {
-        addLog("HR device disconnected. Attempting to reconnect...");
-        set({ hrConnected: false });
-        
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        const attemptReconnect = async () => {
-          // Stop if the device object was cleared (manual disconnect)
-          if (!get().hrDevice) {
-            addLog("HR auto-reconnect aborted (manually disconnected).");
-            return;
-          }
-          
-          try {
-            attempts++;
-            addLog(`HR Reconnect attempt ${attempts}/${maxAttempts}...`);
-            const server = await get().hrDevice?.gatt?.connect();
-            const service = await server?.getPrimaryService('heart_rate');
-            const characteristic = await service?.getCharacteristic('heart_rate_measurement');
-            
-            await characteristic?.startNotifications();
-            addLog("Notifications started for Heart Rate");
-
-            characteristic?.addEventListener('characteristicvaluechanged', (event) => {
-              const value = getCharacteristicValue(event);
-              if (!value) return;
-              const flags = value.getUint8(0);
-              const rate = flags & 0x01 ? value.getUint16(1, true) : value.getUint8(1);
-              
-              get().lastUpdate.heartRate = Date.now();
-              set((state) => ({
-                data: { ...state.data, heartRate: rate }
-              }));
-            });
-
-            addLog("HR reconnected successfully!");
-            set({ hrConnected: true, error: null });
-          } catch (err) {
-            addLog(`HR Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
-            if (attempts < maxAttempts && get().hrDevice) {
-              setTimeout(attemptReconnect, 3000);
-            } else {
-              set({ error: "HR connection lost. Please reconnect manually." });
-            }
-          }
-        };
-
-        setTimeout(attemptReconnect, 2000);
-      };
-
-      addLog(`Connecting to ${device.name}...`);
-      const server = await device.gatt?.connect();
-      const service = await server?.getPrimaryService('heart_rate');
-      const characteristic = await service?.getCharacteristic('heart_rate_measurement');
-      
-      await characteristic?.startNotifications();
-      addLog("Notifications started for Heart Rate");
-
-      characteristic?.addEventListener('characteristicvaluechanged', (event) => {
-        const value = getCharacteristicValue(event);
-        if (!value) return;
-        const flags = value.getUint8(0);
-        const rate = flags & 0x01 ? value.getUint16(1, true) : value.getUint8(1);
-        
-        get().lastUpdate.heartRate = Date.now();
-        set((state) => ({
-          data: { ...state.data, heartRate: rate }
-        }));
-      });
-
-      device.addEventListener('gattserverdisconnected', onHrDisconnect);
-
-      set({ hrDevice: device, hrConnected: true, error: null });
+      await attachHrDevice(device, set, get);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       addLog(`HR Error: ${message}`);
@@ -392,92 +527,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
           { services: ['cycling_speed_and_cadence'] }
         ],
       });
-      
-      const onBikeDisconnect = async () => {
-        addLog("Bike device disconnected. Attempting to reconnect...");
-        set({ bikeConnected: false });
-        
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        const attemptReconnect = async () => {
-          if (!get().bikeDevice) {
-            addLog("Bike auto-reconnect aborted (manually disconnected).");
-            return;
-          }
-          
-          try {
-            attempts++;
-            addLog(`Bike Reconnect attempt ${attempts}/${maxAttempts}...`);
-            const server = await get().bikeDevice?.gatt?.connect();
-            
-            try {
-              const service = await server?.getPrimaryService('fitness_machine');
-              const characteristic = await service?.getCharacteristic('indoor_bike_data');
-              await characteristic?.startNotifications();
-              addLog("Notifications started for FTMS Indoor Bike Data");
-
-              characteristic?.addEventListener('characteristicvaluechanged', (event) => {
-                const value = getCharacteristicValue(event);
-                if (!value) return;
-                handleFtmsIndoorBikeNotification(value, Date.now(), set);
-              });
-            } catch {
-              addLog("FTMS not found on reconnect, trying CSC service...");
-              const service = await server?.getPrimaryService('cycling_speed_and_cadence');
-              const characteristic = await service?.getCharacteristic('csc_measurement');
-              await characteristic?.startNotifications();
-              characteristic?.addEventListener('characteristicvaluechanged', (event) => {
-                const value = getCharacteristicValue(event);
-                if (!value) return;
-                handleCscMeasurement(value, set);
-              });
-            }
-
-            addLog("Bike reconnected successfully!");
-            set({ bikeConnected: true, error: null });
-          } catch (err) {
-            addLog(`Bike Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
-            if (attempts < maxAttempts && get().bikeDevice) {
-              setTimeout(attemptReconnect, 3000);
-            } else {
-              set({ error: "Bike connection lost. Please reconnect manually." });
-            }
-          }
-        };
-
-        setTimeout(attemptReconnect, 2000);
-      };
-
-      addLog(`Connecting to ${device.name}...`);
-      const server = await device.gatt?.connect();
-      
-      try {
-        const service = await server?.getPrimaryService('fitness_machine');
-        const characteristic = await service?.getCharacteristic('indoor_bike_data');
-        await characteristic?.startNotifications();
-        addLog("Notifications started for FTMS Indoor Bike Data");
-
-        characteristic?.addEventListener('characteristicvaluechanged', (event) => {
-          const value = getCharacteristicValue(event);
-          if (!value) return;
-          handleFtmsIndoorBikeNotification(value, Date.now(), set);
-        });
-      } catch {
-        addLog("FTMS not found, trying CSC service...");
-        const service = await server?.getPrimaryService('cycling_speed_and_cadence');
-        const characteristic = await service?.getCharacteristic('csc_measurement');
-        await characteristic?.startNotifications();
-        characteristic?.addEventListener('characteristicvaluechanged', (event) => {
-          const value = getCharacteristicValue(event);
-          if (!value) return;
-          handleCscMeasurement(value, set);
-        });
-      }
-
-      device.addEventListener('gattserverdisconnected', onBikeDisconnect);
-
-      set({ bikeDevice: device, bikeConnected: true, error: null });
+      await attachBikeDevice(device, set, get);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       addLog(`Bike Error: ${message}`);
@@ -485,16 +535,59 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
     }
   },
 
+  reconnectSavedDevices: async () => {
+    const { addLog } = get();
+    if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) {
+      return { hr: false, bike: false };
+    }
+    try {
+      const devices = await navigator.bluetooth.getDevices();
+      const hrSaved = loadSavedDevice('hr');
+      const bikeSaved = loadSavedDevice('bike');
+      let hr = false;
+      let bike = false;
+
+      if (hrSaved) {
+        const device = devices.find((d) => d.id === hrSaved.id);
+        if (device) {
+          await attachHrDevice(device, set, get);
+          hr = true;
+        }
+      }
+
+      if (bikeSaved) {
+        const device = devices.find((d) => d.id === bikeSaved.id);
+        if (device) {
+          await attachBikeDevice(device, set, get);
+          bike = true;
+        }
+      }
+
+      if (hr || bike) addLog("Reconnected to previously saved devices");
+      return { hr, bike };
+    } catch (err) {
+      addLog(`Auto-reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
+      return { hr: false, bike: false };
+    }
+  },
+
   disconnect: () => {
     const { hrDevice, bikeDevice, addLog } = get();
     hrDevice?.gatt?.disconnect();
     bikeDevice?.gatt?.disconnect();
+    // Explicit disconnect also forgets the pairing, so the app does not
+    // auto-reconnect to devices the user deliberately released.
+    clearSavedDevice('hr');
+    clearSavedDevice('bike');
     set({ 
       hrDevice: null, 
       bikeDevice: null, 
       hrConnected: false, 
       bikeConnected: false, 
       data: {},
+      rrIntervals: [],
+      hrvRmssd: null,
+      hrvReadiness: null,
       cumulativeDistance: 0,
       cumulativeCalories: 0,
       lastRawDistance: 0,
@@ -506,7 +599,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         lastCrankEventTime: -1
       }
     });
-    addLog("Disconnected all devices");
+    addLog("Disconnected all devices (saved pairing cleared)");
   },
 
   clearStaleData: () => {

@@ -8,6 +8,7 @@ import { StatusPill } from '../ui';
 import { useI18n } from '@/i18n';
 import { useResistanceAdvisor } from '@/hooks/useResistanceAdvisor';
 import type { RiderProfile, TelemetrySnapshot, WorkoutView } from '@/lib/cockpit-types';
+import { useBluetoothStore } from '@/store/useBluetoothStore';
 import type { LiveWorkoutStats } from '@/store/useWorkoutStore';
 
 interface RecordingCockpitProps {
@@ -63,6 +64,18 @@ interface ResistanceStripMetricProps extends StripMetricProps {
 }
 
 const clampPct = (value: number) => Math.min(100, Math.max(0, value));
+
+const HRV_READINESS_COLORS: Record<string, string> = {
+  strained: 'text-red-400',
+  balanced: 'text-yellow-300',
+  recovered: 'text-green-400',
+};
+
+const HRV_READINESS_LABELS: Record<string, string> = {
+  strained: 'Strained',
+  balanced: 'Balanced',
+  recovered: 'Recovered',
+};
 
 const HR_CARD_AURAS = [
   { rgb: '74, 92, 86', borderAlpha: 0.22, bgAlpha: 0.025, glowAlpha: 0.14 },
@@ -263,6 +276,10 @@ export const RecordingCockpit = ({
     : undefined;
   const hrrInProgress = hrrStatus === 'buffer' || hrrStatus === 'measuring';
   const advisor = useResistanceAdvisor(currentData.distance || 0, currentData.resistance || 0);
+  const hrvRmssd = useBluetoothStore((s) => s.hrvRmssd);
+  const hrvReadiness = useBluetoothStore((s) => s.hrvReadiness);
+  const hrvColor = hrvReadiness ? HRV_READINESS_COLORS[hrvReadiness] : 'text-vp-muted';
+  const hrvLabel = hrvReadiness ? HRV_READINESS_LABELS[hrvReadiness] : null;
 
   return (
     <div className="relative h-full flex flex-col gap-4 overflow-y-auto no-scrollbar px-1 md:px-2 pb-4">
@@ -311,6 +328,14 @@ export const RecordingCockpit = ({
             <Radio size={12} />
             <span className="text-[9px] font-mono uppercase tracking-[0.14em]">{t('Zone')} {hrZoneLabel}</span>
           </div>
+          {hrvRmssd !== null && (
+            <div className={`flex items-center gap-2 rounded-md border border-vp-border bg-white/[0.03] px-2.5 py-1.5 ${hrvColor}`}>
+              <Activity size={12} />
+              <span className="text-[9px] font-mono uppercase tracking-[0.14em]">
+                {t('HRV')} {hrvRmssd} ms{hrvLabel ? ` · ${t(hrvLabel)}` : ''}
+              </span>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-3 text-vp-accent lg:ml-3">
             <Timer size={18} />
             <div className="font-mono text-3xl md:text-4xl font-black leading-none tabular-nums">
