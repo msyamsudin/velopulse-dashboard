@@ -179,7 +179,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
 
     const dayMap: Record<string, { distance: number; calories: number; duration: number; trimp: number; sessions: number; cadenceSum: number }> = {};
 
-    let current = new Date(startDate);
+    const current = new Date(startDate);
     // Use a while loop to increment days safely
     while (current <= endDate) {
       const key = getLocalDateKey(current);

@@ -10,6 +10,25 @@ export interface BluetoothData {
   resistance?: number;
 }
 
+export interface CscTracker {
+  lastWheelRevs: number;
+  lastWheelEventTime: number;
+  lastCrankRevs: number;
+  lastCrankEventTime: number;
+}
+
+/** Minimal state slice consumed by the pure packet parsers (unit-testable). */
+export type BluetoothParseState = Pick<
+  BluetoothState,
+  | 'lastUpdate'
+  | 'cumulativeDistance'
+  | 'cumulativeCalories'
+  | 'lastRawDistance'
+  | 'lastRawCalories'
+  | 'csc'
+  | 'wheelCircumferenceM'
+>;
+
 interface BluetoothState {
   hrConnected: boolean;
   bikeConnected: boolean;
@@ -28,6 +47,11 @@ interface BluetoothState {
   lastRawDistance: number;
   lastRawCalories: number;
 
+  // CSC (Cycling Speed & Cadence) tracking
+  csc: CscTracker;
+  // Wheel circumference in meters; 0 disables CSC speed estimation (needs profile setting)
+  wheelCircumferenceM: number;
+
   // Actions
   addLog: (message: string) => void;
   setError: (error: string | null) => void;
@@ -41,9 +65,9 @@ type BluetoothSetState = (
   partial: Partial<BluetoothState> | ((state: BluetoothState) => Partial<BluetoothState> | BluetoothState)
 ) => void;
 
-const parseFtmsIndoorBikeData = (
+export const parseFtmsIndoorBikeData = (
   value: DataView,
-  state: BluetoothState,
+  state: BluetoothParseState,
   now: number
 ) => {
   const flags = value.getUint16(0, true);
@@ -105,8 +129,26 @@ const parseFtmsIndoorBikeData = (
     trackerUpdates.cumulativeCalories = newCumulative;
     trackerUpdates.lastRawCalories = rawCalories;
 
-    offset += 5;
+    // Total Energy is uint16 (2 bytes), NOT 5 — the extra bytes belong to
+    // Energy Per Hour / Energy Per Minute / Heart Rate below.
+    offset += 2;
   }
+  // Energy Per Hour (uint16)
+  if (flags & 0x0200) offset += 2;
+  // Energy Per Minute (uint8)
+  if (flags & 0x0400) offset += 1;
+  // Heart Rate (uint8)
+  if (flags & 0x0800) {
+    updates.heartRate = value.getUint8(offset);
+    lastUpdate.heartRate = now;
+    offset += 1;
+  }
+  // Metabolic Equivalent (uint8)
+  if (flags & 0x1000) offset += 1;
+  // Elapsed Time (uint16)
+  if (flags & 0x2000) offset += 2;
+  // Remaining Time (uint16)
+  if (flags & 0x4000) offset += 2;
 
   return { updates, lastUpdate, trackerUpdates };
 };
@@ -129,6 +171,95 @@ const handleFtmsIndoorBikeNotification = (value: DataView, now: number, setState
   });
 };
 
+/**
+ * Parse a CSC (Cycling Speed & Cadence) Measurement notification.
+ *
+ * CSC reports CUMULATIVE crank/wheel revolutions plus an event time in
+ * units of 1/1024 s. Cadence is derived from the delta between successive
+ * notifications: (revsDelta / timeDelta) * 60. Both counters wrap (uint16),
+ * so deltas must account for rollover.
+ */
+export const parseCscMeasurement = (
+  value: DataView,
+  state: BluetoothParseState
+): { updates: Partial<BluetoothData>; lastUpdate: Record<string, number>; csc: CscTracker } => {
+  const flags = value.getUint8(0);
+  let offset = 1;
+  const now = Date.now();
+  const updates: Partial<BluetoothData> = {};
+  const lastUpdate = { ...state.lastUpdate };
+  const csc = { ...state.csc };
+
+  // Wheel Revolution Data Present
+  if (flags & 0x01) {
+    const wheelRevs = value.getUint32(offset, true);
+    const wheelEventTime = value.getUint16(offset + 4, true);
+    offset += 6;
+
+    if (csc.lastWheelRevs >= 0) {
+      let revDelta = wheelRevs - csc.lastWheelRevs;
+      if (revDelta < 0) revDelta += 0x100000000;
+      let timeDelta = wheelEventTime - csc.lastWheelEventTime;
+      if (timeDelta < 0) timeDelta += 0x10000;
+      const timeSeconds = timeDelta / 1024;
+      if (revDelta > 0 && timeSeconds > 0 && state.wheelCircumferenceM > 0) {
+        const speedMps = (revDelta * state.wheelCircumferenceM) / timeSeconds;
+        updates.speed = Math.round(speedMps * 3.6 * 10) / 10;
+        lastUpdate.speed = now;
+      }
+    }
+    csc.lastWheelRevs = wheelRevs;
+    csc.lastWheelEventTime = wheelEventTime;
+  }
+
+  // Crank Revolution Data Present
+  if (flags & 0x02) {
+    const crankRevs = value.getUint16(offset, true);
+    const crankEventTime = value.getUint16(offset + 2, true);
+    offset += 4;
+
+    if (csc.lastCrankRevs >= 0) {
+      let revDelta = crankRevs - csc.lastCrankRevs;
+      if (revDelta < 0) revDelta += 0x10000;
+      let timeDelta = crankEventTime - csc.lastCrankEventTime;
+      if (timeDelta < 0) timeDelta += 0x10000;
+      const timeSeconds = timeDelta / 1024;
+      if (revDelta > 0 && timeSeconds > 0) {
+        updates.cadence = Math.round((revDelta / timeSeconds) * 60);
+        lastUpdate.cadence = now;
+      }
+    }
+    csc.lastCrankRevs = crankRevs;
+    csc.lastCrankEventTime = crankEventTime;
+  }
+
+  return { updates, lastUpdate, csc };
+};
+
+const handleCscMeasurement = (value: DataView, setState: BluetoothSetState) => {
+  setState((state) => {
+    const { updates, lastUpdate, csc } = parseCscMeasurement(value, state);
+
+    const cscUnchanged =
+      csc.lastWheelRevs === state.csc.lastWheelRevs &&
+      csc.lastWheelEventTime === state.csc.lastWheelEventTime &&
+      csc.lastCrankRevs === state.csc.lastCrankRevs &&
+      csc.lastCrankEventTime === state.csc.lastCrankEventTime;
+
+    if (Object.keys(updates).length === 0 && cscUnchanged) {
+      return state;
+    }
+
+    return {
+      csc,
+      lastUpdate,
+      data: Object.keys(updates).length > 0
+        ? { ...state.data, ...updates }
+        : state.data
+    };
+  });
+};
+
 export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   hrConnected: false,
   bikeConnected: false,
@@ -142,6 +273,13 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   cumulativeCalories: 0,
   lastRawDistance: 0,
   lastRawCalories: 0,
+  csc: {
+    lastWheelRevs: -1,
+    lastWheelEventTime: -1,
+    lastCrankRevs: -1,
+    lastCrankEventTime: -1
+  },
+  wheelCircumferenceM: 0,
 
   addLog: (message: string) => {
     console.log(`[BLE DEBUG] ${message}`);
@@ -284,18 +422,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
               const characteristic = await service?.getCharacteristic('csc_measurement');
               await characteristic?.startNotifications();
               characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-                const value = event.target.value;
-                const flags = value.getUint8(0);
-                let offset = 1;
-                const now = Date.now();
-                if (flags & 0x01) offset += 6;
-                if (flags & 0x02) {
-                   const crankRevs = value.getUint16(offset, true);
-                   get().lastUpdate.cadence = now;
-                   set((s) => ({ 
-                     data: { ...s.data, cadence: crankRevs % 200 } 
-                   })); 
-                }
+                handleCscMeasurement(event.target.value, set);
               });
             }
 
@@ -334,18 +461,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         const characteristic = await service?.getCharacteristic('csc_measurement');
         await characteristic?.startNotifications();
         characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-          const value = event.target.value;
-          const flags = value.getUint8(0);
-          let offset = 1;
-          const now = Date.now();
-          if (flags & 0x01) offset += 6;
-          if (flags & 0x02) {
-             const crankRevs = value.getUint16(offset, true);
-             get().lastUpdate.cadence = now;
-             set((state) => ({ 
-               data: { ...state.data, cadence: crankRevs % 200 } 
-             })); 
-          }
+          handleCscMeasurement(event.target.value, set);
         });
       }
 
@@ -371,7 +487,13 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       cumulativeDistance: 0,
       cumulativeCalories: 0,
       lastRawDistance: 0,
-      lastRawCalories: 0
+      lastRawCalories: 0,
+      csc: {
+        lastWheelRevs: -1,
+        lastWheelEventTime: -1,
+        lastCrankRevs: -1,
+        lastCrankEventTime: -1
+      }
     });
     addLog("Disconnected all devices");
   },

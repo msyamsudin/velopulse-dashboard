@@ -17,7 +17,7 @@ export const TelemetryLog = ({ rawLogs, copyLogs, copyStatus }: TelemetryLogProp
       <div className="stat-label text-yellow-500 mb-2 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span>Raw Bluetooth Telemetry</span>
-          <span className="opacity-50 text-[8px] font-normal">// Last 50 packets</span>
+          <span className="opacity-50 text-[8px] font-normal">{'// Last 50 packets'}</span>
         </div>
         <button 
           onClick={copyLogs}
