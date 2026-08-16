@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useResistancePlanStore } from '@/store/useResistancePlanStore';
 
 const TOLERANCE = 5;
@@ -6,8 +6,9 @@ const CHANGE_THRESHOLD = 2;
 
 export function useResistanceAdvisor(distanceMeters: number, currentResistance: number) {
   const { enabled, variations } = useResistancePlanStore();
-  const prevKmRef = useRef(-1);
-  const baselineRef = useRef<number | null>(null);
+  // Tracked in state (not refs) so derived values stay readable during render.
+  const [prevKm, setPrevKm] = useState(-1);
+  const [baseline, setBaseline] = useState<number | null>(null);
 
   const distanceKm = distanceMeters / 1000;
   const currentKmSegment = Math.floor(distanceKm);
@@ -17,24 +18,25 @@ export function useResistanceAdvisor(distanceMeters: number, currentResistance: 
     : null;
 
   const hasMore = enabled && currentKmSegment < variations.length - 1;
-  const kmJustCrossed = prevKmRef.current >= 0 && currentKmSegment > prevKmRef.current;
+  const kmJustCrossed = prevKm >= 0 && currentKmSegment > prevKm;
   const matched = suggestedResistance !== null && Math.abs(currentResistance - suggestedResistance) <= TOLERANCE;
 
-  const userChanged = baselineRef.current !== null
-    && Math.abs(currentResistance - baselineRef.current) > CHANGE_THRESHOLD;
+  const userChanged = baseline !== null
+    && Math.abs(currentResistance - baseline) > CHANGE_THRESHOLD;
 
+  // Runs after every render; same cadence as the previous ref-based version.
+  // setPrevKm with an identical value bails out, so no extra re-render loop.
   useEffect(() => {
     if (!enabled) {
-      baselineRef.current = null;
-      prevKmRef.current = -1;
+      setBaseline(null);
+      setPrevKm(-1);
       return;
     }
 
-    const prev = prevKmRef.current;
-    prevKmRef.current = currentKmSegment;
+    setPrevKm(currentKmSegment);
 
-    if (prev !== currentKmSegment || baselineRef.current === null) {
-      baselineRef.current = currentResistance;
+    if (prevKm !== currentKmSegment || baseline === null) {
+      setBaseline(currentResistance);
     }
   });
 

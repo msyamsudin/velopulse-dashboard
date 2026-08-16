@@ -10,12 +10,14 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from 'recharts';
+import type { TooltipPayloadEntry } from 'recharts';
+import type { HistoryData } from '@/store/useWorkoutStore';
 import { downsample } from '../lib/chart-utils';
 import { HR_ZONES, POWER_ZONES, getSafeMaxHr } from '@/lib/constants';
 import { EmptyState, IconButton, SegmentedControl, StatusPill } from './ui';
 
 interface PerformanceChartProps {
-  data: any[];
+  data: HistoryData[];
   title?: string;
   height?: number | string;
   mode?: 'live' | 'history';
@@ -275,7 +277,7 @@ export const PerformanceChart = ({
                       <div className="rounded-lg border border-vp-border bg-vp-bg/95 p-3 font-mono text-[10px] shadow-2xl backdrop-blur-xl">
                         <div className="mb-2 border-b border-vp-border pb-1 uppercase tracking-widest text-vp-muted">{label}</div>
                         <div className="space-y-1.5">
-                          {payload.map((item: any) => {
+                          {payload.map((item: TooltipPayloadEntry) => {
                             const metricDef = metrics.find(m => m.name === item.name);
                             return (
                               <div key={item.name} className="flex items-center justify-between gap-6">

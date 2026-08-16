@@ -56,7 +56,7 @@ export function decrypt(token: string, secret: string): string {
     decrypted += decipher.final('utf8');
     
     return decrypted;
-  } catch (err) {
+  } catch {
     throw new Error('Failed to decrypt token. Please check password and token.');
   }
 }

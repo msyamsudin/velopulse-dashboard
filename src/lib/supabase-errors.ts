@@ -65,22 +65,23 @@ function collectErrorInfo(err: unknown): RawErrorInfo {
     if (typeof value === 'string' && value.trim()) candidates.push(value.trim());
   };
 
-  let current: any = err;
-  const seen = new Set<any>();
+  let current: unknown = err;
+  const seen = new Set<unknown>();
 
   while (current && typeof current === 'object' && !seen.has(current)) {
     seen.add(current);
-    push(current.message);
-    push(current.error_description);
-    push(current.details);
-    push(current.hint);
-    if (typeof current.code === 'string' || typeof current.code === 'number') {
-      candidates.push(`code:${current.code}`);
+    const record = current as Record<string, unknown>;
+    push(record.message);
+    push(record.error_description);
+    push(record.details);
+    push(record.hint);
+    if (typeof record.code === 'string' || typeof record.code === 'number') {
+      candidates.push(`code:${record.code}`);
     }
-    if (typeof current.status === 'number') {
-      candidates.push(`status:${current.status}`);
+    if (typeof record.status === 'number') {
+      candidates.push(`status:${record.status}`);
     }
-    current = current.cause;
+    current = record.cause;
   }
 
   const text = candidates.join(' | ');

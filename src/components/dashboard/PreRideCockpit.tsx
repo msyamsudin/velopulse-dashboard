@@ -17,11 +17,13 @@ import { type ReactNode } from 'react';
 import { EmptyState, MetricCard, Panel, StatusPill } from '../ui';
 import { ResistancePlanPanel } from './ResistancePlanPanel';
 import { useI18n } from '@/i18n';
+import type { RiderProfile, TelemetrySnapshot } from '@/lib/cockpit-types';
+import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 interface PreRideCockpitProps {
-  currentData: any;
-  userProfile: any;
-  sessions: any[];
+  currentData: TelemetrySnapshot;
+  userProfile: RiderProfile;
+  sessions: WorkoutSession[];
   hrConnected: boolean;
   bikeConnected: boolean;
   onStart: () => void;
@@ -47,23 +49,26 @@ const formatDuration = (seconds = 0) => {
   return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`;
 };
 
-const getLastDistanceKm = (session: any) => {
+const getLastDistanceKm = (session: WorkoutSession) => {
   const lastPoint = session?.history?.[session.history.length - 1];
   return lastPoint?.distance ? (lastPoint.distance / 1000).toFixed(2) : '--';
 };
 
-const ReadinessRow = ({ label, detail, connected, icon }: ReadinessRowProps) => (
-  <div className="flex items-center justify-between gap-4 border-b border-vp-border py-3 last:border-b-0">
-    <div className="flex min-w-0 items-center gap-3">
-      <div className={connected ? 'text-vp-accent' : 'text-vp-dim'}>{icon}</div>
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-vp-text">{label}</div>
-        <div className="truncate text-[10px] font-mono uppercase tracking-[0.14em] text-vp-muted">{detail}</div>
+const ReadinessRow = ({ label, detail, connected, icon }: ReadinessRowProps) => {
+  const { t } = useI18n();
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-vp-border py-3 last:border-b-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={connected ? 'text-vp-accent' : 'text-vp-dim'}>{icon}</div>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-vp-text">{label}</div>
+          <div className="truncate text-[10px] font-mono uppercase tracking-[0.14em] text-vp-muted">{detail}</div>
+        </div>
       </div>
+      <StatusPill label={t(connected ? 'Ready' : 'Offline')} tone={connected ? 'ready' : 'neutral'} compact />
     </div>
-    <StatusPill label={connected ? 'Ready' : 'Offline'} tone={connected ? 'ready' : 'neutral'} compact />
-  </div>
-);
+  );
+};
 
 const SummaryMetric = ({ label, value, tone = 'text-vp-text' }: SummaryMetricProps) => (
   <div className="min-w-0">
@@ -122,7 +127,7 @@ export const PreRideCockpit = ({
 
             <div className="grid grid-cols-3 gap-3 rounded-lg border border-vp-border bg-white/[0.025] p-3">
               <SummaryMetric label="FTP" value={`${userProfile.ftp || '--'} W`} tone="text-vp-power" />
-              <SummaryMetric label="Max HR" value={`${userProfile.maxHr || '--'} BPM`} tone="text-vp-hr" />
+              <SummaryMetric label={t('Max HR')} value={`${userProfile.maxHr || '--'} BPM`} tone="text-vp-hr" />
               <SummaryMetric
                 label={t('Weight')}
                 value={
@@ -213,13 +218,13 @@ export const PreRideCockpit = ({
         >
           <ReadinessRow
             label={t('Heart Rate Monitor')}
-            detail={hrConnected ? t('Live heart-rate stream') : 'Rockbros / Standard BLE'}
+            detail={hrConnected ? t('Live heart-rate stream') : t('Rockbros / Standard BLE')}
             connected={hrConnected}
             icon={<Heart size={17} />}
           />
           <ReadinessRow
             label={t('Stationary Bike')}
-            detail={bikeConnected ? t('FTMS metrics stream') : 'Yesoul / FTMS service'}
+            detail={bikeConnected ? t('FTMS metrics stream') : t('Yesoul / FTMS service')}
             connected={bikeConnected}
             icon={<Bike size={17} />}
           />

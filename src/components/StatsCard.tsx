@@ -10,7 +10,7 @@ interface StatsCardProps {
   valueMeta?: ReactNode;
   icon: ReactNode;
   colorClass: string;
-  chartData?: any[];
+  chartData?: unknown[];
   chartKey?: string;
   chartColor?: string;
   delay?: number;

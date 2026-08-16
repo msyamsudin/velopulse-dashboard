@@ -9,6 +9,7 @@ import { HR_ZONES, getActiveHrZoneIndex } from '@/lib/constants';
 
 // Hooks
 import { useAppInitialization } from './hooks/useAppInitialization';
+import type { TelemetrySnapshot } from './lib/cockpit-types';
 
 // Components
 import { DevicePanel } from './components/DevicePanel';
@@ -73,6 +74,7 @@ export default function App() {
   const formatTime = useWorkoutStore(state => state.formatTime);
   const startDistance = useWorkoutStore(state => state.startDistance);
   const startCalories = useWorkoutStore(state => state.startCalories);
+  const sessionStartTime = useWorkoutStore(state => state.sessionStartTime);
   const liveStats = useWorkoutStore(state => state.liveStats);
   const supabaseSyncError = useWorkoutStore(state => state.supabaseSyncError);
   const clearSupabaseSyncError = useWorkoutStore(state => state.clearSupabaseSyncError);
@@ -153,7 +155,7 @@ export default function App() {
 
   // Timer Effect
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isRecording) {
       interval = setInterval(() => {
         incrementElapsed();
@@ -201,7 +203,7 @@ export default function App() {
       )
     : (bleData.calories || 0);
 
-  const currentData = {
+  const currentData: TelemetrySnapshot = {
     hr: bleData.heartRate || 0,
     cadence: bleData.cadence || 0,
     power: bleData.power || 0,
@@ -307,7 +309,7 @@ export default function App() {
             calories={currentData.calories}
             distance={currentData.distance}
             history={workoutHistory}
-            sessionStartTime={useWorkoutStore.getState().sessionStartTime || Date.now()}
+            sessionStartTime={sessionStartTime ?? 0}
             onSave={async () => {
               await saveSession();
               setShowSummary(false);

@@ -72,8 +72,8 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({ valid: true });
-      } catch (err: any) {
-        return NextResponse.json({ valid: false, error: err?.message || 'Error saat validasi Supabase.' });
+      } catch (err) {
+        return NextResponse.json({ valid: false, error: err instanceof Error ? err.message : 'Error saat validasi Supabase.' });
       }
     }
     if (type === 'master') {
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ valid: false, error: 'Tipe tidak diketahui.' }, { status: 400 });
 
-  } catch (err: any) {
-    return NextResponse.json({ valid: false, error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ valid: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

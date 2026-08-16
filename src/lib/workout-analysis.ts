@@ -1,19 +1,29 @@
 import { getSafeMaxHr } from './constants';
+import type { WorkoutSession } from '@/store/useWorkoutStore';
+import type {
+  ComparisonSummary,
+  DailySummaryDay,
+  FullWorkoutStats,
+  GlobalSummary,
+  MetricDelta,
+  SummaryInsights,
+  WorkoutZoneStat,
+} from '@/lib/history-types';
 
-export const getSessionOutcome = (session: any) => {
+export const getSessionOutcome = (session: WorkoutSession) => {
   const history = session?.history || [];
-  const lastPoint = history[history.length - 1] || {};
+  const lastPoint = history[history.length - 1];
 
   return {
-    distanceKm: Number(((lastPoint.distance || 0) / 1000).toFixed(2)),
-    calories: Math.round(lastPoint.calories || 0),
+    distanceKm: Number(((lastPoint?.distance || 0) / 1000).toFixed(2)),
+    calories: Math.round(lastPoint?.calories || 0),
     duration: session?.duration || 0,
     avgPower: session?.stats?.avgPower || 0,
     avgHr: session?.stats?.avgHr || 0,
   };
 };
 
-export const getWorkoutQuality = (session: any, maxHr: number) => {
+export const getWorkoutQuality = (session: WorkoutSession, maxHr: number) => {
   const safeMax = getSafeMaxHr(maxHr);
   const avgHr = session?.stats?.avgHr || 0;
   const ratio = avgHr > 0 ? avgHr / safeMax : 0;
@@ -26,7 +36,7 @@ export const getWorkoutQuality = (session: any, maxHr: number) => {
   return { label: 'Easy', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/25' };
 };
 
-export const getZoneInsight = (zones: any[] = []) => {
+export const getZoneInsight = (zones: WorkoutZoneStat[] = []) => {
   if (zones.length === 0) return 'No heart-rate zone data';
 
   const dominant = zones.reduce((best, zone) => zone.percent > best.percent ? zone : best, zones[0]);
@@ -82,10 +92,10 @@ export const generateSessionInsights = ({
   previousFullStats,
   maxHr,
 }: {
-  session: any;
-  fullStats: any;
-  previousSession?: any;
-  previousFullStats?: any;
+  session: WorkoutSession;
+  fullStats: FullWorkoutStats;
+  previousSession?: WorkoutSession;
+  previousFullStats?: FullWorkoutStats;
   maxHr: number;
 }): TrainingInsight[] => {
   const insights: TrainingInsight[] = [];
@@ -165,10 +175,10 @@ export const generateSummaryInsights = ({
     key
   ),
 }: {
-  comparisonSummary: any;
-  summaryInsights: any;
-  globalSummary: any;
-  weeklyDailyData: any[];
+  comparisonSummary: ComparisonSummary | null;
+  summaryInsights: SummaryInsights | null;
+  globalSummary: GlobalSummary | null;
+  weeklyDailyData: DailySummaryDay[];
   rangeLabel: string;
   translate?: (key: string, values?: Record<string, string | number>) => string;
 }): TrainingInsight[] => {
@@ -178,12 +188,12 @@ export const generateSummaryInsights = ({
   const activeRatio = activeDays / totalDays;
   const bestDelta = comparisonSummary
     ? Object.entries(comparisonSummary.deltas)
-      .filter(([, delta]: any) => delta.hasBaseline && delta.value !== null)
-      .sort(([, a]: any, [, b]: any) => Math.abs(b.value) - Math.abs(a.value))[0]
+      .filter(([, delta]: [string, MetricDelta]) => delta.hasBaseline && delta.value !== null)
+      .sort(([, a]: [string, MetricDelta], [, b]: [string, MetricDelta]) => Math.abs(b.value ?? 0) - Math.abs(a.value ?? 0))[0]
     : null;
 
   if (bestDelta) {
-    const [metric, delta] = bestDelta as [string, any];
+    const [metric, delta] = bestDelta;
     const direction = delta.direction === 'up' ? 'up' : delta.direction === 'down' ? 'down' : 'flat';
     const change = delta.direction === 'up' ? 'higher' : delta.direction === 'down' ? 'lower' : 'unchanged';
     insights.push({
@@ -233,7 +243,7 @@ export const generateSummaryInsights = ({
   return insights.slice(0, 4);
 };
 
-export const getPersonalRecords = (sessions: any[], locale = 'en-US'): PersonalRecord[] => {
+export const getPersonalRecords = (sessions: WorkoutSession[], locale = 'en-US'): PersonalRecord[] => {
   if (sessions.length === 0) return [];
 
   const enriched = sessions.map(session => {

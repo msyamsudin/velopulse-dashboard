@@ -9,11 +9,11 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Pin, Clock } from 'lucide-react';
 import { formatDuration } from '../../utils/formatters';
+import type { HistoryData } from '@/store/useWorkoutStore';
 
 interface StackedWorkoutChartProps {
-  data: any[];
+  data: Array<HistoryData & { relativeTime?: string }>;
   stats: {
     avgHr: number;
     maxHr: number;
@@ -32,9 +32,9 @@ interface StackedWorkoutChartProps {
 export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) => {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const handleMouseMove = (e: any) => {
+  const handleMouseMove = (e: { activeTooltipIndex?: number | string }) => {
     if (e && e.activeTooltipIndex !== undefined) {
-      setActiveIndex(e.activeTooltipIndex);
+      setActiveIndex(Number(e.activeTooltipIndex));
     }
   };
 

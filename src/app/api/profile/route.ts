@@ -22,7 +22,7 @@ function getServerSupabase() {
   });
 }
 
-function errorResponse(err: any) {
+function errorResponse(err: unknown) {
   const info = classifySupabaseError(err);
   console.error('Profile fetch error:', err);
   return NextResponse.json(
@@ -58,7 +58,7 @@ export async function GET() {
       ftp: 200,
       weight: 75
     });
-  } catch (err: any) {
+  } catch (err) {
     return errorResponse(err);
   }
 }
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch (err) {
     return errorResponse(err);
   }
 }

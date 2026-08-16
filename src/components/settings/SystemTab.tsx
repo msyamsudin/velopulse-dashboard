@@ -58,8 +58,8 @@ export const SystemTab = ({
     try {
       const token = await onExport(exportPassword);
       setExportedToken(token);
-    } catch (err: any) {
-      setExportError(err?.message || 'Export failed');
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
       setIsExporting(false);
     }
@@ -84,8 +84,8 @@ export const SystemTab = ({
           window.location.reload();
         }, 1500);
       }
-    } catch (err: any) {
-      setImportError(err?.message || 'Import failed');
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed');
     } finally {
       setIsImporting(false);
     }

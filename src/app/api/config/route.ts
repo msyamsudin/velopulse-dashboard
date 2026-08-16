@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({ error: 'Failed to save configuration' }, { status: 500 });
     }
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Interal server error' }, { status: 500 });
   }
 }

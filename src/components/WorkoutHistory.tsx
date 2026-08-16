@@ -1,18 +1,23 @@
-import { useRef, useState, useMemo } from 'react';
+/* eslint-disable react-hooks/preserve-manual-memoization --
+   WorkoutHistory intentionally parses session dates (new Date) during render.
+   The React Compiler treats new Date() as a non-deterministic bailout, so it
+   cannot verify manual memoization in this component; the memos below are
+   correct and dep-complete. */
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
 import { Download, RefreshCw, Search, Upload, X, AlertTriangle } from 'lucide-react';
-import type { ImportTcxResult } from '../store/useWorkoutStore';
+import type { ImportTcxResult, WorkoutSession } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
 import type { SupabaseErrorInfo } from '../lib/supabase-errors';
 import { useI18n } from '@/i18n';
 
 interface WorkoutHistoryProps {
-  sessions: any[];
+  sessions: WorkoutSession[];
   onClose: () => void;
   onSyncSupabasePending?: () => Promise<void>;
   onLoadMoreSupabaseHistory?: () => Promise<void>;
@@ -86,14 +91,11 @@ export const WorkoutHistory = ({
   };
 
   // Reset offset when range changes
-  useMemo(() => {
+  useEffect(() => {
     setOffsetDays(0);
   }, [summaryRange]);
 
-  const summaryInputSessions = useMemo(
-    () => viewMode !== 'sessions' ? sessions : [],
-    [viewMode, sessions]
-  );
+  const summaryInputSessions = viewMode !== 'sessions' ? sessions : [];
 
   const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData } = useWorkoutHistoryData({
     sessions: summaryInputSessions,
@@ -186,8 +188,8 @@ export const WorkoutHistory = ({
           totals.synced += result.synced;
           totals.pending += result.pending;
           messages.push(...result.messages);
-        } catch (err: any) {
-          messages.push(`${file.name}: ${err?.message || 'Import failed'}`);
+        } catch (err) {
+          messages.push(`${file.name}: ${err instanceof Error ? err.message : 'Import failed'}`);
         }
       }
 

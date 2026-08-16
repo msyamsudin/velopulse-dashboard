@@ -7,12 +7,14 @@ import { CadenceGauge } from '../CadenceGauge';
 import { StatusPill } from '../ui';
 import { useI18n } from '@/i18n';
 import { useResistanceAdvisor } from '@/hooks/useResistanceAdvisor';
+import type { RiderProfile, TelemetrySnapshot, WorkoutView } from '@/lib/cockpit-types';
+import type { LiveWorkoutStats } from '@/store/useWorkoutStore';
 
 interface RecordingCockpitProps {
-  currentData: any;
-  liveStats: any;
-  userProfile: any;
-  workout: any;
+  currentData: TelemetrySnapshot;
+  liveStats: LiveWorkoutStats;
+  userProfile: RiderProfile;
+  workout: WorkoutView;
   hrConnected: boolean;
   bikeConnected: boolean;
   hrrStatus?: 'idle' | 'detecting' | 'buffer' | 'measuring' | 'complete';
@@ -286,9 +288,9 @@ export const RecordingCockpit = ({
               type="button"
               onClick={onOpenChart}
               disabled={!chartAvailable}
-              aria-label={chartAvailable ? 'Open live telemetry chart' : 'Live telemetry chart unavailable until data is recorded'}
+              aria-label={t(chartAvailable ? 'Open live telemetry chart' : 'Live telemetry chart unavailable until data is recorded')}
               className="vp-button vp-focus-ring border-vp-accent/25 bg-vp-accent/8 text-vp-accent hover:border-vp-accent/45 hover:bg-vp-accent/15 disabled:border-vp-border disabled:bg-white/[0.02] disabled:text-vp-dim"
-              title={chartAvailable ? 'Open live telemetry chart' : 'Chart available after telemetry is recorded'}
+              title={t(chartAvailable ? 'Open live telemetry chart' : 'Live telemetry chart unavailable until data is recorded')}
             >
               <Activity size={12} />
               {t('Chart')}
@@ -298,12 +300,12 @@ export const RecordingCockpit = ({
             type="button"
             onClick={onStartHrr}
             disabled={!canStartHrr || hrrInProgress}
-            aria-label={hrrInProgress ? 'Heart rate recovery measurement running' : 'Start heart rate recovery measurement'}
+            aria-label={t(hrrInProgress ? 'Heart rate recovery measurement running' : 'Start heart rate recovery measurement')}
             className="vp-button vp-button-danger vp-focus-ring disabled:opacity-35"
-            title={canStartHrr ? 'Mulai ukur HRR' : 'HRR tersedia saat recording, HR online, bike online, dan sepeda idle'}
+            title={t(canStartHrr ? 'Start HRR measurement' : 'HRR available while recording, HR online, bike online, and bike idle')}
           >
             <Heart size={12} />
-            {hrrInProgress ? 'HRR running' : 'Ukur HRR'}
+            {t(hrrInProgress ? 'HRR running' : 'Measure HRR')}
           </button>
           <div className={`flex items-center gap-2 rounded-md border border-vp-border bg-white/[0.03] px-2.5 py-1.5 ${hrZoneColor}`}>
             <Radio size={12} />

@@ -97,7 +97,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
         setSaveErrorMessage(errorMsg);
         setSaveStatus('error');
       }
-    } catch (err) {
+    } catch {
       setSaveErrorMessage('Could not reach the server. Check your internet connection.');
       setSaveStatus('error');
     }
@@ -131,7 +131,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
         setUnlockError(data.error || 'Failed to save');
         setSaveStatus('error');
       }
-    } catch (err) {
+    } catch {
       setSaveStatus('error');
     }
   };

@@ -641,7 +641,17 @@ const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSessions: 
   return sortSessions(Array.from(merged.values()));
 };
 
-const mapSupabaseWorkout = (item: any): WorkoutSession => {
+interface SupabaseWorkoutRow {
+  id: string;
+  created_at: string;
+  session_start_time?: string | number;
+  duration: number;
+  stats: WorkoutSession['stats'];
+  history: HistoryData[];
+  synced_to_google?: boolean;
+}
+
+const mapSupabaseWorkout = (item: SupabaseWorkoutRow): WorkoutSession => {
   const sessionStartTime = Number(item.session_start_time) || Date.parse(item.created_at) || 0;
 
   return {
@@ -739,7 +749,7 @@ const syncSessionToSupabase = async (session: WorkoutSession): Promise<WorkoutSe
       supabase_synced_at: new Date().toISOString(),
       supabase_sync_error: undefined
     };
-  } catch (err: any) {
+  } catch (err) {
     const info = classifySupabaseError(err);
     return {
       ...session,
@@ -991,8 +1001,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       let remoteDuplicate: WorkoutSession | null = null;
       try {
         remoteDuplicate = await findSupabaseDuplicate(importedSession);
-      } catch (err: any) {
-        result.messages.push(`Could not check Supabase duplicate for ${filename}: ${err?.message || err}`);
+      } catch (err) {
+        result.messages.push(`Could not check Supabase duplicate for ${filename}: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       if (remoteDuplicate) {
@@ -1170,9 +1180,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         });
         persistSessionHistory(mergedSessions);
       }
-    } catch (err: any) {
+    } catch (err) {
       const info = classifySupabaseError(err);
-      console.error('Failed to fetch from Supabase:', err?.message || JSON.stringify(err) || err);
+      console.error('Failed to fetch from Supabase:', err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err) ?? String(err));
       set({ supabaseSyncError: info });
     }
   },
@@ -1204,9 +1214,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         supabaseSyncError: null
       });
       persistSessionHistory(mergedSessions);
-    } catch (err: any) {
+    } catch (err) {
       const info = classifySupabaseError(err);
-      console.error('Failed to fetch older sessions from Supabase:', err?.message || JSON.stringify(err) || err);
+      console.error('Failed to fetch older sessions from Supabase:', err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err) ?? String(err));
       set({ supabaseSyncError: info });
     }
   },

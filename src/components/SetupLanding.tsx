@@ -62,8 +62,8 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (err: any) {
-      setError(err?.message || 'Restore failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Restore failed');
     } finally {
       setIsRestoring(false);
     }

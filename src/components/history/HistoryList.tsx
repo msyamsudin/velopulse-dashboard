@@ -3,9 +3,10 @@ import { formatDate, formatDuration } from '../../utils/formatters';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 import { EmptyState, StatusPill } from '../ui';
 import { calculateEdwardsTrimp } from '../../lib/training-load';
+import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 interface HistoryListProps {
-  sessions: any[];
+  sessions: WorkoutSession[];
   maxHr: number;
   onSelectSession: (id: string) => void;
   isSelectionMode?: boolean;
@@ -24,7 +25,7 @@ export const HistoryList = ({
   const groupedSessions = sessions.reduce<Array<{
     key: string;
     label: string;
-    sessions: any[];
+    sessions: WorkoutSession[];
     totalDistance: number;
     totalDuration: number;
   }>>((groups, session) => {

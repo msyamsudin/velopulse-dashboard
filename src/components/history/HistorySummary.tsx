@@ -4,67 +4,28 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { generateSummaryInsights, getInsightToneClasses, getPersonalRecords } from '../../lib/workout-analysis';
 import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../../lib/export-service';
 import type { TrainingLoadMetrics } from '../../lib/training-load';
+import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, MetricKey, SummaryInsights, WorkoutSession } from '../../lib/history-types';
 import { useI18n } from '../../i18n';
-
-type MetricKey = 'distance' | 'calories' | 'duration' | 'cadence' | 'trimp';
 
 interface HistorySummaryProps {
   section: 'overview' | 'trends' | 'load';
-  sessions: any[];
+  sessions: WorkoutSession[];
   onSelectSession?: (id: string) => void;
-  globalSummary: any;
+  globalSummary: GlobalSummary | null;
   showTotals: boolean;
   setShowTotals: (show: boolean) => void;
   summaryPeriod: string;
-  setSummaryPeriod: (period: any) => void;
+  setSummaryPeriod: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => void;
   summaryRange: '7d' | '30d' | '90d' | '1y' | 'all';
   setSummaryRange: (range: '7d' | '30d' | '90d' | '1y' | 'all') => void;
   chartType: 'bar' | 'line';
   setChartType: (type: 'bar' | 'line') => void;
   weeklyMetric: MetricKey;
-  setWeeklyMetric: (metric: any) => void;
-  normalizedChartData: any[];
-  weeklyDailyData: Array<{
-    date: string;
-    label: string;
-    shortDate: string;
-    distance: number;
-    calories: number;
-    durationSeconds: number;
-    trimp: number;
-    sessions: number;
-    isToday: boolean;
-    hasData: boolean;
-  }>;
-  summaryInsights: {
-    avgDistancePerSession: string;
-    avgDurationPerSession: string;
-    bestPeriodLabel: string;
-    bestPeriodDistance: string;
-    lastWorkoutLabel: string;
-    activeDaysLabel: string;
-    currentStreakLabel: string;
-    longestStreakLabel: string;
-    activeSpanLabel: string;
-  } | null;
-  comparisonSummary: {
-    label: string;
-    headline: string;
-    metrics: {
-      distance: number;
-      calories: number;
-      duration: number;
-      sessions: number;
-      trimp: number;
-    };
-    deltas: {
-      distance: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
-      calories: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
-      duration: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
-      sessions: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
-      trimp: { value: number | null; direction: 'up' | 'down' | 'flat'; hasBaseline: boolean };
-    };
-  } | null;
+  setWeeklyMetric: (metric: MetricKey) => void;
+  normalizedChartData: HistoryChartPoint[];
+  weeklyDailyData: DailySummaryDay[];
+  summaryInsights: SummaryInsights | null;
+  comparisonSummary: ComparisonSummary | null;
   trainingLoadMetrics: TrainingLoadMetrics;
   offsetDays: number;
   setOffsetDays: (offset: number) => void;
@@ -99,8 +60,6 @@ export const HistorySummary = ({
   const [averageStyle, setAverageStyle] = useState<'flat' | 'moving'>('flat');
   const [chartValueMode, setChartValueMode] = useState<'period' | 'cumulative'>('period');
   const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([weeklyMetric]);
-
-  if (!globalSummary) return null;
 
   const rangeOptions = [
     { value: '7d', label: '7D' },
@@ -300,7 +259,6 @@ export const HistorySummary = ({
   }, [chartData, primaryMetric]);
   const unit = metricConfigByKey[primaryMetric].unit;
   const metricColor = metricConfigByKey[primaryMetric].color;
-  const metricColorRgba = metricConfigByKey[primaryMetric].colorRgba;
   const effectiveChartType = denseData && chartType === 'bar' ? 'line' : chartType;
   const activePeriods = chartStats.activePeriods;
   const averageMetrics = averageDisplayMode === 'hidden'
@@ -433,7 +391,7 @@ export const HistorySummary = ({
   const trainingLoadDelta = comparisonSummary?.deltas.trimp;
   const trainingLoadChange = trainingLoadDelta?.hasBaseline
     ? `${trainingLoadDelta.direction === 'up' ? '+' : ''}${trainingLoadDelta.value}%`
-    : globalSummary.totalTrainingLoad > 0 ? t('New baseline') : t('No load');
+    : (globalSummary?.totalTrainingLoad ?? 0) > 0 ? t('New baseline') : t('No load');
   const baselineDelta = trainingLoadMetrics.chronicLoad > 0
     ? Math.round(((trainingLoadMetrics.acuteLoad - trainingLoadMetrics.chronicLoad) / trainingLoadMetrics.chronicLoad) * 100)
     : null;
@@ -506,6 +464,9 @@ export const HistorySummary = ({
       chronic: trainingLoadMetrics.chronicLoad,
       ratio: loadRatio.toFixed(2),
     });
+
+  // Guard placed after all hooks so hook order stays stable across renders.
+  if (!globalSummary) return null;
 
   return (
     <div className="pb-8 flex flex-col gap-4">
@@ -1247,12 +1208,12 @@ export const HistorySummary = ({
                       isAnimationActive={false}
                     >
                       <LabelList
-                        content={(props: any) => {
-                          if (props.index !== line.lastIndex) return null;
-                          const x = Number(props.x ?? 0);
-                          const y = Number(props.y ?? 0);
+                        content={({ index, x, y }: { index?: number; x?: number; y?: number }) => {
+                          if (index !== line.lastIndex) return null;
+                          const xNum = Number(x ?? 0);
+                          const yNum = Number(y ?? 0);
                           return (
-                            <g transform={`translate(${x - 6}, ${y - 8})`}>
+                            <g transform={`translate(${xNum - 6}, ${yNum - 8})`}>
                               <rect
                                 x={-78}
                                 y={-10}

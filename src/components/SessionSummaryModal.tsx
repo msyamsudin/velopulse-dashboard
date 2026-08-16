@@ -1,9 +1,10 @@
 import { motion } from 'motion/react';
-import { Bike, ChevronRight, Download, Heart, Save, Timer, Trash2, Zap } from 'lucide-react';
+import { ChevronRight, Download, Heart, Save, Timer, Trash2, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { downloadTCX } from '../lib/export-service';
 import { Panel, StatusPill } from './ui';
 import { useI18n } from '@/i18n';
+import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
 
 interface SessionSummaryModalProps {
   stats: {
@@ -21,7 +22,7 @@ interface SessionSummaryModalProps {
   duration: string;
   calories: number;
   distance: number;
-  history?: any[];
+  history?: HistoryData[];
   sessionStartTime?: number;
   onSave: () => void;
   onDiscard: () => void;
@@ -60,7 +61,7 @@ export const SessionSummaryModal = ({
   const handleExport = () => {
     if (!history || !sessionStartTime) return;
 
-    const tempSession = {
+    const tempSession: WorkoutSession = {
       id: 'temp',
       sessionStartTime,
       date: new Date(sessionStartTime).toISOString(),
@@ -75,10 +76,10 @@ export const SessionSummaryModal = ({
         hrrScore: stats.hrrScore,
         hrrClassification: stats.hrrClassification
       },
-      history: history as any[]
+      history
     };
 
-    downloadTCX(tempSession as any);
+    downloadTCX(tempSession);
   };
   const handleDiscard = () => {
     if (confirm(t('Discard this workout? Unsaved session data will be lost.'))) {

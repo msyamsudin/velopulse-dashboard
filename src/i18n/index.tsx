@@ -369,6 +369,19 @@ const id: Record<string, string> = {
   'Match!': 'Sesuai!',
   'Next target': 'Target selanjutnya',
   'km reached': 'km tercapai',
+  'Measure HRR': 'Ukur HRR',
+  'HRR running': 'HRR berjalan',
+  'Start HRR measurement': 'Mulai ukur HRR',
+  'HRR available while recording, HR online, bike online, and bike idle': 'HRR tersedia saat recording, HR online, bike online, dan sepeda idle',
+  'Open live telemetry chart': 'Buka grafik telemetri langsung',
+  'Live telemetry chart unavailable until data is recorded': 'Grafik telemetri langsung belum tersedia sampai data direkam',
+  'Heart rate recovery measurement running': 'Pengukuran pemulihan detak jantung berjalan',
+  'Start heart rate recovery measurement': 'Mulai pengukuran pemulihan detak jantung',
+  'Rockbros / Standard BLE': 'Rockbros / BLE standar',
+  'Yesoul / FTMS service': 'Yesoul / layanan FTMS',
+  'Ready': 'Siap',
+  'Offline': 'Luring',
+  'Max HR': 'DJ Maks',
 };
 
 type I18nValue = {

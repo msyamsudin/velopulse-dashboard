@@ -66,13 +66,13 @@ export async function POST(request: NextRequest) {
         } else {
           return NextResponse.json({ error: 'Failed to save configuration' }, { status: 500 });
         }
-      } catch (err: any) {
-        return NextResponse.json({ error: err.message || 'Decryption failed' }, { status: 400 });
+      } catch (err) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : 'Decryption failed' }, { status: 400 });
       }
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-  } catch (err: any) {
+  } catch (err) {
     console.error('[Backup API] Error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

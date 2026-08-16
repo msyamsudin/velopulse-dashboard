@@ -7,21 +7,25 @@ import { StackedWorkoutChart } from './StackedWorkoutChart';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { downloadTCX } from '../../lib/export-service';
 import { generateSessionInsights, getInsightToneClasses, getMetricDelta, getSessionOutcome, getWorkoutQuality, getZoneInsight } from '../../lib/workout-analysis';
+import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
+import type { FullWorkoutStats, WorkoutZoneStat } from '@/lib/history-types';
 
 interface HistoryDetailProps {
-  session: any;
-  fullStats: any;
-  previousSession?: any;
-  previousFullStats?: any;
+  session: WorkoutSession;
+  fullStats: FullWorkoutStats;
+  previousSession?: WorkoutSession;
+  previousFullStats?: FullWorkoutStats;
   maxHr?: number;
   onBack: () => void;
   onClose: () => void;
 }
 
-const toNumber = (value: any) => Number(value || 0);
+const toNumber = (value: unknown) => Number(value || 0);
 const MAX_DETAIL_CHART_POINTS = 600;
 
-const sampleHistoryForChart = (data: any[]) => {
+type ChartPoint = HistoryData & { relativeTime: string };
+
+const sampleHistoryForChart = (data: HistoryData[]): ChartPoint[] => {
   if (!data || data.length === 0) return [];
   if (data.length <= MAX_DETAIL_CHART_POINTS) {
     return data.map((point, index) => ({
@@ -31,7 +35,7 @@ const sampleHistoryForChart = (data: any[]) => {
   }
 
   const factor = data.length / MAX_DETAIL_CHART_POINTS;
-  const result: any[] = [];
+  const result: ChartPoint[] = [];
 
   for (let i = 0; i < MAX_DETAIL_CHART_POINTS; i++) {
     const sourceIndex = Math.floor(i * factor);
@@ -109,7 +113,7 @@ const MiniMetric = ({ label, value, unit, icon, colorClass }: { label: string; v
   </div>
 );
 
-const OverviewChart = ({ data }: { data: any[] }) => {
+const OverviewChart = ({ data }: { data: HistoryData[] }) => {
   const chartData = useMemo(() => sampleHistoryForChart(data), [data]);
 
   return (
@@ -364,7 +368,7 @@ export const HistoryDetail = ({
                 </button>
               </div>
               <div className="space-y-3">
-                {fullStats.zones.map((zone: any) => (
+                {fullStats.zones.map((zone: WorkoutZoneStat) => (
                   <div key={zone.label} className="flex items-center justify-between text-[10px] font-mono">
                     <div className="flex flex-col w-32">
                       <span className={`uppercase ${zone.color}`}>{zone.label}</span>
@@ -414,8 +418,8 @@ export const HistoryDetail = ({
                       maxPower: session.stats.maxPower,
                       avgCadence: session.stats.avgCadence,
                       maxCadence: session.stats.maxCadence,
-                      avgSpeed: fullStats.avgSpeed,
-                      maxSpeed: fullStats.maxSpeed,
+                      avgSpeed: toNumber(fullStats.avgSpeed),
+                      maxSpeed: toNumber(fullStats.maxSpeed),
                       avgResistance: fullStats.avgResistance,
                       maxResistance: fullStats.maxResistance,
                     }}

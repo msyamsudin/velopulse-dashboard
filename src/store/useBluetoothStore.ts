@@ -65,6 +65,9 @@ type BluetoothSetState = (
   partial: Partial<BluetoothState> | ((state: BluetoothState) => Partial<BluetoothState> | BluetoothState)
 ) => void;
 
+const getCharacteristicValue = (event: Event): DataView | null =>
+  (event.target as BluetoothRemoteGATTCharacteristic).value;
+
 export const parseFtmsIndoorBikeData = (
   value: DataView,
   state: BluetoothParseState,
@@ -322,8 +325,9 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
             await characteristic?.startNotifications();
             addLog("Notifications started for Heart Rate");
 
-            characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-              const value = event.target.value;
+            characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+              const value = getCharacteristicValue(event);
+              if (!value) return;
               const flags = value.getUint8(0);
               const rate = flags & 0x01 ? value.getUint16(1, true) : value.getUint8(1);
               
@@ -335,8 +339,8 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
 
             addLog("HR reconnected successfully!");
             set({ hrConnected: true, error: null });
-          } catch (err: any) {
-            addLog(`HR Reconnect failed: ${err.message}`);
+          } catch (err) {
+            addLog(`HR Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
             if (attempts < maxAttempts && get().hrDevice) {
               setTimeout(attemptReconnect, 3000);
             } else {
@@ -356,8 +360,9 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       await characteristic?.startNotifications();
       addLog("Notifications started for Heart Rate");
 
-      characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-        const value = event.target.value;
+      characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+        const value = getCharacteristicValue(event);
+        if (!value) return;
         const flags = value.getUint8(0);
         const rate = flags & 0x01 ? value.getUint16(1, true) : value.getUint8(1);
         
@@ -370,9 +375,10 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       device.addEventListener('gattserverdisconnected', onHrDisconnect);
 
       set({ hrDevice: device, hrConnected: true, error: null });
-    } catch (err: any) {
-      addLog(`HR Error: ${err.message}`);
-      set({ error: err.message });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      addLog(`HR Error: ${message}`);
+      set({ error: message });
     }
   },
 
@@ -411,25 +417,27 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
               await characteristic?.startNotifications();
               addLog("Notifications started for FTMS Indoor Bike Data");
 
-              characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-                const value = event.target.value;
-                const now = Date.now();
-                handleFtmsIndoorBikeNotification(value, now, set);
+              characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                const value = getCharacteristicValue(event);
+                if (!value) return;
+                handleFtmsIndoorBikeNotification(value, Date.now(), set);
               });
-            } catch (e) {
+            } catch {
               addLog("FTMS not found on reconnect, trying CSC service...");
               const service = await server?.getPrimaryService('cycling_speed_and_cadence');
               const characteristic = await service?.getCharacteristic('csc_measurement');
               await characteristic?.startNotifications();
-              characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-                handleCscMeasurement(event.target.value, set);
+              characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+                const value = getCharacteristicValue(event);
+                if (!value) return;
+                handleCscMeasurement(value, set);
               });
             }
 
             addLog("Bike reconnected successfully!");
             set({ bikeConnected: true, error: null });
-          } catch (err: any) {
-            addLog(`Bike Reconnect failed: ${err.message}`);
+          } catch (err) {
+            addLog(`Bike Reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
             if (attempts < maxAttempts && get().bikeDevice) {
               setTimeout(attemptReconnect, 3000);
             } else {
@@ -450,27 +458,30 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         await characteristic?.startNotifications();
         addLog("Notifications started for FTMS Indoor Bike Data");
 
-        characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-          const value = event.target.value;
-          const now = Date.now();
-          handleFtmsIndoorBikeNotification(value, now, set);
+        characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+          const value = getCharacteristicValue(event);
+          if (!value) return;
+          handleFtmsIndoorBikeNotification(value, Date.now(), set);
         });
-      } catch (e) {
+      } catch {
         addLog("FTMS not found, trying CSC service...");
         const service = await server?.getPrimaryService('cycling_speed_and_cadence');
         const characteristic = await service?.getCharacteristic('csc_measurement');
         await characteristic?.startNotifications();
-        characteristic?.addEventListener('characteristicvaluechanged', (event: any) => {
-          handleCscMeasurement(event.target.value, set);
+        characteristic?.addEventListener('characteristicvaluechanged', (event) => {
+          const value = getCharacteristicValue(event);
+          if (!value) return;
+          handleCscMeasurement(value, set);
         });
       }
 
       device.addEventListener('gattserverdisconnected', onBikeDisconnect);
 
       set({ bikeDevice: device, bikeConnected: true, error: null });
-    } catch (err: any) {
-      addLog(`Bike Error: ${err.message}`);
-      set({ error: err.message });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      addLog(`Bike Error: ${message}`);
+      set({ error: message });
     }
   },
 
@@ -511,7 +522,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       if (nextData[key as keyof BluetoothData] !== undefined && 
           nextData[key as keyof BluetoothData] !== 0 && 
           now - (lastUpdate[key] || 0) > timeout) {
-        (nextData as any)[key] = 0;
+        nextData[key as keyof BluetoothData] = 0;
         changed = true;
       }
     });

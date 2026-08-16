@@ -83,8 +83,8 @@ export type Workout = {
   user_id: string;
   date: string;
   duration: number;
-  stats: any;
-  history: any[];
+  stats: Record<string, unknown>;
+  history: Record<string, unknown>[];
   synced_to_google: boolean;
 };
 

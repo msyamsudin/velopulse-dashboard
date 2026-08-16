@@ -19,7 +19,7 @@ export const validateSupabaseConfig = async (password: string, url?: string, key
     });
     const data = await res.json();
     return { valid: data.valid, msg: data.error || 'Supabase Config Valid!' };
-  } catch (err: any) {
-    return { valid: false, msg: err.message || 'Error validating Supabase config.' };
+  } catch (err) {
+    return { valid: false, msg: err instanceof Error ? err.message : 'Error validating Supabase config.' };
   }
 };

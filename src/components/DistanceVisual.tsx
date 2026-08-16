@@ -9,16 +9,7 @@ interface DistanceVisualProps {
 export const DistanceVisual = ({ distanceMeters, currentSpeedKmh }: DistanceVisualProps) => {
   const currentKm = distanceMeters / 1000;
 
-  // 1. Calculate Pace (Minutes per KM)
-  const paceStr = useMemo(() => {
-    if (!currentSpeedKmh || currentSpeedKmh <= 0.1) return '--:--';
-    const paceMinutesDecimal = 60 / currentSpeedKmh;
-    const mins = Math.floor(paceMinutesDecimal);
-    const secs = Math.floor((paceMinutesDecimal - mins) * 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }, [currentSpeedKmh]);
-
-  // 2. Determine Next Milestone
+  // 1. Determine Next Milestone
   const { targetKm, startKm } = useMemo(() => {
     if (currentKm < 1) return { targetKm: 1, startKm: 0 };
     if (currentKm < 5) return { targetKm: 5, startKm: 1 };
