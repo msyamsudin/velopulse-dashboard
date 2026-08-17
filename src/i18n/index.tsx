@@ -385,6 +385,11 @@ const id: Record<string, string> = {
   'Ready': 'Siap',
   'Offline': 'Luring',
   'Max HR': 'DJ Maks',
+  'Offline — data stays local': 'Luring — data tetap di lokal',
+  'Cloud paused': 'Cloud sedang dijeda',
+  'Check Supabase credentials': 'Periksa kredensial Supabase',
+  'Cloud unreachable': 'Cloud tidak terjangkau',
+  'Cloud issue': 'Cloud bermasalah',
 };
 
 type I18nValue = {

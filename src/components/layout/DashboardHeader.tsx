@@ -1,5 +1,6 @@
 import { Activity, Bug, History, Settings } from 'lucide-react';
 import { IconButton } from '../ui';
+import { CloudStatusIndicator } from './CloudStatusIndicator';
 import { useI18n } from '@/i18n';
 
 interface DashboardHeaderProps {
@@ -35,6 +36,7 @@ export const DashboardHeader = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 md:justify-end">
+        <CloudStatusIndicator />
         <button 
           onClick={() => setShowHistory(!showHistory)}
           className={`vp-button vp-focus-ring ${
