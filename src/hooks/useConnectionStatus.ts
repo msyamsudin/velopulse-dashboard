@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { classifySupabaseError, SupabaseErrorInfo } from '@/lib/supabase-errors';
 
 export type CloudStatus =
@@ -13,6 +13,39 @@ const PROBE_TIMEOUT_MS = 8_000;
 
 const isBrowserOnline = () =>
   typeof navigator === 'undefined' ? true : navigator.onLine;
+
+let probeClient: SupabaseClient | null = null;
+let probeClientConfig: { url: string; key: string } | null = null;
+
+/**
+ * Returns a cached client for the probe, recreated only when the config
+ * changes (e.g. the user saved new credentials in Settings).
+ *
+ * It deliberately does NOT reuse getSupabaseClient(): that helper caches a
+ * null client for 30s after any failure, which would mislabel a network
+ * outage as "not configured".
+ *
+ * To keep this probe inert and separate from the real auth client, it uses
+ * its own storage key and never persists/refreshes sessions. That prevents
+ * both the "Multiple GoTrueClient instances" warning (auth-js counts
+ * instances per storage key) and any interference with the real session.
+ */
+const getProbeClient = (url: string, key: string): SupabaseClient => {
+  if (probeClient && probeClientConfig?.url === url && probeClientConfig?.key === key) {
+    return probeClient;
+  }
+
+  probeClient = createClient(url, key, {
+    auth: {
+      storageKey: `sb-probe-${new URL(url).hostname}`,
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+  probeClientConfig = { url, key };
+  return probeClient;
+};
 
 /**
  * Lightweight probe that distinguishes the failure modes the UI cares about:
@@ -37,7 +70,7 @@ export const probeCloudStatus = async (): Promise<CloudStatus> => {
       return { state: 'config-missing' };
     }
 
-    const client = createClient(url, key);
+    const client = getProbeClient(url, key);
     const { error } = await client
       .from('workouts')
       .select('id', { head: true, count: 'exact' })
