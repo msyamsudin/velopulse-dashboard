@@ -2,6 +2,7 @@ import { Activity, Bug, History, Settings } from 'lucide-react';
 import { IconButton } from '../ui';
 import { CloudStatusIndicator } from './CloudStatusIndicator';
 import { useI18n } from '@/i18n';
+import type { CloudStatus } from '@/hooks/useConnectionStatus';
 
 interface DashboardHeaderProps {
   showHistory: boolean;
@@ -9,6 +10,7 @@ interface DashboardHeaderProps {
   showDebug: boolean;
   setShowDebug: (show: boolean) => void;
   setShowSettings: (show: boolean) => void;
+  cloudStatus: CloudStatus | null;
 }
 
 export const DashboardHeader = ({
@@ -16,7 +18,8 @@ export const DashboardHeader = ({
   setShowHistory,
   showDebug,
   setShowDebug,
-  setShowSettings
+  setShowSettings,
+  cloudStatus
 }: DashboardHeaderProps) => {
   const { t } = useI18n();
   return (
@@ -37,6 +40,7 @@ export const DashboardHeader = ({
 
       <div className="flex flex-wrap items-center gap-2 md:justify-end">
         <CloudStatusIndicator
+          status={cloudStatus}
           onOpenHistory={() => setShowHistory(true)}
           onOpenSettings={() => setShowSettings(true)}
         />

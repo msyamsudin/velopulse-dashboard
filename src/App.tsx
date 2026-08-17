@@ -9,6 +9,9 @@ import { HR_ZONES, getActiveHrZoneIndex } from '@/lib/constants';
 
 // Hooks
 import { useAppInitialization } from './hooks/useAppInitialization';
+import { useConnectionStatus } from './hooks/useConnectionStatus';
+import { useAutoSync } from './hooks/useAutoSync';
+import { AutoSyncNotice } from './components/layout/AutoSyncNotice';
 import type { TelemetrySnapshot } from './lib/cockpit-types';
 
 // Components
@@ -58,6 +61,8 @@ export default function App() {
   const { t } = useI18n();
   const hrr = useHeartRateRecovery();
   const isRecording = useWorkoutStore(state => state.isRecording);
+  const { status: cloudStatus } = useConnectionStatus();
+  const { autoSyncNotice, dismissAutoSyncNotice } = useAutoSync(cloudStatus);
   const elapsed = useWorkoutStore(state => state.elapsed);
   const workoutHistory = useWorkoutStore(state => state.history);
   const sessionHistory = useWorkoutStore(state => state.sessionHistory);
@@ -266,6 +271,7 @@ export default function App() {
               showDebug={showDebug}
               setShowDebug={setShowDebug}
               setShowSettings={setShowSettings}
+              cloudStatus={cloudStatus}
             />
           </motion.div>
         )}
@@ -462,6 +468,12 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AutoSyncNotice
+        notice={autoSyncNotice}
+        onDismiss={dismissAutoSyncNotice}
+        onOpenHistory={() => setShowHistory(true)}
+      />
 
       <HrrModal
         status={hrr.status}

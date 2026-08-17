@@ -2,9 +2,11 @@ import type { ReactNode } from 'react';
 import { Cloud, CloudOff, WifiOff } from 'lucide-react';
 import { StatusPill } from '../ui';
 import { useI18n } from '@/i18n';
-import { useConnectionStatus, type CloudStatus } from '@/hooks/useConnectionStatus';
+import type { CloudStatus } from '@/hooks/useConnectionStatus';
 
 interface CloudStatusIndicatorProps {
+  /** Connection state, tracked once at the app level by useConnectionStatus. */
+  status: CloudStatus | null;
   /** Opens the History view (offline / cloud unreachable states). */
   onOpenHistory?: () => void;
   /** Opens the Settings modal (Supabase not configured state). */
@@ -81,11 +83,11 @@ const pillFor = (status: CloudStatus, t: (key: string) => string): PillMeta | nu
  * missing configuration. Hover shows the underlying error detail.
  */
 export function CloudStatusIndicator({
+  status,
   onOpenHistory,
   onOpenSettings,
 }: CloudStatusIndicatorProps) {
   const { t } = useI18n();
-  const { status } = useConnectionStatus();
 
   if (!status || status.state === 'ok') return null;
 

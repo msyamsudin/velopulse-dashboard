@@ -392,6 +392,9 @@ const id: Record<string, string> = {
   'Cloud issue': 'Cloud bermasalah',
   'Open history to see pending sync': 'Buka riwayat untuk melihat sinkronisasi tertunda',
   'Open settings to configure Supabase': 'Buka pengaturan untuk mengonfigurasi Supabase',
+  'Auto-synced {count} sessions to Supabase': 'Auto-sinkron: {count} sesi terkirim ke Supabase',
+  'Auto-sync failed, {count} sessions still pending': 'Auto-sinkron gagal, {count} sesi masih tertunda',
+  'Open history to retry sync': 'Buka riwayat untuk mencoba sinkronisasi lagi',
 };
 
 type I18nValue = {
