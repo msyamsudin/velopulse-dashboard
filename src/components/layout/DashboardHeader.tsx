@@ -36,7 +36,10 @@ export const DashboardHeader = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 md:justify-end">
-        <CloudStatusIndicator />
+        <CloudStatusIndicator
+          onOpenHistory={() => setShowHistory(true)}
+          onOpenSettings={() => setShowSettings(true)}
+        />
         <button 
           onClick={() => setShowHistory(!showHistory)}
           className={`vp-button vp-focus-ring ${

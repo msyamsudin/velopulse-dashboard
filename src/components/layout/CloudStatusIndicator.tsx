@@ -4,6 +4,13 @@ import { StatusPill } from '../ui';
 import { useI18n } from '@/i18n';
 import { useConnectionStatus, type CloudStatus } from '@/hooks/useConnectionStatus';
 
+interface CloudStatusIndicatorProps {
+  /** Opens the History view (offline / cloud unreachable states). */
+  onOpenHistory?: () => void;
+  /** Opens the Settings modal (Supabase not configured state). */
+  onOpenSettings?: () => void;
+}
+
 type PillMeta = {
   tone: 'neutral' | 'warning' | 'danger';
   icon: ReactNode;
@@ -69,9 +76,14 @@ const pillFor = (status: CloudStatus, t: (key: string) => string): PillMeta | nu
  * Compact connection indicator for the header. Renders nothing while healthy;
  * appears only when the app is offline, Supabase is not configured, or the
  * cloud cannot be reached — each with a distinct message so users can tell
- * the conditions apart. Hover shows the underlying error detail.
+ * the conditions apart. Clicking it jumps to the most useful screen:
+ * History (pending/retry sync) for offline or cloud errors, Settings for a
+ * missing configuration. Hover shows the underlying error detail.
  */
-export function CloudStatusIndicator() {
+export function CloudStatusIndicator({
+  onOpenHistory,
+  onOpenSettings,
+}: CloudStatusIndicatorProps) {
   const { t } = useI18n();
   const { status } = useConnectionStatus();
 
@@ -80,9 +92,27 @@ export function CloudStatusIndicator() {
   const meta = pillFor(status, t);
   if (!meta) return null;
 
+  const opensHistory = status.state === 'offline' || status.state === 'unreachable';
+  const onClick = opensHistory ? onOpenHistory : onOpenSettings;
+  const actionLabel = opensHistory
+    ? t('Open history to see pending sync')
+    : t('Open settings to configure Supabase');
+
+  const pill = <StatusPill label={meta.label} icon={meta.icon} tone={meta.tone} compact />;
+
+  if (!onClick) {
+    return <span title={meta.title}>{pill}</span>;
+  }
+
   return (
-    <span title={meta.title}>
-      <StatusPill label={meta.label} icon={meta.icon} tone={meta.tone} compact />
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${meta.title}. ${actionLabel}`}
+      aria-label={`${meta.label}. ${actionLabel}`}
+      className="vp-focus-ring cursor-pointer rounded-md transition-opacity hover:opacity-80"
+    >
+      {pill}
+    </button>
   );
 }

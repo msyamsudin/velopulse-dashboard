@@ -390,6 +390,8 @@ const id: Record<string, string> = {
   'Check Supabase credentials': 'Periksa kredensial Supabase',
   'Cloud unreachable': 'Cloud tidak terjangkau',
   'Cloud issue': 'Cloud bermasalah',
+  'Open history to see pending sync': 'Buka riwayat untuk melihat sinkronisasi tertunda',
+  'Open settings to configure Supabase': 'Buka pengaturan untuk mengonfigurasi Supabase',
 };
 
 type I18nValue = {
