@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  handleFtmsIndoorBikeNotification,
+  isPlausibleHeartRate,
   parseCscMeasurement,
   parseFtmsIndoorBikeData,
+  shouldUseBikeHeartRate,
+  useBluetoothStore,
   type BluetoothParseState,
 } from './useBluetoothStore';
 
@@ -104,6 +108,80 @@ describe('parseFtmsIndoorBikeData', () => {
     const secondResult = parseFtmsIndoorBikeData(second, stateAfterFirst, 2000);
 
     expect(secondResult.updates.calories).toBe(105);
+  });
+});
+
+describe('bike FTMS heart-rate priority', () => {
+  beforeEach(() => {
+    // Reset the singleton store so tests don't leak state into each other.
+    useBluetoothStore.setState({
+      hrConnected: false,
+      bikeConnected: false,
+      data: {},
+      lastUpdate: {},
+    });
+  });
+
+  it('uses the bike heart rate only when no dedicated strap is connected', () => {
+    expect(shouldUseBikeHeartRate(false, 145)).toBe(true);
+    expect(shouldUseBikeHeartRate(true, 145)).toBe(false);
+  });
+
+  it('rejects implausible bike heart-rate values (garbage bytes)', () => {
+    // The exact symptom reported: strap reads 76/77 bpm, bike's FTMS HR field
+    // alternates with 6/11 bpm and overwrites the correct reading.
+    expect(shouldUseBikeHeartRate(false, 6)).toBe(false);
+    expect(shouldUseBikeHeartRate(false, 11)).toBe(false);
+    expect(shouldUseBikeHeartRate(false, 0)).toBe(false);
+    expect(shouldUseBikeHeartRate(false, 255)).toBe(false);
+    expect(shouldUseBikeHeartRate(false, 76)).toBe(true);
+  });
+
+  it('keeps the strap heart rate when the bike sends its own (garbage) HR', () => {
+    useBluetoothStore.setState({
+      hrConnected: true,
+      data: { heartRate: 76 },
+      lastUpdate: { heartRate: 1000 },
+    });
+
+    // FTMS flags 0x0801 (more data + heart rate present), value 6.
+    handleFtmsIndoorBikeNotification(makeView([0x01, 0x08, 0x06]), 2000, useBluetoothStore.setState);
+
+    expect(useBluetoothStore.getState().data.heartRate).toBe(76);
+  });
+
+  it('falls back to the bike FTMS heart rate when no strap is connected', () => {
+    handleFtmsIndoorBikeNotification(makeView([0x01, 0x08, 0x91]), 2000, useBluetoothStore.setState);
+
+    expect(useBluetoothStore.getState().data.heartRate).toBe(145);
+  });
+
+  it('ignores an implausible bike heart rate even without a strap', () => {
+    useBluetoothStore.setState({ data: { heartRate: 76 } });
+
+    handleFtmsIndoorBikeNotification(makeView([0x01, 0x08, 0x06]), 2000, useBluetoothStore.setState);
+
+    expect(useBluetoothStore.getState().data.heartRate).toBe(76);
+  });
+
+  it('still applies other bike metrics when its heart rate is dropped', () => {
+    // flags 0x0800: speed (0x0000 cleared => present) + heart rate; speed 1250 => 12.5 km/h
+    useBluetoothStore.setState({ hrConnected: true, data: { heartRate: 76 } });
+
+    handleFtmsIndoorBikeNotification(makeView([0x00, 0x08, 0xe2, 0x04, 0x06]), 2000, useBluetoothStore.setState);
+
+    const { data } = useBluetoothStore.getState();
+    expect(data.heartRate).toBe(76);
+    expect(data.speed).toBe(12.5);
+  });
+});
+
+describe('isPlausibleHeartRate', () => {
+  it('accepts the plausible range and rejects the rest', () => {
+    expect(isPlausibleHeartRate(20)).toBe(true);
+    expect(isPlausibleHeartRate(250)).toBe(true);
+    expect(isPlausibleHeartRate(19)).toBe(false);
+    expect(isPlausibleHeartRate(251)).toBe(false);
   });
 });
 

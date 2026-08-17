@@ -69,9 +69,28 @@ interface BluetoothState {
   clearStaleData: () => void;
 }
 
-type BluetoothSetState = (
+export type BluetoothSetState = (
   partial: Partial<BluetoothState> | ((state: BluetoothState) => Partial<BluetoothState> | BluetoothState)
 ) => void;
+
+/** Plausible heart-rate range in bpm — anything outside is a bad packet. */
+export const MIN_PLAUSIBLE_HR = 20;
+export const MAX_PLAUSIBLE_HR = 250;
+
+export const isPlausibleHeartRate = (hr: number): boolean =>
+  hr >= MIN_PLAUSIBLE_HR && hr <= MAX_PLAUSIBLE_HR;
+
+/**
+ * Whether the bike's FTMS Heart Rate field may drive the display.
+ *
+ * The dedicated HR strap is the authoritative source; the bike's field is only
+ * a fallback, and only when the value is physiologically plausible. Many bike
+ * consoles emit garbage (or an unrelated byte) in that field — e.g. 6 bpm
+ * while the strap reads 76 — which otherwise races with the strap's
+ * notifications and makes the display flicker between the two.
+ */
+export const shouldUseBikeHeartRate = (hrConnected: boolean, bikeHr: number): boolean =>
+  !hrConnected && isPlausibleHeartRate(bikeHr);
 
 const getCharacteristicValue = (event: Event): DataView | null =>
   (event.target as BluetoothRemoteGATTCharacteristic).value;
@@ -198,9 +217,19 @@ export const parseFtmsIndoorBikeData = (
   return { updates, lastUpdate, trackerUpdates };
 };
 
-const handleFtmsIndoorBikeNotification = (value: DataView, now: number, setState: BluetoothSetState) => {
+export const handleFtmsIndoorBikeNotification = (value: DataView, now: number, setState: BluetoothSetState) => {
   setState((state) => {
     const { updates, lastUpdate, trackerUpdates } = parseFtmsIndoorBikeData(value, state, now);
+
+    // The HR strap is the authoritative heart-rate source. The bike's FTMS
+    // Heart Rate field must never overwrite it (it races with the strap's
+    // notifications and shows garbage like 6 bpm next to the strap's 76).
+    // It is used only as a fallback when no strap is connected, and only
+    // when the value is plausible.
+    if (updates.heartRate !== undefined && !shouldUseBikeHeartRate(state.hrConnected, updates.heartRate)) {
+      delete updates.heartRate;
+      delete lastUpdate.heartRate;
+    }
 
     if (Object.keys(updates).length === 0 && Object.keys(trackerUpdates).length === 0) {
       return state;
@@ -610,7 +639,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
     let changed = false;
     const nextData = { ...data };
     
-    const keysToWatch = ['cadence', 'power', 'speed'];
+    const keysToWatch = ['heartRate', 'cadence', 'power', 'speed'];
     keysToWatch.forEach(key => {
       if (nextData[key as keyof BluetoothData] !== undefined && 
           nextData[key as keyof BluetoothData] !== 0 && 
