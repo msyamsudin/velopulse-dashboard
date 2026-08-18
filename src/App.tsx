@@ -412,7 +412,6 @@ export default function App() {
                   <PreRideCockpit
                     currentData={currentData}
                     userProfile={userProfile}
-                    sessions={sessionHistory}
                     hrConnected={hrConnected}
                     bikeConnected={bikeConnected}
                     bleError={bleError}
