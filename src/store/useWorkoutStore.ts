@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { BluetoothData, useBluetoothStore } from './useBluetoothStore';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, getSupabaseUserId } from '@/lib/supabase';
 import { parseTCXWorkoutSessions } from '@/lib/tcx-import-service';
 import { calcCaloriesFromPower } from '@/lib/physics';
 import { classifySupabaseError, SupabaseErrorInfo } from '@/lib/supabase-errors';
@@ -69,6 +69,11 @@ export interface ImportTcxResult {
   messages: string[];
 }
 
+export interface DeleteSessionResult {
+  success: boolean;
+  message?: string;
+}
+
 interface WorkoutState {
   isRecording: boolean;
   elapsed: number;
@@ -93,6 +98,7 @@ interface WorkoutState {
   saveSession: () => Promise<void>;
   syncPendingSupabaseSessions: () => Promise<void>;
   importTCX: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
+  deleteSession: (sessionId: string) => Promise<DeleteSessionResult>;
   discardSession: () => void;
   loadHistory: () => void;
   loadHistoryFromSupabase: () => Promise<void>;
@@ -683,13 +689,17 @@ const findSupabaseDuplicate = async (session: WorkoutSession) => {
   return data?.[0] ? mapSupabaseWorkout(data[0]) : null;
 };
 
-const buildSupabasePayload = (session: WorkoutSession) => ({
-  session_start_time: session.sessionStartTime,
-  duration: session.duration,
-  stats: session.stats,
-  history: session.history,
-  synced_to_google: Boolean(session.synced_to_google)
-});
+const buildSupabasePayload = async (session: WorkoutSession) => {
+  const userId = await getSupabaseUserId();
+  return {
+    session_start_time: session.sessionStartTime,
+    duration: session.duration,
+    stats: session.stats,
+    history: session.history,
+    synced_to_google: Boolean(session.synced_to_google),
+    ...(userId ? { user_id: userId } : {})
+  };
+};
 
 const syncSessionToSupabase = async (session: WorkoutSession): Promise<WorkoutSession> => {
   const client = await getSupabaseClient();
@@ -702,7 +712,7 @@ const syncSessionToSupabase = async (session: WorkoutSession): Promise<WorkoutSe
   }
 
   try {
-    const payload = buildSupabasePayload(session);
+    const payload = await buildSupabasePayload(session);
     const { data: existingRows, error: lookupError } = await client
       .from('workouts')
       .select('id, created_at, synced_to_google')
@@ -1039,6 +1049,62 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     }
 
     return result;
+  },
+
+  deleteSession: async (sessionId) => {
+    const { sessionHistory } = get();
+    const target = sessionHistory.find(session => session.id === sessionId);
+    if (!target) {
+      return { success: false, message: 'Workout session not found.' };
+    }
+
+    // Delete the cloud copy first (when synced) so the session does not
+    // reappear after the next remote history load.
+    if (target.supabase_id) {
+      const client = await getSupabaseClient();
+      if (client) {
+        const { data, error } = await client
+          .from('workouts')
+          .delete()
+          .eq('id', target.supabase_id);
+
+        if (error) {
+          const info = classifySupabaseError(error);
+          return { success: false, message: info.userMessage };
+        }
+
+        // supabase-js returns the deleted rows. An empty result without an
+        // error means no row matched — typically an RLS DELETE policy that
+        // blocks the anon role (the row still exists in the cloud and would
+        // reappear on the next load). Verify the row is actually gone before
+        // deleting locally.
+        const deletedRows = data as Array<Record<string, unknown>> | null;
+        const deletedCount = deletedRows ? deletedRows.length : 0;
+        if (deletedCount === 0) {
+          const { data: stillThere, error: checkError } = await client
+            .from('workouts')
+            .select('id')
+            .eq('id', target.supabase_id)
+            .maybeSingle();
+
+          if (!checkError && stillThere) {
+            return {
+              success: false,
+              message: 'The cloud copy could not be deleted. Add a DELETE policy for the anon role on the workouts table (see README), then try again.'
+            };
+          }
+        }
+      } else {
+        console.warn(
+          '[Supabase] Client unavailable; deleting workout locally only. It may reappear after the next cloud sync.'
+        );
+      }
+    }
+
+    const nextHistory = sessionHistory.filter(session => session.id !== sessionId);
+    set({ sessionHistory: nextHistory });
+    persistSessionHistory(nextHistory);
+    return { success: true };
   },
 
   discardSession: () => {

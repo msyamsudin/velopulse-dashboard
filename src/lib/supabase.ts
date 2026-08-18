@@ -77,6 +77,44 @@ export const getSupabaseClient = async (): Promise<SupabaseClient | null> => {
   return cachedRuntimeClientPromise;
 };
 
+/**
+ * Returns the id of the signed-in Supabase user, or null when the client is
+ * unavailable or the user has no session. The auth session is persisted by
+ * the shared client (localStorage), so this works across page loads.
+ */
+export const getSupabaseUserId = async (): Promise<string | null> => {
+  const client = await getSupabaseClient();
+  if (!client) return null;
+  const { data } = await client.auth.getSession();
+  return data.session?.user?.id ?? null;
+};
+
+/**
+ * Claims any workout rows that predate Supabase Auth (user_id IS NULL) for
+ * the signed-in user, so existing training data stays visible after the
+ * auth migration. Relies on the "users claim orphan workouts" UPDATE policy
+ * from supabase/schema.sql; silently no-ops when the migration is pending.
+ */
+export const claimOrphanWorkouts = async (): Promise<void> => {
+  const client = await getSupabaseClient();
+  if (!client) return;
+
+  const userId = await getSupabaseUserId();
+  if (!userId) return;
+
+  try {
+    await client
+      .from('workouts')
+      .update({ user_id: userId })
+      .is('user_id', null);
+  } catch (err) {
+    console.warn(
+      '[Auth] Could not claim orphan workouts (run supabase/schema.sql first):',
+      err instanceof Error ? err.message : err
+    );
+  }
+};
+
 // Database Types for reference
 export type Workout = {
   id: string;

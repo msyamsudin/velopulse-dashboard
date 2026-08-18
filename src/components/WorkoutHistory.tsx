@@ -9,8 +9,8 @@ import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
-import { Download, RefreshCw, Search, Upload, X, AlertTriangle } from 'lucide-react';
-import type { ImportTcxResult, WorkoutSession } from '../store/useWorkoutStore';
+import { Download, RefreshCw, Search, Upload, X, AlertTriangle, Trash2 } from 'lucide-react';
+import type { DeleteSessionResult, ImportTcxResult, WorkoutSession } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
 import type { SupabaseErrorInfo } from '../lib/supabase-errors';
@@ -22,6 +22,7 @@ interface WorkoutHistoryProps {
   onSyncSupabasePending?: () => Promise<void>;
   onLoadMoreSupabaseHistory?: () => Promise<void>;
   onImportTCX?: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
+  onDeleteSession?: (sessionId: string) => Promise<DeleteSessionResult>;
   hasMoreSupabaseHistory?: boolean;
   maxHr?: number;
   supabaseSyncError?: SupabaseErrorInfo | null;
@@ -34,6 +35,7 @@ export const WorkoutHistory = ({
   onSyncSupabasePending,
   onLoadMoreSupabaseHistory,
   onImportTCX,
+  onDeleteSession,
   hasMoreSupabaseHistory = false,
   maxHr = 190,
   supabaseSyncError,
@@ -53,6 +55,8 @@ export const WorkoutHistory = ({
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Batch selection states
@@ -88,6 +92,65 @@ export const WorkoutHistory = ({
     const selectedSessions = sessions.filter(s => selectedSessionIds.includes(s.id));
     const { downloadCombinedTCX } = await import('../lib/export-service');
     downloadCombinedTCX(selectedSessions);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!onDeleteSession) return;
+    if (!window.confirm(t('Delete this workout? This action cannot be undone.'))) return;
+
+    setIsDeleting(true);
+    setDeleteNotice(null);
+    try {
+      const result = await onDeleteSession(sessionId);
+      if (result.success) {
+        setDeleteNotice({ tone: 'success', text: t('Workout deleted') });
+        setSelectedSessionId(null);
+      } else {
+        setDeleteNotice({
+          tone: 'error',
+          text: t('Could not delete workout: {message}', { message: result.message || 'Unknown error' })
+        });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!onDeleteSession || selectedSessionIds.length === 0) return;
+    if (!window.confirm(t('Delete {count} selected workouts? This action cannot be undone.', { count: visibleSelectedCount }))) return;
+
+    setIsDeleting(true);
+    setDeleteNotice(null);
+    try {
+      let deleted = 0;
+      let firstError: string | undefined;
+      for (const sessionId of selectedSessionIds) {
+        const result = await onDeleteSession(sessionId);
+        if (result.success) {
+          deleted += 1;
+        } else if (!firstError) {
+          firstError = result.message || 'Unknown error';
+        }
+      }
+
+      if (deleted > 0 && !firstError) {
+        setDeleteNotice({
+          tone: 'success',
+          text: t('{count} workouts deleted', { count: deleted })
+        });
+      } else if (firstError) {
+        setDeleteNotice({
+          tone: 'error',
+          text: t('Could not delete workout: {message}', { message: firstError })
+        });
+      }
+
+      setIsSelectionMode(false);
+      setSelectedSessionIds([]);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Reset offset when range changes
@@ -419,6 +482,18 @@ export const WorkoutHistory = ({
                             <Download size={13} />
                             ZIP (Individual)
                           </button>
+                          {onDeleteSession && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteSelected}
+                              disabled={selectedSessionIds.length === 0 || isDeleting}
+                              aria-label="Delete selected workout sessions"
+                              className="vp-button vp-focus-ring border-vp-danger/30 bg-vp-danger/10 text-vp-danger hover:bg-vp-danger hover:text-vp-bg"
+                            >
+                              <Trash2 size={13} />
+                              {t('Delete Selected')}
+                            </button>
+                          )}
                           </>
                         )}
                       </div>
@@ -426,6 +501,15 @@ export const WorkoutHistory = ({
                     {importNotice && (
                       <div className="order-5 basis-full rounded border border-vp-accent/20 bg-vp-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-vp-accent">
                         {importNotice}
+                      </div>
+                    )}
+                    {deleteNotice && (
+                      <div className={`order-6 basis-full rounded border px-3 py-2 text-[10px] font-mono uppercase tracking-widest ${
+                        deleteNotice.tone === 'error'
+                          ? 'border-vp-danger/30 bg-vp-danger/10 text-vp-danger'
+                          : 'border-vp-accent/20 bg-vp-accent/5 text-vp-accent'
+                      }`}>
+                        {deleteNotice.text}
                       </div>
                     )}
                   </div>
@@ -439,6 +523,7 @@ export const WorkoutHistory = ({
                     isSelectionMode={isSelectionMode}
                     selectedSessionIds={selectedSessionIds}
                     onToggleSelectSession={handleToggleSelectSession}
+                    onDeleteSession={onDeleteSession ? handleDeleteSession : undefined}
                   />
                   {hasMoreSupabaseHistory && !sessionSearch && (
                     <div className="mt-6 flex justify-center">
@@ -496,6 +581,7 @@ export const WorkoutHistory = ({
           maxHr={maxHr}
           onBack={() => setSelectedSessionId(null)}
           onClose={onClose}
+          onDeleteSession={onDeleteSession ? handleDeleteSession : undefined}
         />
       )}
     </AnimatePresence>

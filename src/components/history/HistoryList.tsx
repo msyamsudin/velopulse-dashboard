@@ -1,8 +1,9 @@
-import { Activity, Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff } from 'lucide-react';
+import { Activity, Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff, Trash2 } from 'lucide-react';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 import { EmptyState, StatusPill } from '../ui';
 import { calculateEdwardsTrimp } from '../../lib/training-load';
+import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 interface HistoryListProps {
@@ -12,6 +13,7 @@ interface HistoryListProps {
   isSelectionMode?: boolean;
   selectedSessionIds?: string[];
   onToggleSelectSession?: (id: string) => void;
+  onDeleteSession?: (id: string) => void;
 }
 
 export const HistoryList = ({
@@ -20,8 +22,10 @@ export const HistoryList = ({
   onSelectSession,
   isSelectionMode = false,
   selectedSessionIds = [],
-  onToggleSelectSession
+  onToggleSelectSession,
+  onDeleteSession
 }: HistoryListProps) => {
+  const { t } = useI18n();
   const groupedSessions = sessions.reduce<Array<{
     key: string;
     label: string;
@@ -194,7 +198,21 @@ export const HistoryList = ({
                     <span className="text-[9px] text-vp-accent uppercase font-mono opacity-0 group-hover:opacity-100 transition-opacity">
                       {isSelectionMode ? (isSelected ? 'Deselect' : 'Select') : 'View Details'}
                     </span>
-                    <div className="flex flex-wrap justify-end gap-1">
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      {!isSelectionMode && onDeleteSession && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteSession(session.id);
+                          }}
+                          aria-label={t('Delete workout session')}
+                          title={t('Delete workout session')}
+                          className="vp-focus-ring flex h-6 w-6 items-center justify-center rounded border border-vp-danger/25 bg-vp-danger/5 text-vp-danger/70 transition-colors hover:border-vp-danger/60 hover:bg-vp-danger hover:text-white"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      )}
                       {session.synced_to_supabase ? (
                         <div className="flex text-[9px] text-emerald-400 font-mono uppercase tracking-widest items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded">
                           <Cloud size={9} />
