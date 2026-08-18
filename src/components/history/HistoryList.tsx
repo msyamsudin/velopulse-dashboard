@@ -1,8 +1,8 @@
-import { Activity, Calendar, Clock, Zap, Heart, Route, Flame, Cloud, CloudOff, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Zap, Route, Flame, Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 import { EmptyState, StatusPill } from '../ui';
-import { calculateEdwardsTrimp } from '../../lib/training-load';
 import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
@@ -15,6 +15,15 @@ interface HistoryListProps {
   onToggleSelectSession?: (id: string) => void;
   onDeleteSession?: (id: string) => void;
 }
+
+const MetricCell = ({ label, icon, colorClass, value }: { label: string; icon: ReactNode; colorClass: string; value: ReactNode }) => (
+  <div className="flex flex-col rounded border border-vp-border bg-vp-bg/40 p-2">
+    <span className="mb-1 text-[9px] text-vp-muted uppercase font-mono">{label}</span>
+    <div className={`flex items-center gap-1.5 font-bold text-base tabular-nums ${colorClass}`}>
+      {icon} {value}
+    </div>
+  </div>
+);
 
 export const HistoryList = ({
   sessions,
@@ -93,8 +102,6 @@ export const HistoryList = ({
               const isSelected = selectedSessionIds.includes(session.id);
               const outcome = getSessionOutcome(session);
               const quality = getWorkoutQuality(session, maxHr);
-              const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
-              const trainingLoad = calculateEdwardsTrimp(session.history || [], session.duration || 0, maxHr);
 
               return (
                 <div
@@ -138,67 +145,17 @@ export const HistoryList = ({
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-4 flex-1">
-                    <div className="flex flex-col rounded border border-vp-border bg-vp-bg/40 p-2">
-                      <span className="mb-1 text-[9px] text-vp-muted uppercase font-mono">Distance</span>
-                      <div className="flex items-center gap-1.5 text-vp-distance font-bold text-base tabular-nums">
-                        <Route size={12} /> {outcome.distanceKm.toFixed(2)}<span className="text-[10px] font-normal opacity-50">KM</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col rounded border border-vp-border bg-vp-bg/40 p-2">
-                      <span className="mb-1 text-[9px] text-vp-muted uppercase font-mono">Duration</span>
-                      <div className="flex items-center gap-1.5 text-vp-text font-bold text-base tabular-nums">
-                        <Clock size={12} /> {formatDuration(outcome.duration)}
-                      </div>
-                    </div>
-                    <div className="flex flex-col rounded border border-vp-border bg-vp-bg/40 p-2">
-                      <span className="mb-1 text-[9px] text-vp-muted uppercase font-mono">Calories</span>
-                      <div className="flex items-center gap-1.5 text-vp-calories font-bold text-base tabular-nums">
-                        <Flame size={12} /> {outcome.calories}<span className="text-[10px] font-normal opacity-50">KCAL</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col rounded border border-vp-border bg-vp-bg/40 p-2">
-                      <span className="mb-1 text-[9px] text-vp-muted uppercase font-mono">Avg Power</span>
-                      <div className="flex items-center gap-1.5 text-vp-power font-bold text-base tabular-nums">
-                        <Zap size={12} /> {outcome.avgPower}<span className="text-[10px] font-normal opacity-50">W</span>
-                      </div>
-                    </div>
+                    <MetricCell label="Distance" colorClass="text-vp-distance" icon={<Route size={12} />} value={<>{outcome.distanceKm.toFixed(2)}<span className="text-[10px] font-normal opacity-50">KM</span></>} />
+                    <MetricCell label="Duration" colorClass="text-vp-text" icon={<Clock size={12} />} value={formatDuration(outcome.duration)} />
+                    <MetricCell label="Calories" colorClass="text-vp-calories" icon={<Flame size={12} />} value={<>{outcome.calories}<span className="text-[10px] font-normal opacity-50">KCAL</span></>} />
+                    <MetricCell label="Avg Power" colorClass="text-vp-power" icon={<Zap size={12} />} value={<>{outcome.avgPower}<span className="text-[10px] font-normal opacity-50">W</span></>} />
                   </div>
-
-                  <div className="mb-3 flex items-center justify-between rounded border border-vp-border bg-vp-bg/40 px-2 py-1.5 text-[9px] font-mono uppercase tracking-widest text-vp-muted">
-                    <span className="flex items-center gap-1.5">
-                      <Heart size={10} className="text-vp-hr" />
-                      Avg HR <span className="text-vp-text">{outcome.avgHr}</span> BPM
-                    </span>
-                    <span>{session.stats.avgCadence || 0} RPM</span>
-                  </div>
-
-                  <div className="mb-3 flex items-center justify-between rounded border border-purple-400/15 bg-purple-400/5 px-2 py-1.5 text-[9px] font-mono uppercase tracking-widest">
-                    <span className="flex items-center gap-1.5 text-purple-300">
-                      <Activity size={10} />
-                      TRIMP Load
-                    </span>
-                    <span className="text-vp-text">
-                      {trainingLoad.score} <span className="text-purple-300/70">{trainingLoad.label}</span>
-                    </span>
-                  </div>
-
-                  {hrrScore !== null && (
-                    <div className="mb-3 flex items-center justify-between rounded border border-emerald-400/15 bg-emerald-400/5 px-2 py-1.5 text-[9px] font-mono uppercase tracking-widest">
-                      <span className="flex items-center gap-1.5 text-emerald-300">
-                        <Heart size={10} fill="currentColor" />
-                        HRR
-                      </span>
-                      <span className="text-vp-text">
-                        {hrrScore} BPM <span className="text-emerald-300/70">{session.stats.hrrClassification || ''}</span>
-                      </span>
-                    </div>
-                  )}
 
                   <div className="mt-auto flex justify-between items-center pt-3 border-t border-vp-border">
                     <span className="text-[9px] text-vp-accent uppercase font-mono opacity-0 group-hover:opacity-100 transition-opacity">
                       {isSelectionMode ? (isSelected ? 'Deselect' : 'Select') : 'View Details'}
                     </span>
-                    <div className="flex flex-wrap items-center justify-end gap-1">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       {!isSelectionMode && onDeleteSession && (
                         <button
                           type="button"
@@ -214,15 +171,15 @@ export const HistoryList = ({
                         </button>
                       )}
                       {session.synced_to_supabase ? (
-                        <div className="flex text-[9px] text-emerald-400 font-mono uppercase tracking-widest items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded">
-                          <Cloud size={9} />
-                          Supabase
-                        </div>
+                        <span
+                          title={t('Supabase synced')}
+                          className="h-2 w-2 rounded-full bg-emerald-400"
+                        />
                       ) : (
-                        <div className="flex text-[9px] text-yellow-300 font-mono uppercase tracking-widest items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded">
-                          <CloudOff size={9} />
-                          Pending
-                        </div>
+                        <span
+                          title={t('pending sync')}
+                          className="h-2 w-2 rounded-full bg-yellow-300"
+                        />
                       )}
                     </div>
                   </div>

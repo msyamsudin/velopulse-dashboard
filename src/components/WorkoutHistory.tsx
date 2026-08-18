@@ -3,7 +3,7 @@
    The React Compiler treats new Date() as a non-deterministic bailout, so it
    cannot verify manual memoization in this component; the memos below are
    correct and dep-complete. */
-import { useRef, useState, useMemo, useEffect } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
@@ -12,6 +12,7 @@ import { HistoryDetail } from './history/HistoryDetail';
 import { Download, RefreshCw, Search, Upload, X, AlertTriangle, Trash2 } from 'lucide-react';
 import type { DeleteSessionResult, ImportTcxResult, WorkoutSession } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
+import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../lib/export-service';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
 import type { SupabaseErrorInfo } from '../lib/supabase-errors';
 import { useI18n } from '@/i18n';
@@ -43,14 +44,12 @@ export const WorkoutHistory = ({
 }: WorkoutHistoryProps) => {
   const { t } = useI18n();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'sessions' | 'overview' | 'trends' | 'load'>('sessions');
+  const [viewMode, setViewMode] = useState<'sessions' | 'summary'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
   const [summaryRange, setSummaryRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
   const [weeklyMetric, setWeeklyMetric] = useState<'distance' | 'calories' | 'duration' | 'cadence' | 'trimp'>('distance');
-  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
-  const [showTotals, setShowTotals] = useState(false);
-  const [offsetDays, setOffsetDays] = useState(0);
   const [sessionSearch, setSessionSearch] = useState('');
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isSupabaseRetrying, setIsSupabaseRetrying] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -153,11 +152,6 @@ export const WorkoutHistory = ({
     }
   };
 
-  // Reset offset when range changes
-  useEffect(() => {
-    setOffsetDays(0);
-  }, [summaryRange]);
-
   const summaryInputSessions = viewMode !== 'sessions' ? sessions : [];
 
   const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData } = useWorkoutHistoryData({
@@ -165,8 +159,7 @@ export const WorkoutHistory = ({
     maxHr,
     summaryPeriod,
     summaryRange,
-    weeklyMetric,
-    offsetDays
+    weeklyMetric
   });
 
   const filteredSessions = useMemo(() => {
@@ -329,12 +322,56 @@ export const WorkoutHistory = ({
                   value={viewMode}
                   options={[
                     { label: t('Sessions'), value: 'sessions' },
-                    { label: t('Overview'), value: 'overview' },
-                    { label: t('Trends'), value: 'trends' },
-                    { label: t('Load'), value: 'load' },
+                    { label: t('Summary'), value: 'summary' },
                   ]}
                   onChange={(value) => setViewMode(value as typeof viewMode)}
                 />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setExportMenuOpen(open => !open)}
+                    disabled={sessions.length === 0}
+                    aria-label={t('Export workout data')}
+                    className="vp-button vp-focus-ring"
+                  >
+                    <Download size={13} />
+                    {t('Export')}
+                  </button>
+                  {exportMenuOpen && (
+                    <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-lg border border-vp-border bg-vp-bg shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          downloadSummaryCSV(sessions);
+                          setExportMenuOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-widest text-vp-text transition-colors hover:bg-white/5"
+                      >
+                        Export CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          downloadSummaryJSON(sessions);
+                          setExportMenuOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-widest text-vp-text transition-colors hover:bg-white/5"
+                      >
+                        Export JSON
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          printSummaryPDF(sessions);
+                          setExportMenuOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-widest text-vp-text transition-colors hover:bg-white/5"
+                      >
+                        Export PDF
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button type="button" onClick={onClose} className="vp-button vp-focus-ring" aria-label={t('Close training log')}>
                   {t('Close')}
                 </button>
@@ -375,11 +412,10 @@ export const WorkoutHistory = ({
 
             {viewMode === 'sessions' ? (
               <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Batch Export Control Panel */}
                 {sessions.length > 0 && (
-                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-vp-border bg-white/[0.03] p-2.5">
-                    <div className="contents">
-                      <div className="relative order-1 min-w-[260px] flex-1 lg:max-w-xl">
+                  <div className="mb-3 flex flex-col gap-2 rounded-lg border border-vp-border bg-white/[0.03] p-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative min-w-[260px] flex-1 lg:max-w-xl">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-vp-muted" />
                         <input
                           value={sessionSearch}
@@ -396,7 +432,7 @@ export const WorkoutHistory = ({
                           />
                         )}
                       </div>
-                      <div className="order-4 ml-auto flex flex-wrap items-center gap-2">
+                      <div className="ml-auto flex flex-wrap items-center gap-2">
                         <StatusPill label={`${t('Showing')} ${filteredSessions.length} ${t('of')} ${sessions.length}`} tone="neutral" />
                         {pendingSupabaseCount > 0 && onSyncSupabasePending && (
                           <IconButton
@@ -407,31 +443,14 @@ export const WorkoutHistory = ({
                             tone="primary"
                           />
                         )}
-                      </div>
-                    </div>
-
-                    <div className="contents">
-                      <div className="order-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleToggleSelectionMode}
-                        aria-label={isSelectionMode ? 'Cancel batch export selection' : 'Start batch export selection'}
-                        className={`vp-button vp-focus-ring ${
-                          isSelectionMode 
-                            ? 'vp-button-primary' 
-                            : ''
-                        }`}
-                      >
-                        {t(isSelectionMode ? 'Cancel Batch' : 'Batch Export')}
-                      </button>
-                      {isSelectionMode && (
-                        <span className="text-[10px] font-mono uppercase text-vp-accent tracking-widest font-bold">
-                          {visibleSelectedCount} {t('of')} {filteredSessions.length} {t('visible selected')}
-                        </span>
-                      )}
-                      </div>
-
-                      <div className="order-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleToggleSelectionMode}
+                          aria-label={isSelectionMode ? 'Cancel selection' : 'Select multiple sessions'}
+                          className={`vp-button vp-focus-ring ${isSelectionMode ? 'vp-button-primary' : ''}`}
+                        >
+                          {t(isSelectionMode ? 'Cancel Select' : 'Select')}
+                        </button>
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -452,59 +471,63 @@ export const WorkoutHistory = ({
                             {t(isImporting ? 'Importing' : 'Import TCX')}
                           </button>
                         )}
-                        {isSelectionMode && (
-                          <>
-                          <button
-                            type="button"
-                            onClick={visibleSelectedCount === filteredSessions.length ? handleClearSelection : handleSelectAll}
-                            aria-label={visibleSelectedCount === filteredSessions.length ? 'Deselect visible sessions' : 'Select visible sessions'}
-                            className="vp-button vp-focus-ring"
-                          >
-                            {t(visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleExportCombined}
-                            disabled={selectedSessionIds.length === 0}
-                            aria-label="Export selected sessions as one combined TCX file"
-                            className="vp-button vp-focus-ring border-vp-warning/30 bg-vp-warning/10 text-vp-warning hover:bg-vp-warning hover:text-vp-bg"
-                          >
-                            <Download size={13} />
-                            Combined TCX
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleExportZip}
-                            disabled={selectedSessionIds.length === 0}
-                            aria-label="Export selected sessions as individual TCX files in a ZIP"
-                            className="vp-button vp-focus-ring border-vp-accent/30 bg-vp-accent/10 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
-                          >
-                            <Download size={13} />
-                            ZIP (Individual)
-                          </button>
-                          {onDeleteSession && (
-                            <button
-                              type="button"
-                              onClick={handleDeleteSelected}
-                              disabled={selectedSessionIds.length === 0 || isDeleting}
-                              aria-label="Delete selected workout sessions"
-                              className="vp-button vp-focus-ring border-vp-danger/30 bg-vp-danger/10 text-vp-danger hover:bg-vp-danger hover:text-vp-bg"
-                            >
-                              <Trash2 size={13} />
-                              {t('Delete Selected')}
-                            </button>
-                          )}
-                          </>
-                        )}
                       </div>
                     </div>
+
+                    {isSelectionMode && (
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-vp-accent/20 bg-vp-accent/5 px-3 py-2">
+                        <span className="text-[10px] font-mono uppercase text-vp-accent tracking-widest font-bold">
+                          {visibleSelectedCount} {t('of')} {filteredSessions.length} {t('visible selected')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={visibleSelectedCount === filteredSessions.length ? handleClearSelection : handleSelectAll}
+                          aria-label={visibleSelectedCount === filteredSessions.length ? 'Deselect visible sessions' : 'Select visible sessions'}
+                          className="vp-button vp-focus-ring"
+                        >
+                          {t(visibleSelectedCount === filteredSessions.length ? 'Deselect Visible' : 'Select Visible')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleExportCombined}
+                          disabled={selectedSessionIds.length === 0}
+                          aria-label="Export selected sessions as one combined TCX file"
+                          className="vp-button vp-focus-ring border-vp-warning/30 bg-vp-warning/10 text-vp-warning hover:bg-vp-warning hover:text-vp-bg"
+                        >
+                          <Download size={13} />
+                          Combined TCX
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleExportZip}
+                          disabled={selectedSessionIds.length === 0}
+                          aria-label="Export selected sessions as individual TCX files in a ZIP"
+                          className="vp-button vp-focus-ring border-vp-accent/30 bg-vp-accent/10 text-vp-accent hover:bg-vp-accent hover:text-vp-bg"
+                        >
+                          <Download size={13} />
+                          ZIP (Individual)
+                        </button>
+                        {onDeleteSession && (
+                          <button
+                            type="button"
+                            onClick={handleDeleteSelected}
+                            disabled={selectedSessionIds.length === 0 || isDeleting}
+                            aria-label="Delete selected workout sessions"
+                            className="vp-button vp-focus-ring border-vp-danger/30 bg-vp-danger/10 text-vp-danger hover:bg-vp-danger hover:text-vp-bg"
+                          >
+                            <Trash2 size={13} />
+                            {t('Delete Selected')}
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {importNotice && (
-                      <div className="order-5 basis-full rounded border border-vp-accent/20 bg-vp-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-vp-accent">
+                      <div className="rounded border border-vp-accent/20 bg-vp-accent/5 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-vp-accent">
                         {importNotice}
                       </div>
                     )}
                     {deleteNotice && (
-                      <div className={`order-6 basis-full rounded border px-3 py-2 text-[10px] font-mono uppercase tracking-widest ${
+                      <div className={`rounded border px-3 py-2 text-[10px] font-mono uppercase tracking-widest ${
                         deleteNotice.tone === 'error'
                           ? 'border-vp-danger/30 bg-vp-danger/10 text-vp-danger'
                           : 'border-vp-accent/20 bg-vp-accent/5 text-vp-accent'
@@ -542,29 +565,24 @@ export const WorkoutHistory = ({
                 </div>
               </div>
             ) : (
-              <HistorySummary 
-                section={viewMode}
-                sessions={sessions}
-                onSelectSession={setSelectedSessionId}
-                globalSummary={globalSummary}
-                showTotals={showTotals}
-                setShowTotals={setShowTotals}
-                summaryPeriod={summaryPeriod}
-                setSummaryPeriod={setSummaryPeriod}
-                summaryRange={summaryRange}
-                setSummaryRange={setSummaryRange}
-                chartType={chartType}
-                setChartType={setChartType}
-                weeklyMetric={weeklyMetric}
-                setWeeklyMetric={setWeeklyMetric}
-                normalizedChartData={normalizedChartData}
-                summaryInsights={summaryInsights}
-                comparisonSummary={comparisonSummary}
-                trainingLoadMetrics={trainingLoadMetrics}
-                weeklyDailyData={weeklyDailyData}
-                offsetDays={offsetDays}
-                setOffsetDays={setOffsetDays}
-              />
+              <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
+                <HistorySummary 
+                  sessions={sessions}
+                  onSelectSession={setSelectedSessionId}
+                  globalSummary={globalSummary}
+                  summaryPeriod={summaryPeriod}
+                  setSummaryPeriod={setSummaryPeriod}
+                  summaryRange={summaryRange}
+                  setSummaryRange={setSummaryRange}
+                  weeklyMetric={weeklyMetric}
+                  setWeeklyMetric={setWeeklyMetric}
+                  normalizedChartData={normalizedChartData}
+                  summaryInsights={summaryInsights}
+                  comparisonSummary={comparisonSummary}
+                  trainingLoadMetrics={trainingLoadMetrics}
+                  weeklyDailyData={weeklyDailyData}
+                />
+              </div>
             )}
 
             <div className="mt-4 border-t border-vp-border pt-5 text-center text-[10px] font-mono uppercase tracking-[0.24em] text-vp-muted">
