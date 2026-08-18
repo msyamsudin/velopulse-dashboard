@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { computeRmssd, parseHeartRateMeasurement, recordHrvReading, type ReadinessLevel } from '@/lib/hrv';
-import { clearSavedDevice, loadSavedDevice, saveSavedDevice } from '@/lib/saved-devices';
 
 export interface BluetoothData {
   heartRate?: number;
@@ -64,7 +63,6 @@ interface BluetoothState {
   setError: (error: string | null) => void;
   connectHeartRate: () => Promise<void>;
   connectBike: () => Promise<void>;
-  reconnectSavedDevices: () => Promise<{ hr: boolean; bike: boolean }>;
   disconnect: () => void;
   clearStaleData: () => void;
 }
@@ -99,9 +97,9 @@ const getCharacteristicValue = (event: Event): DataView | null =>
 const HRV_WINDOW_SIZE = 60;
 
 /**
- * Shared handler for Heart Rate Measurement notifications (both the initial
- * connect and the auto-reconnect path): parses HR + RR-intervals, updates the
- * rolling RMSSD window and the daily readiness classification.
+ * Shared handler for Heart Rate Measurement notifications: parses HR +
+ * RR-intervals, updates the rolling RMSSD window and the daily readiness
+ * classification.
  */
 const handleHeartRateValue = (value: DataView, set: BluetoothSetState, get: () => BluetoothState) => {
   const { heartRate, rrIntervalsMs } = parseHeartRateMeasurement(value);
@@ -334,128 +332,9 @@ const handleCscMeasurement = (value: DataView, setState: BluetoothSetState) => {
   });
 };
 
-export const RECONNECT_INITIAL_DELAY_MS = 300;
-export const RECONNECT_MAX_BACKOFF_MS = 10_000;
-
-interface ReconnectLoopState {
-  timer: ReturnType<typeof setTimeout> | null;
-  running: boolean;
-}
-
-/**
- * Per-device auto-reconnect bookkeeping. The guarantee is SINGLE-FLIGHT: at
- * most one reconnect loop may run per device, and a duplicate disconnect event
- * while a loop is already running is ignored.
- *
- * Without this guard, every attach*Device call (mount auto-reconnect + manual
- * connect + dev StrictMode double-mount) registers its own
- * `gattserverdisconnected` listener, and each drop spawns several parallel
- * reconnect loops that issue concurrent `gatt.connect()` calls. On Android
- * that races and can tear down a healthy connection, producing exactly the
- * perpetual connect/disconnect churn seen in the debug log — and, during a
- * ride, the intermittent heart-rate gaps visible in the exported TCX.
- */
-const reconnectLoops = new WeakMap<object, ReconnectLoopState>();
-
-/** Cancel any pending reconnect work for a device (e.g. on manual disconnect). */
-const clearReconnectState = (device: BluetoothDevice | null) => {
-  if (!device) return;
-  const state = reconnectLoops.get(device);
-  if (!state) return;
-  if (state.timer) clearTimeout(state.timer);
-  state.timer = null;
-  state.running = false;
-};
-
-/** Key under which the disconnect handler is stored on the device object. */
-const DISCONNECT_HANDLER_KEY = '__velopulseDisconnectHandler';
-
-/**
- * Register the `gattserverdisconnected` handler EXACTLY once per device,
- * replacing any previously registered one. attach*Device can run multiple
- * times for the same device (mount auto-reconnect + manual connect + dev
- * StrictMode), and every extra listener would spawn an extra reconnect loop.
- */
-const bindDisconnectHandler = (device: BluetoothDevice, handler: () => void) => {
-  const prev = (device as unknown as Record<string, unknown>)[DISCONNECT_HANDLER_KEY];
-  if (typeof prev === 'function') {
-    device.removeEventListener('gattserverdisconnected', prev as EventListener);
-  }
-  (device as unknown as Record<string, unknown>)[DISCONNECT_HANDLER_KEY] = handler;
-  device.addEventListener('gattserverdisconnected', handler);
-};
-
-interface ReconnectLoopOptions {
-  label: string;
-  /** The still-registered device, or null once the user disconnected manually. */
-  getDevice: () => BluetoothDevice | null;
-  /** Called after a successful reconnect (set the connected flag, clear errors). */
-  onReconnected: () => void;
-  /** Establish the full connection + notification subscription; MUST throw on failure. */
-  establish: () => Promise<void>;
-}
-
-/**
- * Auto-reconnect loop with capped exponential backoff. Unlike the old "give up
- * after 5 attempts" behaviour, it keeps retrying while the device is still
- * registered, because a strap that dropped out of range often comes back
- * mid-ride; only a manual disconnect stops it.
- */
-const startReconnectLoop = (device: BluetoothDevice, options: ReconnectLoopOptions, addLog: (message: string) => void) => {
-  const existing = reconnectLoops.get(device);
-  const state: ReconnectLoopState = existing ?? { timer: null, running: false };
-  if (!existing) reconnectLoops.set(device, state);
-
-  // A reconnect loop is already in flight — this disconnect event is a duplicate.
-  if (state.running) return;
-  state.running = true;
-
-  let attempts = 0;
-  const finish = () => {
-    state.running = false;
-    if (state.timer) {
-      clearTimeout(state.timer);
-      state.timer = null;
-    }
-  };
-
-  const attempt = async () => {
-    state.timer = null;
-
-    // Stop if the device object was cleared or replaced (manual disconnect / re-pair).
-    if (!options.getDevice()) {
-      addLog(`${options.label} auto-reconnect aborted (manually disconnected).`);
-      finish();
-      return;
-    }
-
-    attempts += 1;
-    try {
-      await options.establish();
-      addLog(`${options.label} reconnected successfully!`);
-      options.onReconnected();
-      finish();
-    } catch (err) {
-      addLog(`${options.label} Reconnect attempt ${attempts} failed: ${err instanceof Error ? err.message : String(err)}`);
-      if (!options.getDevice()) {
-        finish();
-        return;
-      }
-      const backoff = Math.min(
-        RECONNECT_MAX_BACKOFF_MS,
-        RECONNECT_INITIAL_DELAY_MS * 2 ** Math.min(attempts - 1, 4)
-      );
-      state.timer = setTimeout(attempt, backoff);
-    }
-  };
-
-  state.timer = setTimeout(attempt, RECONNECT_INITIAL_DELAY_MS);
-};
-
 /**
  * Connect + subscribe to Heart Rate Measurement. Throws on any missing step so
- * a (re)connect can never "succeed" while silently delivering no data — the
- * previous `?.`-chained reconnect reported success with zero notifications.
+ * a connect can never "succeed" while silently delivering no data.
  */
 const establishHr = async (device: BluetoothDevice, set: BluetoothSetState, get: () => BluetoothState) => {
   const { addLog } = get();
@@ -506,9 +385,8 @@ const establishBike = async (device: BluetoothDevice, set: BluetoothSetState, ge
 };
 
 /**
- * Full connection + notification setup for a heart-rate device, including the
- * auto-reconnect-on-disconnect loop. Shared by the pairing flow and the
- * saved-device auto-reconnect.
+ * Full connection + notification setup for a heart-rate device. Shared by the
+ * manual pairing flow.
  */
 export const attachHrDevice = async (device: BluetoothDevice, set: BluetoothSetState, get: () => BluetoothState) => {
   const { addLog } = get();
@@ -516,26 +394,7 @@ export const attachHrDevice = async (device: BluetoothDevice, set: BluetoothSetS
 
   await establishHr(device, set, get);
 
-  bindDisconnectHandler(device, () => {
-    // Manual disconnect nulls the device BEFORE gatt.disconnect(), so a real
-    // drop and a deliberate release are distinguishable here.
-    if (get().hrDevice !== device) return;
-    addLog('HR device disconnected. Attempting to reconnect...');
-    set({ hrConnected: false });
-    startReconnectLoop(
-      device,
-      {
-        label: 'HR',
-        getDevice: () => (get().hrDevice === device ? device : null),
-        onReconnected: () => set({ hrConnected: true, error: null }),
-        establish: () => establishHr(device, set, get),
-      },
-      addLog
-    );
-  });
-
   set({ hrDevice: device, hrConnected: true, error: null });
-  saveSavedDevice('hr', { id: device.id, name: device.name ?? '' });
 };
 
 /** Same as attachHrDevice, for the bike: FTMS Indoor Bike Data with CSC fallback. */
@@ -545,24 +404,7 @@ export const attachBikeDevice = async (device: BluetoothDevice, set: BluetoothSe
 
   await establishBike(device, set, get);
 
-  bindDisconnectHandler(device, () => {
-    if (get().bikeDevice !== device) return;
-    addLog('Bike device disconnected. Attempting to reconnect...');
-    set({ bikeConnected: false });
-    startReconnectLoop(
-      device,
-      {
-        label: 'Bike',
-        getDevice: () => (get().bikeDevice === device ? device : null),
-        onReconnected: () => set({ bikeConnected: true, error: null }),
-        establish: () => establishBike(device, set, get),
-      },
-      addLog
-    );
-  });
-
   set({ bikeDevice: device, bikeConnected: true, error: null });
-  saveSavedDevice('bike', { id: device.id, name: device.name ?? '' });
 };
 
 export const useBluetoothStore = create<BluetoothState>((set, get) => ({
@@ -631,56 +473,11 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
     }
   },
 
-  reconnectSavedDevices: async () => {
-    const { addLog } = get();
-    if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) {
-      return { hr: false, bike: false };
-    }
-    try {
-      const devices = await navigator.bluetooth.getDevices();
-      const hrSaved = loadSavedDevice('hr');
-      const bikeSaved = loadSavedDevice('bike');
-      let hr = false;
-      let bike = false;
-
-      if (hrSaved) {
-        const device = devices.find((d) => d.id === hrSaved.id);
-        if (device) {
-          await attachHrDevice(device, set, get);
-          hr = true;
-        }
-      }
-
-      if (bikeSaved) {
-        const device = devices.find((d) => d.id === bikeSaved.id);
-        if (device) {
-          await attachBikeDevice(device, set, get);
-          bike = true;
-        }
-      }
-
-      if (hr || bike) addLog("Reconnected to previously saved devices");
-      return { hr, bike };
-    } catch (err) {
-      addLog(`Auto-reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
-      return { hr: false, bike: false };
-    }
-  },
-
   disconnect: () => {
     const { hrDevice, bikeDevice, addLog } = get();
-    // Forget the devices and cancel pending reconnects BEFORE gatt.disconnect()
-    // fires: the disconnect handler checks `hrDevice`/`bikeDevice` identity, so
-    // a deliberate release must look like a manual disconnect, not a drop.
-    clearReconnectState(hrDevice);
-    clearReconnectState(bikeDevice);
     set({ hrDevice: null, bikeDevice: null });
     hrDevice?.gatt?.disconnect();
     bikeDevice?.gatt?.disconnect();
-    // Explicit disconnect also forgets the pairing, so the app does not
-    // auto-reconnect to devices the user deliberately released.
-    clearSavedDevice('hr');
-    clearSavedDevice('bike');
     set({ 
       hrConnected: false, 
       bikeConnected: false, 
@@ -699,7 +496,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
         lastCrankEventTime: -1
       }
     });
-    addLog("Disconnected all devices (saved pairing cleared)");
+    addLog("Disconnected all devices");
   },
 
   clearStaleData: () => {

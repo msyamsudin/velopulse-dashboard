@@ -13,7 +13,6 @@ export interface ProfileLoadError {
 
 export const useAppInitialization = () => {
   const clearStaleData = useBluetoothStore(state => state.clearStaleData);
-  const reconnectSavedDevices = useBluetoothStore(state => state.reconnectSavedDevices);
   const loadHistory = useWorkoutStore(state => state.loadHistory);
 
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -98,12 +97,6 @@ export const useAppInitialization = () => {
     }, 1000);
     return () => clearInterval(interval);
   }, [clearStaleData]);
-
-  // Reconnect to previously paired devices without a re-pair dialog.
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) return;
-    reconnectSavedDevices();
-  }, [reconnectSavedDevices]);
 
   const { data: sysConfigCheck, refetch: refetchSysCheck } = useQuery({
     queryKey: ['sysConfigCheck'],
