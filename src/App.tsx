@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBluetoothStore } from './store/useBluetoothStore';
 import { calculateSessionCalories, useWorkoutStore } from './store/useWorkoutStore';
+import { useAuthStore } from './store/useAuthStore';
 import { HR_ZONES, getActiveHrZoneIndex } from '@/lib/constants';
 
 // Hooks
@@ -18,6 +19,7 @@ import type { TelemetrySnapshot } from './lib/cockpit-types';
 import { DevicePanel } from './components/DevicePanel';
 import { TelemetryLog } from './components/TelemetryLog';
 import { SetupLanding } from './components/SetupLanding';
+import { AuthScreen } from './components/AuthScreen';
 
 // Layout & Dashboard Components
 import { DashboardHeader } from './components/layout/DashboardHeader';
@@ -59,6 +61,8 @@ type AppMode = 'setup' | 'ready' | 'ride' | 'telemetry' | 'review';
 
 export default function App() {
   const { t } = useI18n();
+  const authSession = useAuthStore(state => state.session);
+  const authLoading = useAuthStore(state => state.loading);
   const hrr = useHeartRateRecovery();
   const isRecording = useWorkoutStore(state => state.isRecording);
   const { status: cloudStatus } = useConnectionStatus();
@@ -75,6 +79,7 @@ export default function App() {
   const loadMoreHistoryFromSupabase = useWorkoutStore(state => state.loadMoreHistoryFromSupabase);
   const hasMoreSupabaseHistory = useWorkoutStore(state => state.hasMoreSupabaseHistory);
   const importTCX = useWorkoutStore(state => state.importTCX);
+  const deleteSession = useWorkoutStore(state => state.deleteSession);
   const discardSession = useWorkoutStore(state => state.discardSession);
   const formatTime = useWorkoutStore(state => state.formatTime);
   const startDistance = useWorkoutStore(state => state.startDistance);
@@ -108,6 +113,10 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [skipAuth, setSkipAuth] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.sessionStorage.getItem('velopulse-skip-auth') === '1';
+  });
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
   const [wasRecording, setWasRecording] = useState(false);
   const [hasRequestedRemoteHistory, setHasRequestedRemoteHistory] = useState(false);
@@ -133,6 +142,12 @@ export default function App() {
   const scrollSurfaceBleed = isCompactSurface
     ? '-mx-2 px-6 md:-mx-4 md:px-8'
     : '-mx-3 px-7 md:-mx-6 md:px-10 lg:-mx-8 lg:px-12';
+
+  // Initialize Supabase auth (restores a persisted session, then claims
+  // pre-auth workouts and refreshes cloud history when signed in).
+  useEffect(() => {
+    useAuthStore.getState().initialize();
+  }, []);
 
   // Sync session data with BLE data
   useEffect(() => {
@@ -253,6 +268,36 @@ export default function App() {
     );
   }
 
+  // Supabase Auth gate: when the cloud is configured and reachable but the
+  // user is not signed in, ask for login before showing the dashboard. Users
+  // can continue locally (data stays on this device and syncs later).
+  const cloudUnavailable = cloudStatus?.state === 'offline' || cloudStatus?.state === 'unreachable';
+  const authRequired = Boolean(sysConfigCheck?.configured) && !cloudUnavailable;
+  const handleContinueLocal = () => {
+    try {
+      window.sessionStorage.setItem('velopulse-skip-auth', '1');
+    } catch {
+      // Session storage unavailable (private mode); the skip lasts this render.
+    }
+    setSkipAuth(true);
+  };
+  const handleSignIn = () => {
+    try {
+      window.sessionStorage.removeItem('velopulse-skip-auth');
+    } catch {
+      // Ignore storage failures; the in-memory flag is enough.
+    }
+    setSkipAuth(false);
+  };
+
+  if (authRequired && !authLoading && !authSession && !skipAuth) {
+    return (
+      <AuthScreen
+        onContinueLocal={handleContinueLocal}
+      />
+    );
+  }
+
   return (
     <div className={`h-dvh overflow-hidden bg-vp-bg ${shellPadding}`}>
       <div className={`mx-auto flex h-full w-full ${contentWidth} flex-col overflow-hidden transition-all duration-500 ease-out`}>
@@ -272,6 +317,8 @@ export default function App() {
               setShowDebug={setShowDebug}
               setShowSettings={setShowSettings}
               cloudStatus={cloudStatus}
+              showSignIn={authRequired && !authSession}
+              onSignIn={handleSignIn}
             />
           </motion.div>
         )}
@@ -292,6 +339,7 @@ export default function App() {
             onLoadMoreSupabaseHistory={loadMoreHistoryFromSupabase}
             hasMoreSupabaseHistory={hasMoreSupabaseHistory}
             onImportTCX={importTCX}
+            onDeleteSession={deleteSession}
             supabaseSyncError={supabaseSyncError}
             onDismissSupabaseError={clearSupabaseSyncError}
           />

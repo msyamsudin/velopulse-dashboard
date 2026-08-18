@@ -40,6 +40,27 @@ VeloPulse adalah dashboard fitness untuk memvisualisasikan data saat latihan.
 1.  Buat project baru di [Supabase.com](https://supabase.com/).
 2.  Buka **Project Settings** > **API** untuk menemukan URL dan Anon Key.
 
+#### 2. Supabase Auth (login email/password)
+
+Data latihan diamankan per-akun dengan **Supabase Auth**. Setiap baris pada
+tabel `workouts` dimiliki oleh satu user (`user_id`), dan seluruh policy RLS
+mengacu pada `auth.uid()`.
+
+1.  Buka **Supabase Dashboard > Authentication > Providers > Email**, lalu
+    aktifkan provider **Email**. Nyalakan **"Enable Sign ups"** jika ingin
+    pengguna bisa mendaftar sendiri dari layar login.
+2.  Jalankan file [`supabase/schema.sql`](supabase/schema.sql) di
+    **Supabase Dashboard > SQL Editor** (aman dijalankan ulang).
+3.  Buka aplikasi → layar **Masuk** akan muncul. Daftar dengan email pertama
+    kali, lalu masuk. Data latihan lama (yang dibuat sebelum migrasi auth)
+    otomatis di-claim ke akun Anda — tidak perlu backfill manual.
+4.  Tombol **"Lanjutkan tanpa akun"** dipakai untuk mode lokal: data tetap di
+    perangkat dan disinkronkan setelah Anda masuk.
+
+Catatan: sebelum migrasi ini, tabel `workouts` dibuka untuk role `anon`.
+`schema.sql` menghapus policy anon tersebut, jadi tanpa login cloud tidak lagi
+bisa dibaca/diubah oleh siapa pun.
+
 ### Menjalankan Secara Lokal
 
 Untuk menjalankan development server:

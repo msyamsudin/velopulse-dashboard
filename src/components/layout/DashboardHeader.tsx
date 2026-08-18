@@ -1,4 +1,4 @@
-import { Activity, Bug, History, Settings } from 'lucide-react';
+import { Activity, Bug, History, LogIn, Settings } from 'lucide-react';
 import { IconButton } from '../ui';
 import { CloudStatusIndicator } from './CloudStatusIndicator';
 import { useI18n } from '@/i18n';
@@ -11,6 +11,8 @@ interface DashboardHeaderProps {
   setShowDebug: (show: boolean) => void;
   setShowSettings: (show: boolean) => void;
   cloudStatus: CloudStatus | null;
+  showSignIn?: boolean;
+  onSignIn?: () => void;
 }
 
 export const DashboardHeader = ({
@@ -19,7 +21,9 @@ export const DashboardHeader = ({
   showDebug,
   setShowDebug,
   setShowSettings,
-  cloudStatus
+  cloudStatus,
+  showSignIn = false,
+  onSignIn
 }: DashboardHeaderProps) => {
   const { t } = useI18n();
   return (
@@ -44,6 +48,14 @@ export const DashboardHeader = ({
           onOpenHistory={() => setShowHistory(true)}
           onOpenSettings={() => setShowSettings(true)}
         />
+        {showSignIn && (
+          <IconButton
+            onClick={onSignIn}
+            label={t('Sign in')}
+            icon={<LogIn size={15} />}
+            tone="primary"
+          />
+        )}
         <button 
           onClick={() => setShowHistory(!showHistory)}
           className={`vp-button vp-focus-ring ${

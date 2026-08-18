@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, ChevronRight, Settings, Download, Route, Flame, Cloud, CloudOff } from 'lucide-react';
+import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, ChevronRight, Settings, Download, Route, Flame, Cloud, CloudOff, Trash2 } from 'lucide-react';
 import { StackedWorkoutChart } from './StackedWorkoutChart';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { downloadTCX } from '../../lib/export-service';
@@ -18,6 +18,7 @@ interface HistoryDetailProps {
   maxHr?: number;
   onBack: () => void;
   onClose: () => void;
+  onDeleteSession?: (id: string) => void;
 }
 
 const toNumber = (value: unknown) => Number(value || 0);
@@ -170,7 +171,8 @@ export const HistoryDetail = ({
   previousFullStats,
   maxHr = 190,
   onBack,
-  onClose
+  onClose,
+  onDeleteSession
 }: HistoryDetailProps) => {
   const [isDetailReady, setIsDetailReady] = useState(false);
   const [showZoneBpm, setShowZoneBpm] = useState(false);
@@ -248,6 +250,15 @@ export const HistoryDetail = ({
             <Download size={12} />
             Export TCX
           </button>
+          {onDeleteSession && (
+            <button
+              onClick={() => onDeleteSession(session.id)}
+              className="px-4 py-2 rounded border border-red-400/30 text-red-400 hover:bg-red-500 hover:border-red-500 hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
+            >
+              <Trash2 size={12} />
+              Delete Workout
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-muted hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all"
