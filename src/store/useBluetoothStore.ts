@@ -71,25 +71,6 @@ export type BluetoothSetState = (
   partial: Partial<BluetoothState> | ((state: BluetoothState) => Partial<BluetoothState> | BluetoothState)
 ) => void;
 
-/** Plausible heart-rate range in bpm — anything outside is a bad packet. */
-export const MIN_PLAUSIBLE_HR = 20;
-export const MAX_PLAUSIBLE_HR = 250;
-
-export const isPlausibleHeartRate = (hr: number): boolean =>
-  hr >= MIN_PLAUSIBLE_HR && hr <= MAX_PLAUSIBLE_HR;
-
-/**
- * Whether the bike's FTMS Heart Rate field may drive the display.
- *
- * The dedicated HR strap is the authoritative source; the bike's field is only
- * a fallback, and only when the value is physiologically plausible. Many bike
- * consoles emit garbage (or an unrelated byte) in that field — e.g. 6 bpm
- * while the strap reads 76 — which otherwise races with the strap's
- * notifications and makes the display flicker between the two.
- */
-export const shouldUseBikeHeartRate = (hrConnected: boolean, bikeHr: number): boolean =>
-  !hrConnected && isPlausibleHeartRate(bikeHr);
-
 const getCharacteristicValue = (event: Event): DataView | null =>
   (event.target as BluetoothRemoteGATTCharacteristic).value;
 
@@ -219,14 +200,19 @@ export const handleFtmsIndoorBikeNotification = (value: DataView, now: number, s
   setState((state) => {
     const { updates, lastUpdate, trackerUpdates } = parseFtmsIndoorBikeData(value, state, now);
 
-    // The HR strap is the authoritative heart-rate source. The bike's FTMS
-    // Heart Rate field must never overwrite it (it races with the strap's
-    // notifications and shows garbage like 6 bpm next to the strap's 76).
-    // It is used only as a fallback when no strap is connected, and only
-    // when the value is plausible.
-    if (updates.heartRate !== undefined && !shouldUseBikeHeartRate(state.hrConnected, updates.heartRate)) {
+    // The dedicated HR strap is the ONLY heart-rate source. The bike's FTMS
+    // Heart Rate field is never used — its console emits garbage (or an
+    // unrelated byte) in that field and it must not overwrite or interfere
+    // with the strap's stream.
+    if (updates.heartRate !== undefined) {
       delete updates.heartRate;
-      delete lastUpdate.heartRate;
+      // Restore the previous heart-rate timestamp instead of deleting it:
+      // clearStaleData relies on it to judge staleness, and a missing
+      // timestamp makes the display go "Waiting" even while the strap is
+      // streaming normally (the bike sends packets more often than the
+      // strap, so each dropped packet used to wipe the strap's timestamp
+      // right before the watchdog ran).
+      lastUpdate.heartRate = state.lastUpdate.heartRate;
     }
 
     if (Object.keys(updates).length === 0 && Object.keys(trackerUpdates).length === 0) {

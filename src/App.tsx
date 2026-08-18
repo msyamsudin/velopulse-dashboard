@@ -388,7 +388,12 @@ export default function App() {
                     sessions={sessionHistory}
                     hrConnected={hrConnected}
                     bikeConnected={bikeConnected}
-                    onStart={toggleRecording}
+                    onStart={() => {
+                      // HR strap is required to start: the bike HR fallback
+                      // was removed, so a session without the strap records
+                      // no heart rate at all.
+                      if (hrConnected) toggleRecording();
+                    }}
                     onDisconnect={disconnect}
                   />
                 )}

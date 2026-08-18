@@ -91,12 +91,19 @@ export const PreRideCockpit = ({
   const hasSignal = Boolean(currentData.hr || currentData.cadence || currentData.power || currentData.speed);
   const lastSession = sessions[0];
   const profileReady = Boolean(userProfile.ftp && userProfile.maxHr && userProfile.weight);
-  const readinessLabel = t(sensorCount === 2 ? 'Ready to ride' : sensorCount === 1 ? 'Partial tracking' : 'Manual session');
-  const startHint = sensorCount === 2
-    ? t('All core sensors are online.')
-    : sensorCount === 1
-      ? t('One core sensor is online. You can start with partial telemetry.')
-      : t('You can start now, but live telemetry will be limited.');
+  // The HR strap is REQUIRED to start a workout: there is no fallback
+  // heart-rate source anymore, so a session without it would record no HR.
+  const canStart = hrConnected;
+  const readinessLabel = !hrConnected
+    ? t('Heart rate strap required')
+    : bikeConnected
+      ? t('Ready to ride')
+      : t('Partial tracking');
+  const startHint = !hrConnected
+    ? t('Connect your heart rate strap to start a workout.')
+    : bikeConnected
+      ? t('All core sensors are online.')
+      : t('Heart rate is online. You can start without the bike.');
   const handleDisconnect = () => {
     if (confirm(t('Disconnect all devices? You will need to reconnect before recording live telemetry.'))) {
       onDisconnect();
@@ -150,8 +157,10 @@ export const PreRideCockpit = ({
               <button
                 type="button"
                 onClick={onStart}
+                disabled={!canStart}
                 aria-label={t('Start workout session')}
-                className="vp-focus-ring flex min-h-14 items-center justify-center gap-3 rounded-lg bg-vp-accent px-7 py-4 text-sm font-black uppercase tracking-[0.16em] text-vp-bg transition-colors hover:bg-vp-accent/90"
+                title={canStart ? t('Start workout session') : t('Connect your heart rate strap to start a workout.')}
+                className="vp-focus-ring flex min-h-14 items-center justify-center gap-3 rounded-lg bg-vp-accent px-7 py-4 text-sm font-black uppercase tracking-[0.16em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:cursor-not-allowed disabled:bg-vp-muted/25 disabled:text-vp-dim disabled:hover:bg-vp-muted/25"
               >
                 <Play size={20} fill="currentColor" />
                 {t('Start')}

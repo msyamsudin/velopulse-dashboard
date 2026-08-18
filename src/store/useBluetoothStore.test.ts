@@ -1,10 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   handleFtmsIndoorBikeNotification,
-  isPlausibleHeartRate,
   parseCscMeasurement,
   parseFtmsIndoorBikeData,
-  shouldUseBikeHeartRate,
   useBluetoothStore,
   type BluetoothParseState,
 } from './useBluetoothStore';
@@ -111,7 +109,7 @@ describe('parseFtmsIndoorBikeData', () => {
   });
 });
 
-describe('bike FTMS heart-rate priority', () => {
+describe('bike FTMS heart-rate is never used (strap is the only HR source)', () => {
   beforeEach(() => {
     // Reset the singleton store so tests don't leak state into each other.
     useBluetoothStore.setState({
@@ -122,22 +120,7 @@ describe('bike FTMS heart-rate priority', () => {
     });
   });
 
-  it('uses the bike heart rate only when no dedicated strap is connected', () => {
-    expect(shouldUseBikeHeartRate(false, 145)).toBe(true);
-    expect(shouldUseBikeHeartRate(true, 145)).toBe(false);
-  });
-
-  it('rejects implausible bike heart-rate values (garbage bytes)', () => {
-    // The exact symptom reported: strap reads 76/77 bpm, bike's FTMS HR field
-    // alternates with 6/11 bpm and overwrites the correct reading.
-    expect(shouldUseBikeHeartRate(false, 6)).toBe(false);
-    expect(shouldUseBikeHeartRate(false, 11)).toBe(false);
-    expect(shouldUseBikeHeartRate(false, 0)).toBe(false);
-    expect(shouldUseBikeHeartRate(false, 255)).toBe(false);
-    expect(shouldUseBikeHeartRate(false, 76)).toBe(true);
-  });
-
-  it('keeps the strap heart rate when the bike sends its own (garbage) HR', () => {
+  it('keeps the strap heart rate when the bike sends its own HR', () => {
     useBluetoothStore.setState({
       hrConnected: true,
       data: { heartRate: 76 },
@@ -150,18 +133,15 @@ describe('bike FTMS heart-rate priority', () => {
     expect(useBluetoothStore.getState().data.heartRate).toBe(76);
   });
 
-  it('falls back to the bike FTMS heart rate when no strap is connected', () => {
-    handleFtmsIndoorBikeNotification(makeView([0x01, 0x08, 0x91]), 2000, useBluetoothStore.setState);
-
-    expect(useBluetoothStore.getState().data.heartRate).toBe(145);
-  });
-
-  it('ignores an implausible bike heart rate even without a strap', () => {
+  it('never uses the bike heart rate, even without a strap (fallback removed)', () => {
     useBluetoothStore.setState({ data: { heartRate: 76 } });
 
-    handleFtmsIndoorBikeNotification(makeView([0x01, 0x08, 0x06]), 2000, useBluetoothStore.setState);
+    // Bike sends a *plausible* HR (145) with speed — must still be ignored.
+    handleFtmsIndoorBikeNotification(makeView([0x00, 0x08, 0xe2, 0x04, 0x91]), 2000, useBluetoothStore.setState);
 
-    expect(useBluetoothStore.getState().data.heartRate).toBe(76);
+    const { data } = useBluetoothStore.getState();
+    expect(data.heartRate).toBe(76); // strap value untouched, no bike fallback
+    expect(data.speed).toBe(12.5);   // other bike metrics still apply
   });
 
   it('still applies other bike metrics when its heart rate is dropped', () => {
@@ -174,14 +154,65 @@ describe('bike FTMS heart-rate priority', () => {
     expect(data.heartRate).toBe(76);
     expect(data.speed).toBe(12.5);
   });
-});
 
-describe('isPlausibleHeartRate', () => {
-  it('accepts the plausible range and rejects the rest', () => {
-    expect(isPlausibleHeartRate(20)).toBe(true);
-    expect(isPlausibleHeartRate(250)).toBe(true);
-    expect(isPlausibleHeartRate(19)).toBe(false);
-    expect(isPlausibleHeartRate(251)).toBe(false);
+  it('preserves the strap heart-rate timestamp when the bike HR is dropped (regression: Waiting flicker)', () => {
+    useBluetoothStore.setState({
+      hrConnected: true,
+      data: { heartRate: 76 },
+      lastUpdate: { heartRate: 1000 },
+    });
+
+    // Real-world bike packet: flags 0x0800 => speed (no more-data) + HR.
+    // Speed 1250 => 12.5 km/h, HR = garbage 6. If the packet only carried HR
+    // the handler would early-return before persisting anything, so the
+    // timestamp bug only shows with other metrics present — like Yesoul sends.
+    handleFtmsIndoorBikeNotification(makeView([0x00, 0x08, 0xe2, 0x04, 0x06]), 2000, useBluetoothStore.setState);
+
+    const { data, lastUpdate } = useBluetoothStore.getState();
+    expect(data.heartRate).toBe(76);
+    expect(data.speed).toBe(12.5);
+    // The strap's timestamp must survive the dropped packet — deleting it
+    // makes clearStaleData think the strap is stale and zero the display.
+    expect(lastUpdate.heartRate).toBe(1000);
+  });
+
+  it('keeps the HR display live when the bike interleaves HR packets while the strap streams', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      useBluetoothStore.setState({
+        hrConnected: true,
+        data: { heartRate: 76 },
+        lastUpdate: { heartRate: 0 },
+      });
+
+      for (let s = 1; s <= 5; s++) {
+        // Strap notification at the top of each second.
+        vi.setSystemTime(s * 1000);
+        useBluetoothStore.setState((state) => ({
+          data: { ...state.data, heartRate: 76 },
+          lastUpdate: { ...state.lastUpdate, heartRate: s * 1000 },
+        }));
+
+      // Bike HR packet mid-second (dropped by policy, never used). Carries
+      // speed too — like the real Yesoul packets — so the handler persists
+      // its lastUpdate instead of early-returning.
+        vi.setSystemTime(s * 1000 + 400);
+        handleFtmsIndoorBikeNotification(makeView([0x00, 0x08, 0xe2, 0x04, 0x06]), s * 1000 + 400, useBluetoothStore.setState);
+
+        // The app's 1s stale-data watchdog.
+        vi.setSystemTime(s * 1000 + 800);
+        useBluetoothStore.getState().clearStaleData();
+      }
+
+      const { data, lastUpdate } = useBluetoothStore.getState();
+      // Without the fix, each dropped bike packet wipes lastUpdate.heartRate
+      // and the watchdog zeroes the HR by ~3.8s — the Waiting flicker.
+      expect(data.heartRate).toBe(76);
+      expect(lastUpdate.heartRate).toBe(5000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
