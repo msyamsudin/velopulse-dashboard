@@ -3,6 +3,7 @@ import {
   Bike,
   Bluetooth,
   Check,
+  ChevronRight,
   Clock3,
   Heart,
   Play,
@@ -14,7 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import { type ReactNode } from 'react';
-import { EmptyState, MetricCard, Panel, StatusPill } from '../ui';
+import { EmptyState, InlineNotice, MetricCard, Panel, StatusPill } from '../ui';
 import { ResistancePlanPanel } from './ResistancePlanPanel';
 import { useI18n } from '@/i18n';
 import type { RiderProfile, TelemetrySnapshot } from '@/lib/cockpit-types';
@@ -26,8 +27,12 @@ interface PreRideCockpitProps {
   sessions: WorkoutSession[];
   hrConnected: boolean;
   bikeConnected: boolean;
+  bleError: string | null;
+  connectHeartRate: () => void;
+  connectBike: () => void;
   onStart: () => void;
   onDisconnect: () => void;
+  onOpenSettings: () => void;
 }
 
 interface ReadinessRowProps {
@@ -35,6 +40,9 @@ interface ReadinessRowProps {
   detail: string;
   connected: boolean;
   icon: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
 }
 
 interface SummaryMetricProps {
@@ -54,10 +62,11 @@ const getLastDistanceKm = (session: WorkoutSession) => {
   return lastPoint?.distance ? (lastPoint.distance / 1000).toFixed(2) : '--';
 };
 
-const ReadinessRow = ({ label, detail, connected, icon }: ReadinessRowProps) => {
+const ReadinessRow = ({ label, detail, connected, icon, onClick, disabled = connected, ariaLabel }: ReadinessRowProps) => {
   const { t } = useI18n();
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-vp-border py-3 last:border-b-0">
+  const interactive = Boolean(onClick);
+  const content = (
+    <>
       <div className="flex min-w-0 items-center gap-3">
         <div className={connected ? 'text-vp-accent' : 'text-vp-dim'}>{icon}</div>
         <div className="min-w-0">
@@ -65,8 +74,26 @@ const ReadinessRow = ({ label, detail, connected, icon }: ReadinessRowProps) => 
           <div className="truncate text-[10px] font-mono uppercase tracking-[0.14em] text-vp-muted">{detail}</div>
         </div>
       </div>
-      <StatusPill label={t(connected ? 'Ready' : 'Offline')} tone={connected ? 'ready' : 'neutral'} compact />
-    </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <StatusPill label={t(connected ? 'Ready' : 'Offline')} tone={connected ? 'ready' : 'neutral'} compact />
+        {interactive && !disabled && <ChevronRight size={14} className="text-vp-muted" />}
+      </div>
+    </>
+  );
+  const rowClass = 'flex items-center justify-between gap-4 border-b border-vp-border py-3 last:border-b-0';
+  if (!interactive) {
+    return <div className={rowClass}>{content}</div>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      className={`vp-focus-ring w-full rounded-lg text-left transition-colors hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent ${rowClass}`}
+    >
+      {content}
+    </button>
   );
 };
 
@@ -83,8 +110,12 @@ export const PreRideCockpit = ({
   sessions,
   hrConnected,
   bikeConnected,
+  bleError,
+  connectHeartRate,
+  connectBike,
   onStart,
-  onDisconnect
+  onDisconnect,
+  onOpenSettings
 }: PreRideCockpitProps) => {
   const { locale, t } = useI18n();
   const sensorCount = Number(hrConnected) + Number(bikeConnected);
@@ -230,19 +261,35 @@ export const PreRideCockpit = ({
             detail={hrConnected ? t('Live heart-rate stream') : t('Rockbros / Standard BLE')}
             connected={hrConnected}
             icon={<Heart size={17} />}
+            onClick={connectHeartRate}
+            disabled={hrConnected}
+            ariaLabel={t(hrConnected ? 'Heart rate monitor connected' : 'Connect heart rate monitor')}
           />
           <ReadinessRow
             label={t('Stationary Bike')}
             detail={bikeConnected ? t('FTMS metrics stream') : t('Yesoul / FTMS service')}
             connected={bikeConnected}
             icon={<Bike size={17} />}
+            onClick={connectBike}
+            disabled={bikeConnected}
+            ariaLabel={t(bikeConnected ? 'Stationary bike connected' : 'Connect stationary bike')}
           />
           <ReadinessRow
             label={t('Profile')}
             detail={`${userProfile.ftp || 0} FTP / ${userProfile.maxHr || 0} max HR / ${userProfile.weight || 0} kg`}
             connected={profileReady}
             icon={<SlidersHorizontal size={17} />}
+            onClick={onOpenSettings}
+            ariaLabel={t('Open settings')}
           />
+
+          {bleError && (
+            <div className="pt-3">
+              <InlineNotice tone="danger">
+                Error: {bleError}
+              </InlineNotice>
+            </div>
+          )}
         </Panel>
 
         <Panel

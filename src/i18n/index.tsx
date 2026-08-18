@@ -171,7 +171,6 @@ const id: Record<string, string> = {
   'Import': 'Impor',
   'Or restore from a backup token': 'Atau pulihkan dari token cadangan',
   'Restore Configuration': 'Pulihkan Konfigurasi',
-  'Device Management': 'Manajemen Perangkat',
   'Heart Rate Monitor': 'Monitor Detak Jantung',
   'Stationary Bike': 'Sepeda Statis',
   'Connected': 'Terhubung',

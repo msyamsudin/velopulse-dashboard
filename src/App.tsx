@@ -16,7 +16,6 @@ import { AutoSyncNotice } from './components/layout/AutoSyncNotice';
 import type { TelemetrySnapshot } from './lib/cockpit-types';
 
 // Components
-import { DevicePanel } from './components/DevicePanel';
 import { TelemetryLog } from './components/TelemetryLog';
 import { SetupLanding } from './components/SetupLanding';
 import { AuthScreen } from './components/AuthScreen';
@@ -132,7 +131,6 @@ export default function App() {
     : showHistory
       ? 'review'
       : primarySurface;
-  const isReadySurface = primarySurface === 'ready';
   const isRideSurface = primarySurface === 'ride';
   const isTelemetrySurface = primarySurface === 'telemetry';
   const isCompactSurface = isRideSurface || isTelemetrySurface;
@@ -387,25 +385,6 @@ export default function App() {
               transition={{ duration: 0.3 }}
               className={`h-full flex flex-col space-y-6 overflow-y-auto no-scrollbar pb-8 ${scrollSurfaceBleed}`}
             >
-              {isReadySurface && (
-                <div className="grid grid-cols-1 gap-4 shrink-0">
-                  <motion.div
-                    key="device-panel"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                  >
-                    <DevicePanel
-                      hrConnected={hrConnected}
-                      bikeConnected={bikeConnected}
-                      error={bleError}
-                      connectHeartRate={connectHeartRate}
-                      connectBike={connectBike}
-                    />
-                  </motion.div>
-                </div>
-              )}
-
               <div className="flex-1 min-h-0">
                 {isRideSurface ? (
                   <RecordingCockpit
@@ -436,6 +415,9 @@ export default function App() {
                     sessions={sessionHistory}
                     hrConnected={hrConnected}
                     bikeConnected={bikeConnected}
+                    bleError={bleError}
+                    connectHeartRate={connectHeartRate}
+                    connectBike={connectBike}
                     onStart={() => {
                       // HR strap is required to start: the bike HR fallback
                       // was removed, so a session without the strap records
@@ -443,6 +425,7 @@ export default function App() {
                       if (hrConnected) toggleRecording();
                     }}
                     onDisconnect={disconnect}
+                    onOpenSettings={() => setShowSettings(true)}
                   />
                 )}
               </div>
