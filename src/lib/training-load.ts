@@ -78,7 +78,8 @@ const roundOne = (value: number) => Math.round(value * 10) / 10;
 
 /**
  * Calculates workload guidance from up to 28 chronological daily TRIMP totals.
- * Chronic load is expressed as the average weekly load over the last 28 days.
+ * Chronic load is the average weekly load of the 3 weeks BEFORE the current
+ * (acute) week — the acute week is not counted twice in the ratio.
  */
 export const calculateTrainingLoadMetrics = (dailyLoads: number[] = []): TrainingLoadMetrics => {
   const normalized = dailyLoads
@@ -87,7 +88,9 @@ export const calculateTrainingLoadMetrics = (dailyLoads: number[] = []): Trainin
   const padded = [...Array(Math.max(0, 28 - normalized.length)).fill(0), ...normalized];
   const acuteDays = padded.slice(-7);
   const acuteLoad = acuteDays.reduce((total, load) => total + load, 0);
-  const chronicLoad = padded.reduce((total, load) => total + load, 0) / 4;
+  // Uncoupled baseline: only the 21 days before the acute week.
+  const baselineDays = padded.slice(0, 21);
+  const chronicLoad = baselineDays.reduce((total, load) => total + load, 0) / 3;
   const acuteChronicRatio = chronicLoad > 0 ? acuteLoad / chronicLoad : null;
   const dailyMean = acuteLoad / 7;
   const variance = acuteDays.reduce((total, load) => total + ((load - dailyMean) ** 2), 0) / 7;
@@ -97,7 +100,7 @@ export const calculateTrainingLoadMetrics = (dailyLoads: number[] = []): Trainin
   const trainingDays = padded.filter(load => load > 0).length;
 
   let recommendation: TrainingLoadMetrics['recommendation'] = 'Maintain';
-  let recommendationDetail = 'Recent load is close to your 28-day baseline. Keep the next session controlled.';
+  let recommendationDetail = 'Recent load is close to your 3-week baseline. Keep the next session controlled.';
 
   if (trainingDays < 4) {
     recommendation = 'Build';

@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import { BluetoothData, useBluetoothStore } from './useBluetoothStore';
 import { getSupabaseClient, getSupabaseUserId } from '@/lib/supabase';
 import { parseTCXWorkoutSessions } from '@/lib/tcx-import-service';
-import { calcCaloriesFromPower } from '@/lib/physics';
+import { calcCaloriesFromPower, DELTA_MAX_SECONDS } from '@/lib/physics';
 import { classifySupabaseError, SupabaseErrorInfo } from '@/lib/supabase-errors';
 
 export interface HistoryData {
   time: string;
+  /** Wall-clock timestamp (ms) of the sample; used for real Δt integration. */
+  ts?: number;
   hr: number;
   cadence: number;
   power: number;
@@ -14,6 +16,11 @@ export interface HistoryData {
   distance: number;
   resistance: number;
   calories: number;
+  /** True when the value was zeroed by the stale-data watchdog (3 s without updates). */
+  staleHr?: boolean;
+  stalePower?: boolean;
+  staleCadence?: boolean;
+  staleSpeed?: boolean;
 }
 
 export interface WorkoutSession {
@@ -28,6 +35,8 @@ export interface WorkoutSession {
     maxPower: number;
     avgCadence: number;
     maxCadence: number;
+    avgSpeed?: number;
+    maxSpeed?: number;
     hrrScore?: number;
     hrrClassification?: string;
   };
@@ -54,11 +63,14 @@ export interface LiveWorkoutStats {
 }
 
 interface LiveWorkoutTotals {
-  count: number;
   hr: number;
+  hrTime: number;
   power: number;
+  powerTime: number;
   cadence: number;
+  cadenceTime: number;
   speed: number;
+  speedTime: number;
 }
 
 export interface ImportTcxResult {
@@ -80,6 +92,12 @@ interface WorkoutState {
   sessionStartTime: number | null;
   startDistance: number;
   startCalories: number;
+  /** Fractional calorie accumulator shared by the live card and history points. */
+  calorieAccumulator: number;
+  /** Sticky per-session flag: true once a power sample arrives. */
+  hasPowerSource: boolean;
+  /** Wall-clock ts (ms) of the last history point, for real Δt integration. */
+  lastHistoryPointTs: number | null;
   history: HistoryData[];
   sessionHistory: WorkoutSession[];
   hrrScore: number | null;
@@ -114,6 +132,8 @@ const SESSION_HISTORY_STORAGE_KEY = 'velopulse_sessions';
 const WORKOUT_INDEXED_DB_NAME = 'velopulse_workouts';
 const WORKOUT_INDEXED_DB_VERSION = 1;
 const WORKOUT_INDEXED_DB_STORE = 'workout_state';
+const BLE_STALE_TIMEOUT_MS = 3000;
+const RECOVERY_GRACE_SECONDS = 30;
 
 const ACTIVE_SESSION_HISTORY_POINT_LIMITS = [1800, 900, 300, 60];
 const SESSION_HISTORY_STORAGE_ATTEMPTS = [
@@ -142,12 +162,99 @@ const EMPTY_LIVE_STATS: LiveWorkoutStats = {
 };
 
 const EMPTY_LIVE_TOTALS: LiveWorkoutTotals = {
-  count: 0,
   hr: 0,
+  hrTime: 0,
   power: 0,
+  powerTime: 0,
   cadence: 0,
-  speed: 0
+  cadenceTime: 0,
+  speed: 0,
+  speedTime: 0
 };
+
+/**
+ * Effective seconds between consecutive history points. The first point
+ * represents one second; gaps are clamped to [0, DELTA_MAX_SECONDS] so a long
+ * dropout cannot inject a huge single interval into the accumulator.
+ */
+const getDeltaSeconds = (history: HistoryData[], index: number) => {
+  if (index === 0) return 1;
+  const current = history[index]?.ts;
+  const previous = history[index - 1]?.ts;
+  if (!current || !previous) return 1;
+  const deltaSeconds = (current - previous) / 1000;
+  return Math.min(Math.max(deltaSeconds, 0), DELTA_MAX_SECONDS);
+};
+
+/**
+ * Reintegrates calories from a point series. Legacy points carry no ts and may
+ * be downsampled for storage, so when no timestamp exists the snapshot
+ * duration is distributed evenly across the retained points.
+ */
+const computeCalorieAccumulator = (history: HistoryData[], elapsedSeconds = 0) => {
+  const hasPowerSource = history.some(point => point.power > 0);
+  if (!hasPowerSource) {
+    return history[history.length - 1]?.calories || 0;
+  }
+  if (elapsedSeconds > 0 && !history.some(point => point.ts)) {
+    const secondsPerPoint = elapsedSeconds / history.length;
+    return history.reduce(
+      (total, point) => total + calcCaloriesFromPower(point.power || 0, secondsPerPoint),
+      0
+    );
+  }
+  return history.reduce(
+    (total, point, index) =>
+      total + calcCaloriesFromPower(point.power || 0, getDeltaSeconds(history, index)),
+    0
+  );
+};
+
+/**
+ * Single authoritative Δt-weighted, stale-excluded aggregation step shared by
+ * the incremental live path and the full recompute path.
+ */
+const addPointToTotals = (
+  totals: LiveWorkoutTotals,
+  point: HistoryData,
+  deltaSeconds: number
+): LiveWorkoutTotals => {
+  // HR is physiologically never 0 while riding; power/cadence/speed zeros
+  // only count when they are genuine (not watchdog-zeroed stale samples).
+  const validHr = point.hr > 0 && !point.staleHr;
+  const validPower = !point.stalePower;
+  const validCadence = !point.staleCadence;
+  const validSpeed = !point.staleSpeed;
+
+  return {
+    hr: totals.hr + (validHr ? point.hr * deltaSeconds : 0),
+    hrTime: totals.hrTime + (validHr ? deltaSeconds : 0),
+    power: totals.power + (validPower ? point.power * deltaSeconds : 0),
+    powerTime: totals.powerTime + (validPower ? deltaSeconds : 0),
+    cadence: totals.cadence + (validCadence ? point.cadence * deltaSeconds : 0),
+    cadenceTime: totals.cadenceTime + (validCadence ? deltaSeconds : 0),
+    speed: totals.speed + (validSpeed ? (point.speed || 0) * deltaSeconds : 0),
+    speedTime: totals.speedTime + (validSpeed ? deltaSeconds : 0)
+  };
+};
+
+const statsFromTotals = (
+  totals: LiveWorkoutTotals,
+  maxes: { maxHr: number; maxPower: number; maxCadence: number; maxSpeed: number },
+  hrrScore: number | null,
+  hrrClassification: string | null
+): LiveWorkoutStats => ({
+  avgHr: totals.hrTime > 0 ? Math.round(totals.hr / totals.hrTime) : 0,
+  maxHr: maxes.maxHr,
+  avgPower: totals.powerTime > 0 ? Math.round(totals.power / totals.powerTime) : 0,
+  maxPower: maxes.maxPower,
+  avgCadence: totals.cadenceTime > 0 ? Math.round(totals.cadence / totals.cadenceTime) : 0,
+  maxCadence: maxes.maxCadence,
+  avgSpeed: totals.speedTime > 0 ? Number((totals.speed / totals.speedTime).toFixed(1)) : 0,
+  maxSpeed: Number(maxes.maxSpeed.toFixed(1)),
+  hrrScore,
+  hrrClassification
+});
 
 const calculateLiveStats = (
   history: HistoryData[],
@@ -161,14 +268,8 @@ const calculateLiveStats = (
     };
   }
 
-  const aggregate = history.reduce((acc, point) => ({
-    totals: {
-      count: acc.totals.count + 1,
-      hr: acc.totals.hr + point.hr,
-      power: acc.totals.power + point.power,
-      cadence: acc.totals.cadence + point.cadence,
-      speed: acc.totals.speed + (point.speed || 0)
-    },
+  const aggregate = history.reduce((acc, point, index) => ({
+    totals: addPointToTotals(acc.totals, point, getDeltaSeconds(history, index)),
     maxHr: Math.max(acc.maxHr, point.hr),
     maxPower: Math.max(acc.maxPower, point.power),
     maxCadence: Math.max(acc.maxCadence, point.cadence),
@@ -184,35 +285,27 @@ const calculateLiveStats = (
   const { totals } = aggregate;
 
   return {
-    stats: {
-      avgHr: Math.round(totals.hr / totals.count),
-      maxHr: aggregate.maxHr,
-      avgPower: Math.round(totals.power / totals.count),
-      maxPower: aggregate.maxPower,
-      avgCadence: Math.round(totals.cadence / totals.count),
-      maxCadence: aggregate.maxCadence,
-      avgSpeed: Number((totals.speed / totals.count).toFixed(1)),
-      maxSpeed: Number(aggregate.maxSpeed.toFixed(1)),
-      hrrScore,
-      hrrClassification
-    },
+    stats: statsFromTotals(totals, aggregate, hrrScore, hrrClassification),
     totals
   };
 };
 
+/** Session-relative sensor calories (cumulative sensor value minus the session start offset). */
+export const sensorCaloriesDelta = (sensorCalories: number | undefined, startCalories: number) =>
+  Math.max(0, (sensorCalories || 0) - startCalories);
+
 export const calculateSessionCalories = (
   data: BluetoothData,
   startCalories: number,
-  previousCalories: number,
-  durationSec = 1
+  accumulator: number,
+  hasPowerSource: boolean,
+  deltaSeconds: number
 ) => {
-  const powerCalories = calcCaloriesFromPower(data.power || 0, durationSec);
-  if (powerCalories > 0) {
-    return previousCalories + Math.round(powerCalories);
+  if (hasPowerSource) {
+    return accumulator + calcCaloriesFromPower(data.power || 0, deltaSeconds);
   }
 
-  const sensorCalories = Math.max(0, (data.calories || 0) - startCalories);
-  return Math.max(previousCalories, Math.round(sensorCalories));
+  return Math.max(accumulator, sensorCaloriesDelta(data.calories, startCalories));
 };
 
 type ActiveSessionSnapshot = {
@@ -221,6 +314,9 @@ type ActiveSessionSnapshot = {
   sessionStartTime: number | null;
   startDistance: number;
   startCalories: number;
+  calorieAccumulator: number;
+  hasPowerSource: boolean;
+  lastHistoryPointTs: number | null;
   history: HistoryData[];
 };
 
@@ -275,6 +371,9 @@ const buildActiveSessionStorageSnapshot = (
   sessionStartTime: state.sessionStartTime,
   startDistance: state.startDistance,
   startCalories: state.startCalories,
+  calorieAccumulator: state.calorieAccumulator,
+  hasPowerSource: state.hasPowerSource,
+  lastHistoryPointTs: state.lastHistoryPointTs,
   history: sampleHistoryPoints(state.history, maxHistoryPoints)
 });
 
@@ -776,6 +875,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   sessionStartTime: null,
   startDistance: 0,
   startCalories: 0,
+  calorieAccumulator: 0,
+  hasPowerSource: false,
+  lastHistoryPointTs: null,
   history: [],
   sessionHistory: [],
   hrrScore: null,
@@ -798,6 +900,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         sessionStartTime: startTime,
         startDistance: sDist,
         startCalories: sCal,
+        calorieAccumulator: 0,
+        hasPowerSource: false,
+        lastHistoryPointTs: null,
         liveStats: EMPTY_LIVE_STATS,
         liveStatsTotals: EMPTY_LIVE_TOTALS,
         hrrScore: null,
@@ -810,6 +915,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         sessionStartTime: startTime,
         startDistance: sDist,
         startCalories: sCal,
+        calorieAccumulator: 0,
+        hasPowerSource: false,
+        lastHistoryPointTs: null,
         history: []
       }, { immediate: true });
     } else {
@@ -823,7 +931,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   incrementElapsed: () => {
     set((state) => {
-      const nextElapsed = state.elapsed + 1;
+      const nextElapsed = state.sessionStartTime
+        ? Math.max(0, Math.floor((Date.now() - state.sessionStartTime) / 1000))
+        : state.elapsed + 1;
       const nextState = { ...state, elapsed: nextElapsed };
       persistActiveSession(nextState);
       return { elapsed: nextElapsed };
@@ -833,51 +943,82 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   addHistoryPoint: (data) => {
     if (!get().isRecording) return;
     const { startDistance, startCalories } = get();
-    const now = new Date();
+    const nowMs = Date.now();
+    const now = new Date(nowMs);
     const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
     
     // To prevent timeline stretching, don't add multiple points for the same second
     const lastPoint = get().history[get().history.length - 1];
     if (lastPoint && lastPoint.time === timeStr) return;
 
+    const bleLastUpdate = useBluetoothStore.getState().lastUpdate;
+    const isStaleValue = (key: keyof BluetoothData) =>
+      bleLastUpdate[key] === undefined || nowMs - bleLastUpdate[key] > BLE_STALE_TIMEOUT_MS;
+
+    const staleHr = (data.heartRate || 0) === 0 && isStaleValue('heartRate');
+    const stalePower = (data.power || 0) === 0 && isStaleValue('power');
+    const staleCadence = (data.cadence || 0) === 0 && isStaleValue('cadence');
+    const staleSpeed = (data.speed || 0) === 0 && isStaleValue('speed');
+
     set((state) => {
-      const previousCalories = lastPoint?.calories || 0;
-      const point = {
+      const deltaSeconds = state.lastHistoryPointTs !== null
+        ? Math.min(Math.max((nowMs - state.lastHistoryPointTs) / 1000, 0), DELTA_MAX_SECONDS)
+        : 1;
+      // Sticky power source, but a power meter that goes stale (watchdog
+      // zeroed, no packets for 3+ s) hands control back to the sensor so a
+      // dead battery mid-ride does not freeze the calorie count.
+      const hasPowerSource = (state.hasPowerSource || (data.power || 0) > 0) && !stalePower;
+      const nextAccumulator = calculateSessionCalories(
+        data,
+        startCalories,
+        state.calorieAccumulator,
+        hasPowerSource,
+        deltaSeconds
+      );
+      const point: HistoryData = {
         time: timeStr,
+        ts: nowMs,
         hr: data.heartRate || 0,
         cadence: data.cadence || 0,
         power: data.power || 0,
         speed: data.speed || 0,
         distance: Math.max(0, (data.distance || 0) - startDistance),
         resistance: data.resistance || 0,
-        calories: calculateSessionCalories(data, startCalories, previousCalories)
+        calories: nextAccumulator,
+        staleHr,
+        stalePower,
+        staleCadence,
+        staleSpeed
       };
       const newHistory = [...state.history, point];
-      const nextTotals = {
-        count: state.liveStatsTotals.count + 1,
-        hr: state.liveStatsTotals.hr + point.hr,
-        power: state.liveStatsTotals.power + point.power,
-        cadence: state.liveStatsTotals.cadence + point.cadence,
-        speed: state.liveStatsTotals.speed + (point.speed || 0)
+
+      const nextTotals = addPointToTotals(state.liveStatsTotals, point, deltaSeconds);
+      const nextLiveStats = statsFromTotals(
+        nextTotals,
+        {
+          maxHr: Math.max(state.liveStats.maxHr, point.hr),
+          maxPower: Math.max(state.liveStats.maxPower, point.power),
+          maxCadence: Math.max(state.liveStats.maxCadence, point.cadence),
+          maxSpeed: Math.max(state.liveStats.maxSpeed, point.speed || 0)
+        },
+        state.hrrScore,
+        state.hrrClassification
+      );
+      const nextState = {
+        ...state,
+        history: newHistory,
+        calorieAccumulator: nextAccumulator,
+        hasPowerSource,
+        lastHistoryPointTs: nowMs
       };
-      const nextLiveStats = {
-        avgHr: Math.round(nextTotals.hr / nextTotals.count),
-        maxHr: Math.max(state.liveStats.maxHr, point.hr),
-        avgPower: Math.round(nextTotals.power / nextTotals.count),
-        maxPower: Math.max(state.liveStats.maxPower, point.power),
-        avgCadence: Math.round(nextTotals.cadence / nextTotals.count),
-        maxCadence: Math.max(state.liveStats.maxCadence, point.cadence),
-        avgSpeed: Number((nextTotals.speed / nextTotals.count).toFixed(1)),
-        maxSpeed: Number(Math.max(state.liveStats.maxSpeed, point.speed || 0).toFixed(1)),
-        hrrScore: state.hrrScore,
-        hrrClassification: state.hrrClassification
-      };
-      const nextState = { ...state, history: newHistory };
       persistActiveSession(nextState);
       return {
         history: newHistory,
         liveStats: nextLiveStats,
-        liveStatsTotals: nextTotals
+        liveStatsTotals: nextTotals,
+        calorieAccumulator: nextAccumulator,
+        hasPowerSource,
+        lastHistoryPointTs: nowMs
       };
     });
   },
@@ -899,19 +1040,23 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const { history, elapsed, sessionHistory, sessionStartTime } = get();
     if (!sessionStartTime) return;
 
-    // Allow saving if there's history OR if there's significant elapsed time
-    if (history.length === 0 && elapsed < 1) {
+    // A session without any history point carries no metrics worth saving;
+    // computing stats from an empty array would yield NaN/-Infinity.
+    if (history.length === 0) {
       get().discardSession();
       return;
     }
 
+    const computed = calculateLiveStats(history, get().hrrScore, get().hrrClassification);
     const stats = {
-      avgHr: Math.round(history.reduce((a, b) => a + b.hr, 0) / history.length) || 0,
-      maxHr: Math.max(...history.map(h => h.hr)) || 0,
-      avgPower: Math.round(history.reduce((a, b) => a + b.power, 0) / history.length) || 0,
-      maxPower: Math.max(...history.map(h => h.power)) || 0,
-      avgCadence: Math.round(history.reduce((a, b) => a + b.cadence, 0) / history.length) || 0,
-      maxCadence: Math.max(...history.map(h => h.cadence)) || 0,
+      avgHr: computed.stats.avgHr,
+      maxHr: computed.stats.maxHr,
+      avgPower: computed.stats.avgPower,
+      maxPower: computed.stats.maxPower,
+      avgCadence: computed.stats.avgCadence,
+      maxCadence: computed.stats.maxCadence,
+      avgSpeed: computed.stats.avgSpeed,
+      maxSpeed: computed.stats.maxSpeed,
       hrrScore: get().hrrScore !== null ? get().hrrScore! : undefined,
       hrrClassification: get().hrrClassification !== null ? get().hrrClassification! : undefined,
     };
@@ -1112,6 +1257,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       history: [],
       elapsed: 0,
       sessionStartTime: null,
+      calorieAccumulator: 0,
+      hasPowerSource: false,
+      lastHistoryPointTs: null,
       isRecording: false,
       hrrScore: null,
       hrrClassification: null,
@@ -1124,6 +1272,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       sessionStartTime: null,
       startDistance: 0,
       startCalories: 0,
+      calorieAccumulator: 0,
+      hasPowerSource: false,
+      lastHistoryPointTs: null,
       history: []
     }, { immediate: true });
   },
@@ -1146,12 +1297,35 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       console.log('[Recovery] Restoring active session from local storage:', activeSession);
       const restoredHistory = activeSession.history || [];
       const restoredLiveStats = calculateLiveStats(restoredHistory);
+      const lastPoint = restoredHistory[restoredHistory.length - 1];
+      const lastPointTs = typeof activeSession.lastHistoryPointTs === 'number'
+        ? activeSession.lastHistoryPointTs
+        : lastPoint?.ts;
+      const nowMs = Date.now();
+      const lastHistoryPointTs = lastPointTs ?? nowMs;
+      // A long gap since the last recorded point means the app was closed in
+      // the middle of the session. Shift the wall-clock base forward so dead
+      // time (hours/days) is not counted into the saved duration. Legacy
+      // snapshots carry no timestamps: fall back to wall age minus elapsed.
+      const gapSeconds = lastPointTs !== undefined
+        ? (nowMs - lastPointTs) / 1000
+        : (nowMs - activeSession.sessionStartTime) / 1000 - (activeSession.elapsed || 0);
+      const sessionStartTime = gapSeconds > RECOVERY_GRACE_SECONDS
+        ? nowMs - ((activeSession.elapsed || 0) + RECOVERY_GRACE_SECONDS) * 1000
+        : activeSession.sessionStartTime;
       set({
         isRecording: activeSession.isRecording || false,
         elapsed: activeSession.elapsed || 0,
-        sessionStartTime: activeSession.sessionStartTime,
+        sessionStartTime,
         startDistance: activeSession.startDistance || 0,
         startCalories: activeSession.startCalories || 0,
+        calorieAccumulator: typeof activeSession.calorieAccumulator === 'number'
+          ? activeSession.calorieAccumulator
+          : computeCalorieAccumulator(restoredHistory, activeSession.elapsed || 0),
+        hasPowerSource: typeof activeSession.hasPowerSource === 'boolean'
+          ? activeSession.hasPowerSource
+          : restoredHistory.some(point => point.power > 0),
+        lastHistoryPointTs,
         history: restoredHistory,
         liveStats: restoredLiveStats.stats,
         liveStatsTotals: restoredLiveStats.totals

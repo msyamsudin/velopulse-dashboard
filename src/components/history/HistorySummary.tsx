@@ -23,6 +23,14 @@ interface HistorySummaryProps {
   trainingLoadMetrics: TrainingLoadMetrics;
 }
 
+const RECORD_RANGE_DAYS: Record<'7d' | '30d' | '90d' | '1y' | 'all', number | null> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '1y': 365,
+  'all': null,
+};
+
 export const HistorySummary = ({
   sessions,
   onSelectSession,
@@ -51,7 +59,6 @@ export const HistorySummary = ({
 
   const denseData = normalizedChartData.length > 45;
   const compactLabels = normalizedChartData.length > 14;
-  const ultraDense = normalizedChartData.length > 45;
   const labelInterval = normalizedChartData.length > 60
     ? 14
     : normalizedChartData.length > 45
@@ -175,11 +182,13 @@ export const HistorySummary = ({
     rangeLabel,
     translate: t,
   }), [comparisonSummary, summaryInsights, globalSummary, weeklyDailyData, rangeLabel, t]);
-  const recordRange: '30d' | '90d' | 'all' = summaryRange === '90d' ? '90d' : summaryRange === '1y' || summaryRange === 'all' ? 'all' : '30d';
+  // Personal Records scope matches the selected range 1:1 so the label
+  // "Best efforts from the selected period" stays accurate.
+  const recordRange = summaryRange;
   const recordSessions = useMemo(() => {
-    if (recordRange === 'all') return sessions;
+    const days = RECORD_RANGE_DAYS[recordRange];
+    if (days === null) return sessions;
 
-    const days = recordRange === '30d' ? 30 : 90;
     const start = new Date();
     start.setDate(start.getDate() - (days - 1));
     start.setHours(0, 0, 0, 0);
@@ -249,7 +258,7 @@ export const HistorySummary = ({
           ? t('This week is above your usual load, so avoid another sharp increase.')
           : t('This week is much higher than your usual load, so recovery should be prioritized.');
   const loadAnalysisDetail = loadRatio === null
-    ? t('Keep adding easy sessions so the app can build a reliable 28-day baseline.')
+    ? t('Keep adding easy sessions so the app can build a reliable 3-week baseline.')
     : loadRatio < 0.8
       ? t('If you feel recovered, you can build gradually; avoid jumping straight into a very hard week.')
       : loadRatio <= 1.3
@@ -553,7 +562,7 @@ export const HistorySummary = ({
                 </div>
               )}
             </div>
-            <div className={`relative flex items-end min-h-[260px] h-[clamp(260px,40vh,420px)] w-full pb-2 ${ultraDense ? 'gap-px' : compactLabels ? 'gap-[2px]' : 'gap-1.5'}`}>
+            <div className={`relative flex items-end min-h-[260px] h-[clamp(260px,40vh,420px)] w-full pb-2 ${denseData ? 'gap-px' : compactLabels ? 'gap-[2px]' : 'gap-1.5'}`}>
               {averageLine && (
                 <div
                   className="pointer-events-none absolute left-0 right-2 z-10 border-t border-dashed"
@@ -689,7 +698,7 @@ export const HistorySummary = ({
               {t('Load Guidance')}
             </div>
             <div className="mt-1 text-[11px] font-mono uppercase tracking-[0.12em] text-white/45">
-              {t('7-day load compared with a 28-day baseline')}
+              {t('7-day load compared with a 3-week baseline')}
             </div>
           </div>
           <div className={`rounded border px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-[0.14em] ${
@@ -706,7 +715,7 @@ export const HistorySummary = ({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: t('This week'), value: trainingLoadMetrics.acuteLoad, detail: t('Total load in the last 7 days') },
-            { label: t('Usual week'), value: trainingLoadMetrics.chronicLoad, detail: t('Your 28-day weekly baseline') },
+            { label: t('Usual week'), value: trainingLoadMetrics.chronicLoad, detail: t('Your 3-week baseline') },
             { label: t('Load Ratio'), value: trainingLoadMetrics.acuteChronicRatio?.toFixed(2) ?? '--', detail: t('This week / usual week') },
             { label: t('Recommendation'), value: t(trainingLoadMetrics.recommendation), detail: t('Suggested next training focus') },
           ].map(metric => (
@@ -1002,7 +1011,7 @@ export const HistorySummary = ({
                       </div>
                       <div className={`mt-1 text-[9px] font-mono uppercase tracking-[0.12em] ${deltaColor}`}>
                         {delta.hasBaseline
-                          ? `${delta.direction === 'up' ? '+' : delta.direction === 'down' ? '' : ''}${delta.value}%`
+                          ? `${delta.direction === 'up' ? '+' : ''}${delta.value}%`
                           : metric > 0
                             ? t('new')
                             : t('none')}

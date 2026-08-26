@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { formatDuration } from '../utils/formatters';
 import { HR_ZONES, getSafeMaxHr } from '@/lib/constants';
 import { calculateEdwardsTrimp, calculateTrainingLoadMetrics } from '@/lib/training-load';
+import { getFinalMetrics } from '@/lib/workout-analysis';
 import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import type { HistoryData } from '@/store/useWorkoutStore';
@@ -27,6 +28,10 @@ interface UseWorkoutHistoryDataProps {
 }
 
 const DAY_MS = 86400000;
+
+/** Duration-weighted average: Σ(value × duration) / Σ duration. */
+const weightedAvg = (weightedSum: number, totalDuration: number) =>
+  totalDuration > 0 ? Math.round(weightedSum / totalDuration) : 0;
 
 const getLocalDateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -88,67 +93,102 @@ const buildZoneStats = (maxHr: number) => {
   }));
 };
 
+/**
+ * Module-level memo for calculateFullStats: keyed by session object identity
+ * so each session is computed once per maxHr without mutating hook-owned state.
+ */
+const fullStatsCache = new WeakMap<WorkoutSession, { maxHr: number; stats: FullWorkoutStats }>();
+
 export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryRange, offsetDays = 0 }: UseWorkoutHistoryDataProps): WorkoutHistoryData => {
   const { locale, t } = useI18n();
 
   const calculateFullStats = useMemo(() => (session: WorkoutSession): FullWorkoutStats => {
     const history = session.history || [];
     const safeMax = getSafeMaxHr(maxHr);
-    const emptyStats: FullWorkoutStats = {
-      ...session.stats,
-      avgSpeed: '0.0',
-      maxSpeed: '0.0',
-      totalDistance: '0.0',
-      totalCalories: 0,
-      avgResistance: 0,
-      maxResistance: 0,
-      moveMinutes: 0,
-      trainingLoad: calculateEdwardsTrimp([], session.duration || 0, maxHr),
-      zones: [],
-    };
 
-    if (history.length === 0) return emptyStats;
+    const cachedEntry = fullStatsCache.get(session);
+    if (cachedEntry && cachedEntry.maxHr === maxHr) {
+      return cachedEntry.stats;
+    }
 
-    const trainingLoad = calculateEdwardsTrimp(history, session.duration || 0, safeMax);
+    const computeStats = (): FullWorkoutStats => {
+      const emptyStats: FullWorkoutStats = {
+        ...session.stats,
+        avgSpeed: '0.0',
+        maxSpeed: '0.0',
+        totalDistance: '0.0',
+        totalDistanceKm: 0,
+        totalCalories: 0,
+        avgResistance: 0,
+        maxResistance: 0,
+        moveMinutes: 0,
+        trainingLoad: { score: 0, label: 'Recovery', activeMinutes: 0 },
+        zones: [],
+      };
 
-    const activePoints = history.filter((h: HistoryData) => h.hr >= (safeMax * HR_ZONES[0].minPct)).length;
-    const activeRatio = activePoints / history.length;
-    const activeSeconds = Math.floor(session.duration * activeRatio);
-    const moveMinutes = Math.floor(activeSeconds / 60);
+      if (history.length === 0) return emptyStats;
 
-    const zones = buildZoneStats(safeMax);
+      // Safe max for any array size (spread Math.max overflows the call
+      // stack on very long recordings).
+      const maxBy = <T>(items: T[], pick: (item: T) => number) =>
+        items.reduce((max, item) => Math.max(max, pick(item)), 0);
 
-    history.forEach((h: HistoryData) => {
-      const ratio = h.hr / safeMax;
-      // Last zone is catch-all for >= 90% (handles HR above 100% maxHR)
-      for (let i = zones.length - 1; i >= 0; i--) {
-        if (ratio >= zones[i].min) {
-          zones[i].seconds++;
-          break;
+      const trainingLoad = calculateEdwardsTrimp(history, session.duration || 0, safeMax);
+
+      const activePoints = history.filter((h: HistoryData) => h.hr >= (safeMax * HR_ZONES[0].minPct)).length;
+      const activeRatio = activePoints / history.length;
+      const activeSeconds = Math.floor(session.duration * activeRatio);
+      const moveMinutes = Math.floor(activeSeconds / 60);
+
+      const zones = buildZoneStats(safeMax);
+
+      history.forEach((h: HistoryData) => {
+        const ratio = h.hr / safeMax;
+        // Last zone is catch-all for >= 90% (handles HR above 100% maxHR)
+        for (let i = zones.length - 1; i >= 0; i--) {
+          if (ratio >= zones[i].min) {
+            zones[i].seconds++;
+            break;
+          }
         }
-      }
-    });
+      });
 
-    return {
-      ...session.stats,
-      avgSpeed: (history.reduce((total, point) => total + point.speed, 0) / history.length).toFixed(1),
-      maxSpeed: Math.max(...history.map(point => point.speed)).toFixed(1),
-      totalDistance: (Math.max(...history.map(point => point.distance)) / 1000).toFixed(2),
-      totalCalories: Math.max(...history.map(point => point.calories)),
-      avgResistance: Math.round(history.reduce((total, point) => total + point.resistance, 0) / history.length),
-      maxResistance: Math.max(...history.map(point => point.resistance)),
-      moveMinutes,
-      trainingLoad,
-      zones: zones.map(zone => {
-        const ratio = zone.seconds / history.length;
-        const allocatedSeconds = Math.round(ratio * session.duration);
-        return {
-          ...zone,
-          percent: Math.round(ratio * 100),
-          time: formatDuration(allocatedSeconds)
-        };
-      })
+      const { distanceMeters: maxDistanceMeters, calories: maxCalories } = getFinalMetrics(history);
+      const totalDistanceKm = maxDistanceMeters / 1000;
+
+      return {
+        ...session.stats,
+        avgSpeed: (history.reduce((total, point) => total + point.speed, 0) / history.length).toFixed(1),
+        maxSpeed: maxBy(history, point => point.speed).toFixed(1),
+        totalDistance: totalDistanceKm.toFixed(2),
+        totalDistanceKm,
+        totalCalories: maxCalories,
+        avgResistance: Math.round(history.reduce((total, point) => total + point.resistance, 0) / history.length),
+        maxResistance: maxBy(history, point => point.resistance),
+        moveMinutes,
+        trainingLoad,
+        zones: zones.map((zone, index) => {
+          const ratio = zone.seconds / history.length;
+          // Seconds must sum exactly to the session duration: the last zone
+          // absorbs the rounding remainder.
+          const seconds = index === zones.length - 1
+            ? Math.max(0, session.duration - zones.slice(0, -1).reduce(
+                (total, z) => total + Math.round((z.seconds / history.length) * session.duration),
+                0
+              ))
+            : Math.round(ratio * session.duration);
+          return {
+            ...zone,
+            percent: Math.round(ratio * 100),
+            time: formatDuration(seconds)
+          };
+        })
+      };
     };
+
+    const stats = computeStats();
+    fullStatsCache.set(session, { maxHr, stats });
+    return stats;
   }, [maxHr]);
 
   const filteredSessions = useMemo(() => {
@@ -196,13 +236,13 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         : new Date(endDate);
     startDate.setHours(0, 0, 0, 0);
 
-    const dayMap: Record<string, { distance: number; calories: number; duration: number; trimp: number; sessions: number; cadenceSum: number }> = {};
+    const dayMap: Record<string, { distance: number; calories: number; duration: number; trimp: number; sessions: number; cadenceWeighted: number }> = {};
 
     const current = new Date(startDate);
     // Use a while loop to increment days safely
     while (current <= endDate) {
       const key = getLocalDateKey(current);
-      dayMap[key] = { distance: 0, calories: 0, duration: 0, trimp: 0, sessions: 0, cadenceSum: 0 };
+      dayMap[key] = { distance: 0, calories: 0, duration: 0, trimp: 0, sessions: 0, cadenceWeighted: 0 };
       current.setDate(current.getDate() + 1);
     }
 
@@ -210,12 +250,13 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       const key = getLocalDateKey(new Date(session.date));
       if (dayMap[key] !== undefined) {
         const full = calculateFullStats(session);
-        dayMap[key].distance += parseFloat(full.totalDistance) || 0;
+        const duration = session.duration || 0;
+        dayMap[key].distance += full.totalDistanceKm || 0;
         dayMap[key].calories += full.totalCalories || 0;
-        dayMap[key].duration += session.duration || 0;
+        dayMap[key].duration += duration;
         dayMap[key].trimp += full.trainingLoad.score || 0;
         dayMap[key].sessions += 1;
-        dayMap[key].cadenceSum += session.stats.avgCadence || 0;
+        dayMap[key].cadenceWeighted += (session.stats.avgCadence || 0) * duration;
       }
     });
 
@@ -233,7 +274,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         durationSeconds: data.duration,
         trimp: Math.round(data.trimp * 10) / 10,
         sessions: data.sessions,
-        cadence: data.sessions > 0 ? Math.round(data.cadenceSum / data.sessions) : 0,
+        cadence: weightedAvg(data.cadenceWeighted, data.duration),
         isToday,
         hasData: data.sessions > 0,
       };
@@ -276,9 +317,9 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     totalCalories: number;
     totalDuration: number;
     totalTrainingLoad: number;
-    avgHrSum: number;
-    avgPowerSum: number;
-    avgCadenceSum: number;
+    avgHrWeighted: number;
+    avgPowerWeighted: number;
+    avgCadenceWeighted: number;
     sessionCount: number;
   }
 
@@ -313,8 +354,11 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         sortKey = date.getFullYear() * 12 + date.getMonth();
         label = date.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
       } else if (summaryPeriod === 'weekly') {
+        // UTC day arithmetic avoids DST-fraction drift in the week number.
         const startOfYear = new Date(date.getFullYear(), 0, 1);
-        const pastDaysOfYear = (date.getTime() - startOfYear.getTime()) / 86400000;
+        const dateUtc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+        const startOfYearUtc = Date.UTC(date.getFullYear(), 0, 1);
+        const pastDaysOfYear = Math.floor((dateUtc - startOfYearUtc) / DAY_MS);
         const weekNum = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
         key = `${date.getFullYear()}-W${weekNum}`;
         sortKey = date.getFullYear() * 100 + weekNum;
@@ -322,6 +366,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       }
 
       const full = calculateFullStats(session);
+      const duration = session.duration || 0;
 
       if (!groups[key]) {
         groups[key] = {
@@ -332,20 +377,20 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
           totalCalories: 0,
           totalDuration: 0,
           totalTrainingLoad: 0,
-          avgHrSum: 0,
-          avgPowerSum: 0,
-          avgCadenceSum: 0,
+          avgHrWeighted: 0,
+          avgPowerWeighted: 0,
+          avgCadenceWeighted: 0,
           sessionCount: 0,
         };
       }
 
-      groups[key].totalDistance += parseFloat(full.totalDistance) || 0;
+      groups[key].totalDistance += full.totalDistanceKm || 0;
       groups[key].totalCalories += full.totalCalories || 0;
-      groups[key].totalDuration += session.duration || 0;
+      groups[key].totalDuration += duration;
       groups[key].totalTrainingLoad += full.trainingLoad.score || 0;
-      groups[key].avgHrSum += session.stats.avgHr || 0;
-      groups[key].avgPowerSum += session.stats.avgPower || 0;
-      groups[key].avgCadenceSum += session.stats.avgCadence || 0;
+      groups[key].avgHrWeighted += (session.stats.avgHr || 0) * duration;
+      groups[key].avgPowerWeighted += (session.stats.avgPower || 0) * duration;
+      groups[key].avgCadenceWeighted += (session.stats.avgCadence || 0) * duration;
       groups[key].sessionCount += 1;
     });
 
@@ -353,9 +398,9 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       .sort((a, b) => a.sortKey - b.sortKey)
       .map(g => ({
         ...g,
-        avgHr: Math.round(g.avgHrSum / g.sessionCount),
-        avgPower: Math.round(g.avgPowerSum / g.sessionCount),
-        avgCadence: Math.round(g.avgCadenceSum / g.sessionCount),
+        avgHr: weightedAvg(g.avgHrWeighted, g.totalDuration),
+        avgPower: weightedAvg(g.avgPowerWeighted, g.totalDuration),
+        avgCadence: weightedAvg(g.avgCadenceWeighted, g.totalDuration),
         totalDistance: parseFloat(g.totalDistance.toFixed(2)),
         totalTrainingLoad: Math.round(g.totalTrainingLoad * 10) / 10,
       }));
@@ -371,9 +416,9 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       : null;
     const totalTrainingLoad = summaryData.reduce((acc, curr) => acc + (curr.totalTrainingLoad || 0), 0);
     const totalSessions = summaryData.reduce((acc, curr) => acc + curr.sessionCount, 0);
-    const sevenDayTrainingLoad = weeklyDailyData
-      .slice(-7)
-      .reduce((acc, day) => acc + (day.trimp || 0), 0);
+    // Single source for the 7-day load: the raw acute load used by Load
+    // Guidance (rounds only once, no per-day rounding accumulation).
+    const sevenDayTrainingLoad = trainingLoadMetrics.acuteLoad;
 
     return {
       totalDistance: summaryData.reduce((acc, curr) => acc + curr.totalDistance, 0).toFixed(2),
@@ -382,12 +427,12 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       totalSessions,
       totalTrainingLoad: Math.round(totalTrainingLoad * 10) / 10,
       averageTrainingLoad: totalSessions > 0 ? Math.round((totalTrainingLoad / totalSessions) * 10) / 10 : 0,
-      sevenDayTrainingLoad: Math.round(sevenDayTrainingLoad * 10) / 10,
+      sevenDayTrainingLoad,
       hrrSessions: hrrSessions.length,
       avgHrr,
       bestHrr,
     };
-  }, [summaryData, filteredSessions, weeklyDailyData]);
+  }, [summaryData, filteredSessions, trainingLoadMetrics]);
 
   const summaryInsights = useMemo<SummaryInsights | null>(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;
@@ -409,7 +454,6 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       current.totalDistance > best.totalDistance ? current : best
     , summaryData[0]);
 
-    let currentStreak = 0;
     let longestStreak = 0;
     let runningStreak = 0;
     for (const day of weeklyDailyData) {
@@ -421,7 +465,15 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       }
     }
 
-    for (let i = weeklyDailyData.length - 1; i >= 0; i--) {
+    // Grace: today has not ended yet — when the last day is today without
+    // data, count the streak from yesterday instead of breaking to 0.
+    let currentStreak = 0;
+    let streakStartIndex = weeklyDailyData.length - 1;
+    const lastDay = weeklyDailyData[streakStartIndex];
+    if (lastDay?.isToday && !lastDay.hasData) {
+      streakStartIndex -= 1;
+    }
+    for (let i = streakStartIndex; i >= 0; i--) {
       if (weeklyDailyData[i].hasData) currentStreak += 1;
       else break;
     }
@@ -450,7 +502,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     const summarizeSessions = (targetSessions: WorkoutSession[]) => {
       return targetSessions.reduce((acc, session) => {
         const full = calculateFullStats(session);
-        acc.distance += parseFloat(full.totalDistance) || 0;
+        acc.distance += full.totalDistanceKm || 0;
         acc.calories += full.totalCalories || 0;
         acc.duration += session.duration || 0;
         acc.trimp += full.trainingLoad.score || 0;

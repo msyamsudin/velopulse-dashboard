@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBluetoothStore } from './store/useBluetoothStore';
-import { calculateSessionCalories, useWorkoutStore } from './store/useWorkoutStore';
+import { sensorCaloriesDelta, useWorkoutStore } from './store/useWorkoutStore';
 import { useAuthStore } from './store/useAuthStore';
 import { HR_ZONES, getActiveHrZoneIndex } from '@/lib/constants';
 
@@ -211,15 +211,10 @@ export default function App() {
   };
 
   const latestHistoryPoint = workoutHistory[workoutHistory.length - 1];
-  const fallbackSessionCalories = Math.max(0, (bleData.calories || 0) - startCalories);
-  const currentSessionCalories = isRecording
-    ? calculateSessionCalories(
-        bleData,
-        startCalories,
-        latestHistoryPoint?.calories ?? fallbackSessionCalories,
-        0
-      )
-    : (bleData.calories || 0);
+  // Single calorie source: the shared fractional accumulator stored on the
+  // latest history point. The sensor delta only serves as a fallback before
+  // the first point of a session exists.
+  const currentSessionCalories = latestHistoryPoint?.calories ?? sensorCaloriesDelta(bleData.calories, startCalories);
 
   const currentData: TelemetrySnapshot = {
     hr: bleData.heartRate || 0,
@@ -228,7 +223,7 @@ export default function App() {
     speed: bleData.speed || 0,
     distance: isRecording ? Math.max(0, (bleData.distance || 0) - startDistance) : (bleData.distance || 0),
     resistance: bleData.resistance || 0,
-    calories: currentSessionCalories
+    calories: Math.round(currentSessionCalories)
   };
 
   const getHrZone = (hr: number) => {

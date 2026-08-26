@@ -1,8 +1,11 @@
 
 import JSZip from 'jszip';
+import { calcCaloriesFromPower, DELTA_MAX_SECONDS } from './physics';
+import { getFinalMetrics } from './workout-analysis';
 
 export interface HistoryData {
   time: string;
+  ts?: number;
   hr: number;
   cadence: number;
   power: number;
@@ -28,6 +31,59 @@ export interface WorkoutSession {
   history: HistoryData[];
   synced_to_google?: boolean;
 }
+
+/**
+ * Reintegrates calories from the power series when the stored column is
+ * unusable (legacy sessions whose per-second rounding froze it at ~0).
+ * Shared by the TCX and CSV/JSON/PDF exporters so every format agrees.
+ */
+const reintegrateCalories = (history: HistoryData[]) => {
+  const hasPower = history.some(point => point.power > 0);
+  if (!hasPower) return 0;
+
+  let total = 0;
+  let previousTs: number | null = null;
+  history.forEach(point => {
+    let deltaSeconds = 1;
+    if (point.ts && previousTs !== null) {
+      deltaSeconds = Math.min(Math.max((point.ts - previousTs) / 1000, 0), DELTA_MAX_SECONDS);
+    }
+    total += calcCaloriesFromPower(point.power || 0, deltaSeconds);
+    previousTs = point.ts ?? null;
+  });
+  return Math.round(total);
+};
+
+/**
+ * Session calories for the TCX lap element. Prefers the stored accumulator
+ * (last history point); for legacy sessions whose calorie column flatlined
+ * at ~0 (per-second rounding bug), reintegrates power with real Δt.
+ */
+const getSessionCalories = (session: WorkoutSession) => {
+  const history = session.history || [];
+  const lastPoint = history[history.length - 1];
+  if (!lastPoint) return 0;
+
+  const storedCalories = Math.round(lastPoint.calories || 0);
+  if (storedCalories > 0) return storedCalories;
+
+  return reintegrateCalories(history);
+};
+
+const buildLapSummary = (session: WorkoutSession) => {
+  const lastPoint = session.history?.[session.history.length - 1];
+  const avgHr = session.stats?.avgHr || 0;
+  const maxHr = session.stats?.maxHr || 0;
+  return [
+    `<TotalTimeSeconds>${session.duration}</TotalTimeSeconds>`,
+    `<DistanceMeters>${(lastPoint?.distance || 0).toFixed(1)}</DistanceMeters>`,
+    maxHr > 0 ? `<MaximumHeartRateBpm><Value>${Math.round(maxHr)}</Value></MaximumHeartRateBpm>` : '',
+    `<Calories>${getSessionCalories(session)}</Calories>`,
+    avgHr > 0 ? `<AverageHeartRateBpm><Value>${Math.round(avgHr)}</Value></AverageHeartRateBpm>` : '',
+    `<Intensity>Active</Intensity>`,
+    `<TriggerMethod>Manual</TriggerMethod>`,
+  ].filter(Boolean).join('\n        ');
+};
 
 /**
  * Generates a TCX (Training Center XML) file from a workout session.
@@ -71,11 +127,7 @@ export const generateTCX = (session: WorkoutSession): string => {
     <Activity Sport="Biking">
       <Id>${startTime}</Id>
       <Lap StartTime="${startTime}">
-        <TotalTimeSeconds>${session.duration}</TotalTimeSeconds>
-        <DistanceMeters>${(session.history[session.history.length - 1]?.distance || 0).toFixed(1)}</DistanceMeters>
-        <Calories>${Math.round(session.history[session.history.length - 1]?.calories || 0)}</Calories>
-        <Intensity>Active</Intensity>
-        <TriggerMethod>Manual</TriggerMethod>
+        ${buildLapSummary(session)}
         <Track>${trackpoints}
         </Track>
       </Lap>
@@ -139,11 +191,7 @@ export const generateCombinedTCX = (sessions: WorkoutSession[]): string => {
     <Activity Sport="Biking">
       <Id>${startTime}</Id>
       <Lap StartTime="${startTime}">
-        <TotalTimeSeconds>${session.duration}</TotalTimeSeconds>
-        <DistanceMeters>${(session.history[session.history.length - 1]?.distance || 0).toFixed(1)}</DistanceMeters>
-        <Calories>${Math.round(session.history[session.history.length - 1]?.calories || 0)}</Calories>
-        <Intensity>Active</Intensity>
-        <TriggerMethod>Manual</TriggerMethod>
+        ${buildLapSummary(session)}
         <Track>${trackpoints}
         </Track>
       </Lap>
@@ -228,9 +276,12 @@ const csvEscape = (value: string | number) => {
 
 const getSessionReportRows = (sessions: WorkoutSession[]) => {
   return sessions.map(session => {
-    const lastPoint = session.history[session.history.length - 1] || {} as HistoryData;
-    const distanceKm = Number(((lastPoint.distance || 0) / 1000).toFixed(2));
-    const calories = Math.round(lastPoint.calories || 0);
+    const history = session.history || [];
+    const { distanceMeters, calories: maxCalories } = getFinalMetrics(history);
+    const distanceKm = Number((distanceMeters / 1000).toFixed(2));
+    // Legacy sessions whose stored calories flatlined are reintegrated here
+    // too, matching the TCX exporter.
+    const calories = maxCalories > 0 ? Math.round(maxCalories) : reintegrateCalories(history);
     const avgSpeed = session.duration > 0 ? Number((distanceKm / (session.duration / 3600)).toFixed(1)) : 0;
 
     return {

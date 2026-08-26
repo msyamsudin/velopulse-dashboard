@@ -30,6 +30,8 @@ export interface FullWorkoutStats {
   maxSpeed: string;
   totalDistance: string;
   totalCalories: number;
+  /** Raw (unrounded) distance in km for lossless aggregation. */
+  totalDistanceKm: number;
   avgResistance: number;
   maxResistance: number;
   moveMinutes: number;

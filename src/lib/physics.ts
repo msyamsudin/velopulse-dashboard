@@ -16,3 +16,10 @@ export function calcCaloriesFromPower(watt: number, durationSec: number): number
   const JOULES_PER_KCAL = 4184;
   return (watt * durationSec) / (JOULES_PER_KCAL * GROSS_EFFICIENCY);
 }
+
+/**
+ * Upper bound (seconds) for the interval credited to a single history point.
+ * Shared by every calorie/recovery integration so a long dropout cannot
+ * extrapolate one stale sample across minutes of dead time.
+ */
+export const DELTA_MAX_SECONDS = 5;

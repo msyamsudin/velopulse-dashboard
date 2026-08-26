@@ -1,5 +1,5 @@
 import { getSafeMaxHr } from './constants';
-import type { WorkoutSession } from '@/store/useWorkoutStore';
+import type { WorkoutSession, HistoryData } from '@/store/useWorkoutStore';
 import type {
   ComparisonSummary,
   DailySummaryDay,
@@ -10,17 +10,45 @@ import type {
   WorkoutZoneStat,
 } from '@/lib/history-types';
 
-export const getSessionOutcome = (session: WorkoutSession) => {
+/**
+ * Single source of truth for a session's final distance/calories (max over
+ * the history, robust against counter resets). Shared by the summary
+ * aggregates, personal records, and every export format.
+ */
+export const getFinalMetrics = (history: HistoryData[]) => {
+  let distanceMeters = 0;
+  let calories = 0;
+  for (const point of history) {
+    if (point.distance > distanceMeters) distanceMeters = point.distance;
+    if (point.calories > calories) calories = point.calories;
+  }
+  return { distanceMeters, calories };
+};
+
+const outcomeCache = new WeakMap<WorkoutSession, ReturnType<typeof computeOutcome>>();
+
+const computeOutcome = (session: WorkoutSession) => {
   const history = session?.history || [];
-  const lastPoint = history[history.length - 1];
+  const { distanceMeters, calories } = getFinalMetrics(history);
 
   return {
-    distanceKm: Number(((lastPoint?.distance || 0) / 1000).toFixed(2)),
-    calories: Math.round(lastPoint?.calories || 0),
+    distanceKm: Number((distanceMeters / 1000).toFixed(2)),
+    calories: Math.round(calories),
     duration: session?.duration || 0,
     avgPower: session?.stats?.avgPower || 0,
     avgHr: session?.stats?.avgHr || 0,
   };
+};
+
+export const getSessionOutcome = (session: WorkoutSession) => {
+  if (!session) return computeOutcome(session);
+
+  const cached = outcomeCache.get(session);
+  if (cached) return cached;
+
+  const outcome = computeOutcome(session);
+  outcomeCache.set(session, outcome);
+  return outcome;
 };
 
 export const getWorkoutQuality = (session: WorkoutSession, maxHr: number) => {

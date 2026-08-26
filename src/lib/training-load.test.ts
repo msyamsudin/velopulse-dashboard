@@ -37,15 +37,26 @@ describe('getTrainingLoadLabel', () => {
 });
 
 describe('calculateTrainingLoadMetrics', () => {
-  it('normalizes chronic load to a weekly 28-day baseline', () => {
+  it('normalizes chronic load to the 3-week baseline before the acute week', () => {
     const result = calculateTrainingLoadMetrics(Array.from({ length: 28 }, (_, index) => index % 2 === 0 ? 10 : 0));
 
     expect(result.acuteLoad).toBe(30);
-    expect(result.chronicLoad).toBe(35);
-    expect(result.acuteChronicRatio).toBe(0.86);
+    expect(result.chronicLoad).toBe(36.7);
+    expect(result.acuteChronicRatio).toBe(0.82);
     expect(result.monotony).toBeGreaterThan(0);
     expect(result.strain).toBeGreaterThan(0);
     expect(result.recommendation).toBe('Maintain');
+  });
+
+  it('keeps the acute week out of the chronic baseline', () => {
+    const result = calculateTrainingLoadMetrics([
+      ...Array(21).fill(10),
+      ...Array(7).fill(30),
+    ]);
+
+    expect(result.acuteLoad).toBe(210);
+    expect(result.chronicLoad).toBe(70); // 21 days × 10 / 3 weeks, no double-counting
+    expect(result.acuteChronicRatio).toBe(3);
   });
 
   it('recommends recovery after a sharp load increase', () => {
