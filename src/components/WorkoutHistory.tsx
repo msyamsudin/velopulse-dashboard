@@ -9,6 +9,7 @@ import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
 import { HistoryDetail } from './history/HistoryDetail';
+import { SessionCharts } from './history/SessionCharts';
 import { Download, RefreshCw, Search, Upload, X, AlertTriangle, Trash2 } from 'lucide-react';
 import type { DeleteSessionResult, ImportTcxResult, WorkoutSession } from '../store/useWorkoutStore';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
@@ -44,7 +45,7 @@ export const WorkoutHistory = ({
 }: WorkoutHistoryProps) => {
   const { t } = useI18n();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'sessions' | 'summary'>('sessions');
+  const [viewMode, setViewMode] = useState<'sessions' | 'charts' | 'summary'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
   const [summaryRange, setSummaryRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
   const [weeklyMetric, setWeeklyMetric] = useState<'distance' | 'calories' | 'duration' | 'cadence' | 'trimp'>('distance');
@@ -152,7 +153,7 @@ export const WorkoutHistory = ({
     }
   };
 
-  const summaryInputSessions = viewMode !== 'sessions' ? sessions : [];
+  const summaryInputSessions = viewMode === 'summary' ? sessions : [];
 
   const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData } = useWorkoutHistoryData({
     sessions: summaryInputSessions,
@@ -322,6 +323,7 @@ export const WorkoutHistory = ({
                   value={viewMode}
                   options={[
                     { label: t('Sessions'), value: 'sessions' },
+                    { label: t('Charts'), value: 'charts' },
                     { label: t('Summary'), value: 'summary' },
                   ]}
                   onChange={(value) => setViewMode(value as typeof viewMode)}
@@ -563,6 +565,14 @@ export const WorkoutHistory = ({
                     </div>
                   )}
                 </div>
+              </div>
+            ) : viewMode === 'charts' ? (
+              <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
+                <SessionCharts
+                  sessions={filteredSessions}
+                  maxHr={maxHr}
+                  onSelectSession={setSelectedSessionId}
+                />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
