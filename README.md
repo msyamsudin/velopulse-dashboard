@@ -14,7 +14,7 @@ VeloPulse adalah dashboard fitness untuk memvisualisasikan data saat latihan.
 
 1.  **Clone repositori**:
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/msyamsudin/velopulse-dashboard.git
     cd velopulse-dashboard
     ```
 
