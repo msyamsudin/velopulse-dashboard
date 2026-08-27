@@ -6,7 +6,7 @@ VeloPulse adalah dashboard fitness untuk memvisualisasikan data saat latihan.
 
 ### Prasyarat
 
-- **Node.js** (disarankan versi LTS terbaru)
+- **Node.js** (versi dikunci di `.nvmrc` / `.node-version` — saat ini **24**; untuk nvm/fnm/volta jalankan `nvm use` / `fnm use` agar otomatis switch)
 - **pnpm** (versi yang dipakai tercantum di field `packageManager` pada `package.json`; aktifkan lewat `corepack enable` jika belum ada)
 - **Akun Supabase** (untuk penyimpanan data)
 
