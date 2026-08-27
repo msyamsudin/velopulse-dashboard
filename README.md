@@ -7,6 +7,7 @@ VeloPulse adalah dashboard fitness untuk memvisualisasikan data saat latihan.
 ### Prasyarat
 
 - **Node.js** (disarankan versi LTS terbaru)
+- **pnpm** (versi yang dipakai tercantum di field `packageManager` pada `package.json`; aktifkan lewat `corepack enable` jika belum ada)
 - **Akun Supabase** (untuk penyimpanan data)
 
 ### Instalasi
@@ -19,7 +20,7 @@ VeloPulse adalah dashboard fitness untuk memvisualisasikan data saat latihan.
 
 2.  **Instal dependensi**:
     ```bash
-    npm install
+    pnpm install
     ```
 
 3.  **Konfigurasi environment variable**:
@@ -66,7 +67,7 @@ bisa dibaca/diubah oleh siapa pun.
 Untuk menjalankan development server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Buka [http://localhost:3000](http://localhost:3000) di browser untuk melihat hasilnya.

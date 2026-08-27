@@ -36,9 +36,9 @@ if not exist ".env" (
 :: 2. Check if node_modules exists
 if not exist "node_modules\" (
     echo [INFO] Node modules not found. Launching initial setup...
-    call npm install
+    call pnpm install
     if %ERRORLEVEL% neq 0 (
-        echo [ERROR] npm install failed. Please check your internet connection.
+        echo [ERROR] pnpm install failed. Please check your internet connection.
         pause
         exit /b %ERRORLEVEL%
     )
@@ -51,6 +51,6 @@ start cmd /c "timeout /t 5 /nobreak > nul && start http://localhost:%PORT%"
 :: 4. Start the application
 echo [INFO] Ignition... All systems GO.
 echo.
-call npm run dev
+call pnpm run dev
 
 pause

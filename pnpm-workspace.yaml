@@ -1,0 +1,10 @@
+# Konfigurasi pnpm 11 (setting pindah ke sini dari field "pnpm" di package.json).
+# Repositori ini paket tunggal (bukan monorepo); file ini hanya berisi setting.
+#
+# Paket berikut diizinkan menjalankan build/postinstall script:
+# - sharp: menjalankan install/check.js — verifikasi binary platform
+#   (binary asli @img/sharp-win32-x64 sudah tersedia via optionalDependencies)
+# - unrs-resolver: napi-postinstall check untuk binding native
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
