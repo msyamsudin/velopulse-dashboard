@@ -1,4 +1,5 @@
 import { motion } from 'motion/react';
+import { SaveAnimationTest } from './SaveAnimationTest';
 
 interface TelemetryLogProps {
   rawLogs: string[];
@@ -19,12 +20,15 @@ export const TelemetryLog = ({ rawLogs, copyLogs, copyStatus }: TelemetryLogProp
           <span>Raw Bluetooth Telemetry</span>
           <span className="opacity-50 text-[8px] font-normal">{'// Last 50 packets'}</span>
         </div>
-        <button 
-          onClick={copyLogs}
-          className="px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 transition-colors text-[9px] flex items-center gap-1"
-        >
-          {copyStatus === 'copied' ? 'COPIED!' : 'COPY LOGS'}
-        </button>
+        <div className="flex items-center gap-2">
+          <SaveAnimationTest />
+          <button 
+            onClick={copyLogs}
+            className="px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 transition-colors text-[9px] flex items-center gap-1"
+          >
+            {copyStatus === 'copied' ? 'COPIED!' : 'COPY LOGS'}
+          </button>
+        </div>
       </div>
       <div className="font-mono text-[10px] h-48 overflow-y-auto space-y-1 text-yellow-500/80">
         {rawLogs.length === 0 ? (

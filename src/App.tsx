@@ -73,6 +73,9 @@ export default function App() {
   const incrementElapsed = useWorkoutStore(state => state.incrementElapsed);
   const addHistoryPoint = useWorkoutStore(state => state.addHistoryPoint);
   const saveSession = useWorkoutStore(state => state.saveSession);
+  const isSavingSession = useWorkoutStore(state => state.isSavingSession);
+  const saveSessionProgress = useWorkoutStore(state => state.saveSessionProgress);
+  const saveSessionPhase = useWorkoutStore(state => state.saveSessionPhase);
   const syncPendingSupabaseSessions = useWorkoutStore(state => state.syncPendingSupabaseSessions);
   const loadHistoryFromSupabase = useWorkoutStore(state => state.loadHistoryFromSupabase);
   const loadMoreHistoryFromSupabase = useWorkoutStore(state => state.loadMoreHistoryFromSupabase);
@@ -358,6 +361,7 @@ export default function App() {
             history={workoutHistory}
             sessionStartTime={sessionStartTime ?? 0}
             onSave={async () => {
+              if (isSavingSession) return; // Prevent double-submit while saving
               await saveSession();
               setShowSummary(false);
             }}
@@ -365,6 +369,9 @@ export default function App() {
               discardSession();
               setShowSummary(false);
             }}
+            isSaving={isSavingSession}
+            saveProgress={saveSessionProgress}
+            savePhase={saveSessionPhase}
           />
         )}
       </AnimatePresence>

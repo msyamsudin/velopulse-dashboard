@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronRight, Download, Heart, Save, Timer, Trash2, Zap } from 'lucide-react';
+import { Check, ChevronRight, Download, Heart, Loader2, Save, Timer, Trash2, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { downloadTCX } from '../lib/export-service';
 import { Panel, StatusPill } from './ui';
 import { useI18n } from '@/i18n';
-import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
+import type { HistoryData, SaveSessionPhase, WorkoutSession } from '@/store/useWorkoutStore';
 
 interface SessionSummaryModalProps {
   stats: {
@@ -24,6 +25,12 @@ interface SessionSummaryModalProps {
   distance: number;
   history?: HistoryData[];
   sessionStartTime?: number;
+  /** True while saveSession() is running; drives the progress bar. */
+  isSaving?: boolean;
+  /** 0–100 save progress reported by the workout store. */
+  saveProgress?: number;
+  /** Current save stage, used to pick a localized progress label. */
+  savePhase?: SaveSessionPhase;
   onSave: () => void;
   onDiscard: () => void;
 }
@@ -45,6 +52,17 @@ interface DetailMetricProps {
 const parseDurationSeconds = (duration: string) =>
   duration.split(':').reduce((acc, time) => (60 * acc) + Number(time), 0);
 
+const SAVE_PHASE_LABEL: Record<SaveSessionPhase, string> = {
+  idle: 'Saving...',
+  preparing: 'Preparing workout data…',
+  local: 'Saving to this device…',
+  sync: 'Syncing to the cloud…',
+  finalizing: 'Finalizing…',
+  done: 'Saved',
+};
+
+const SAVE_SEGMENTS: SaveSessionPhase[] = ['preparing', 'local', 'sync', 'finalizing', 'done'];
+
 export const SessionSummaryModal = ({
   stats,
   duration,
@@ -52,40 +70,59 @@ export const SessionSummaryModal = ({
   distance,
   history,
   sessionStartTime,
+  isSaving = false,
+  saveProgress = 0,
+  savePhase = 'idle',
   onSave,
   onDiscard
 }: SessionSummaryModalProps) => {
   const { t } = useI18n();
-  const canExport = Boolean(history && sessionStartTime);
+
+  // Freeze the summary on first render: the store is cleared by
+  // discardSession() right before the save completes, so the modal must keep
+  // showing the ride it captured instead of zeroed-out live stats.
+  const [snapshot] = useState(() => ({
+    stats,
+    duration,
+    calories,
+    distance,
+    history,
+    sessionStartTime,
+  }));
+  const canExport = Boolean(snapshot.history && snapshot.sessionStartTime);
 
   const handleExport = () => {
-    if (!history || !sessionStartTime) return;
+    if (!snapshot.history || !snapshot.sessionStartTime) return;
 
     const tempSession: WorkoutSession = {
       id: 'temp',
-      sessionStartTime,
-      date: new Date(sessionStartTime).toISOString(),
-      duration: parseDurationSeconds(duration),
+      sessionStartTime: snapshot.sessionStartTime,
+      date: new Date(snapshot.sessionStartTime).toISOString(),
+      duration: parseDurationSeconds(snapshot.duration),
       stats: {
-        avgHr: stats.avgHr,
-        maxHr: stats.maxHr,
-        avgPower: stats.avgPower,
-        maxPower: stats.maxPower,
-        avgCadence: stats.avgCadence,
-        maxCadence: stats.maxCadence,
-        hrrScore: stats.hrrScore,
-        hrrClassification: stats.hrrClassification
+        avgHr: snapshot.stats.avgHr,
+        maxHr: snapshot.stats.maxHr,
+        avgPower: snapshot.stats.avgPower,
+        maxPower: snapshot.stats.maxPower,
+        avgCadence: snapshot.stats.avgCadence,
+        maxCadence: snapshot.stats.maxCadence,
+        hrrScore: snapshot.stats.hrrScore,
+        hrrClassification: snapshot.stats.hrrClassification
       },
-      history
+      history: snapshot.history
     };
 
     downloadTCX(tempSession);
   };
   const handleDiscard = () => {
-    if (confirm(t('Discard this workout? Unsaved session data will be lost.'))) {
+    if (!isSaving && confirm(t('Discard this workout? Unsaved session data will be lost.'))) {
       onDiscard();
     }
   };
+
+  const phaseLabel = isSaving ? t(SAVE_PHASE_LABEL[savePhase]) : '';
+  const isDone = isSaving && savePhase === 'done';
+  const activeSegmentIndex = SAVE_SEGMENTS.indexOf(savePhase);
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-vp-bg/90 p-4 backdrop-blur-xl">
@@ -105,23 +142,23 @@ export const SessionSummaryModal = ({
                 {t('Review the telemetry snapshot before saving this ride.')}
               </p>
             </div>
-            <StatusPill label={`${history?.length || 0} ${t('points')}`} tone={history?.length ? 'ready' : 'neutral'} />
+            <StatusPill label={`${snapshot.history?.length || 0} ${t('points')}`} tone={snapshot.history?.length ? 'ready' : 'neutral'} />
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <ResultMetric icon={<Timer size={15} />} label={t('Duration')} value={duration} tone="text-vp-speed" />
-            <ResultMetric icon={<ChevronRight size={15} />} label={t('Distance')} value={`${(distance / 1000).toFixed(2)} KM`} tone="text-vp-distance" />
-            <ResultMetric icon={<Zap size={15} />} label={t('Calories')} value={`${calories} KCAL`} tone="text-vp-calories" />
-            <ResultMetric icon={<Heart size={15} />} label={t('Avg HR')} value={`${stats.avgHr} BPM`} tone="text-vp-hr" />
+            <ResultMetric icon={<Timer size={15} />} label={t('Duration')} value={snapshot.duration} tone="text-vp-speed" />
+            <ResultMetric icon={<ChevronRight size={15} />} label={t('Distance')} value={`${(snapshot.distance / 1000).toFixed(2)} KM`} tone="text-vp-distance" />
+            <ResultMetric icon={<Zap size={15} />} label={t('Calories')} value={`${snapshot.calories} KCAL`} tone="text-vp-calories" />
+            <ResultMetric icon={<Heart size={15} />} label={t('Avg HR')} value={`${snapshot.stats.avgHr} BPM`} tone="text-vp-hr" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <DetailMetric label={t('Avg Power')} value={`${stats.avgPower} W`} subValue={`${t('Max')} ${stats.maxPower} W`} tone="text-vp-power" />
-            <DetailMetric label={t('Avg Cadence')} value={`${stats.avgCadence} RPM`} subValue={`${t('Max')} ${stats.maxCadence} RPM`} tone="text-vp-cadence" />
-            <DetailMetric label={t('Avg Speed')} value={`${stats.avgSpeed} KM/H`} subValue={`${t('Max')} ${stats.maxSpeed} KM/H`} tone="text-vp-speed" />
+            <DetailMetric label={t('Avg Power')} value={`${snapshot.stats.avgPower} W`} subValue={`${t('Max')} ${snapshot.stats.maxPower} W`} tone="text-vp-power" />
+            <DetailMetric label={t('Avg Cadence')} value={`${snapshot.stats.avgCadence} RPM`} subValue={`${t('Max')} ${snapshot.stats.maxCadence} RPM`} tone="text-vp-cadence" />
+            <DetailMetric label={t('Avg Speed')} value={`${snapshot.stats.avgSpeed} KM/H`} subValue={`${t('Max')} ${snapshot.stats.maxSpeed} KM/H`} tone="text-vp-speed" />
           </div>
 
-          {stats.hrrScore !== undefined && stats.hrrScore !== null && (
+          {snapshot.stats.hrrScore !== undefined && snapshot.stats.hrrScore !== null && (
             <Panel className="border-vp-accent/25 bg-vp-accent/5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
@@ -131,32 +168,98 @@ export const SessionSummaryModal = ({
                   <div>
                     <div className="vp-label">{t('Heart Rate Recovery')}</div>
                     <div className="mt-1 text-sm font-semibold uppercase text-vp-accent">
-                      {stats.hrrClassification}
+                      {snapshot.stats.hrrClassification}
                     </div>
                   </div>
                 </div>
                 <div className="font-mono text-vp-text">
-                  <span className="text-3xl font-black tabular-nums">{stats.hrrScore}</span>
+                  <span className="text-3xl font-black tabular-nums">{snapshot.stats.hrrScore}</span>
                   <span className="ml-1 text-xs text-vp-muted">{t('BPM drop')}</span>
                 </div>
               </div>
             </Panel>
           )}
 
+          {isSaving && (
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={saveProgress}
+              aria-label={phaseLabel}
+              className="border-t border-vp-border pt-5"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  {isDone ? (
+                    <Check size={14} className="shrink-0 text-vp-accent" />
+                  ) : (
+                    <Loader2 size={14} className="shrink-0 animate-spin text-vp-accent" />
+                  )}
+                  <span className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-vp-text/90">
+                    {phaseLabel}
+                  </span>
+                </div>
+                <span className="font-mono text-xs tabular-nums text-vp-muted">
+                  {saveProgress}%
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {SAVE_SEGMENTS.map((segment, index) => {
+                  const isCompleted = index < activeSegmentIndex;
+                  const isActive = index === activeSegmentIndex;
+                  return (
+                    <div key={segment} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                      <div className="flex h-4 items-center justify-center">
+                        {isCompleted ? (
+                          <Check size={12} className="text-vp-accent" />
+                        ) : isActive ? (
+                          <Loader2 size={12} className="animate-spin text-vp-accent" />
+                        ) : (
+                          <span className="h-1 w-1 rounded-full bg-vp-muted/40" />
+                        )}
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                        <motion.div
+                          initial={false}
+                          animate={{
+                            width: isCompleted || isActive ? '100%' : '0%',
+                            backgroundColor: isCompleted || isActive ? '#35f0bd' : 'rgba(255,255,255,0.04)'
+                          }}
+                          transition={{ ease: 'easeOut', duration: 0.3 }}
+                          className={[
+                            'h-full rounded-full',
+                            savePhase === 'sync' && isActive ? 'vp-progress-stripes' : ''
+                          ].filter(Boolean).join(' ')}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-vp-muted">
+                {isDone
+                  ? t('Workout saved to this device and synced to the cloud.')
+                  : t('Please keep this window open until saving finishes.')}
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-3 border-t border-vp-border pt-5 md:grid-cols-3">
             <button
               type="button"
               onClick={onSave}
+              disabled={isSaving}
               aria-label={t('Save workout session')}
-              className="vp-focus-ring flex min-h-12 items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90"
+              className="vp-focus-ring flex min-h-12 items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-60"
             >
-              <Save size={18} />
-              {t('Save')}
+              {isDone ? <Check size={18} /> : isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              {isDone ? t('Saved') : isSaving ? t('Saving...') : t('Save')}
             </button>
             <button
               type="button"
               onClick={handleExport}
-              disabled={!canExport}
+              disabled={isSaving || !canExport}
               aria-label={canExport ? 'Export workout as TCX' : 'Export unavailable until session data is ready'}
               className="vp-button vp-focus-ring min-h-12 text-vp-accent disabled:text-vp-muted"
             >
@@ -166,6 +269,7 @@ export const SessionSummaryModal = ({
             <button
               type="button"
               onClick={handleDiscard}
+              disabled={isSaving}
               aria-label={t('Discard unsaved workout session')}
               className="vp-button vp-button-danger vp-focus-ring min-h-12"
             >

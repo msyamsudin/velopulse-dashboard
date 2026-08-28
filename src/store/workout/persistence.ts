@@ -237,6 +237,7 @@ export const persistSessionHistoryToIndexedDb = (sessions: WorkoutSession[]) => 
   sessionHistoryIndexedDbQueue = sessionHistoryIndexedDbQueue
     .catch(() => undefined)
     .then(() => setWorkoutStorageValue(SESSION_HISTORY_STORAGE_KEY, sessions));
+  return sessionHistoryIndexedDbQueue;
 };
 
 export const writeActiveSession = (state: ActiveSessionSnapshot) => {
@@ -347,9 +348,9 @@ export const persistActiveSession = (
   }
 };
 
-export const persistSessionHistory = (sessions: WorkoutSession[]) => {
+export const persistSessionHistory = (sessions: WorkoutSession[]): Promise<void> | void => {
   if (typeof window === 'undefined') return;
-  persistSessionHistoryToIndexedDb(sessions);
+  const indexedDbWrite = persistSessionHistoryToIndexedDb(sessions);
 
   const localStorageFallback = compactSessionsForStorage(sessions, 10, 20);
   if (
@@ -360,7 +361,7 @@ export const persistSessionHistory = (sessions: WorkoutSession[]) => {
     )
   ) {
     warnedSessionHistoryFallbackStorageFailure = false;
-    return;
+    return indexedDbWrite;
   }
 
   try {
@@ -375,4 +376,6 @@ export const persistSessionHistory = (sessions: WorkoutSession[]) => {
     );
     warnedSessionHistoryFallbackStorageFailure = true;
   }
+
+  return indexedDbWrite;
 };

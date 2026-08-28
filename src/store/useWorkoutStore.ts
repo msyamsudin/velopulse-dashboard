@@ -24,5 +24,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get, api) => ({
   supabaseHistoryLoadedCount: 0,
   hasMoreSupabaseHistory: false,
   supabaseSyncError: null,
+  isSavingSession: false,
+  saveSessionProgress: 0,
+  saveSessionPhase: 'idle',
   ...createWorkoutActions(api),
 }));

@@ -43,6 +43,7 @@ import type {
   ActiveSessionSnapshot,
   HistoryData,
   ImportTcxResult,
+  SaveSessionPhase,
   WorkoutActions,
   WorkoutSession,
   WorkoutState,
@@ -201,6 +202,10 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
     },
 
     saveSession: async () => {
+      // Re-entrancy guard: a fast double-click could fire a second call
+      // before the Save button re-renders disabled.
+      if (get().isSavingSession) return;
+
       const { history, elapsed, sessionHistory, sessionStartTime } = get();
       if (!sessionStartTime) return;
 
@@ -211,52 +216,82 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         return;
       }
 
-      const computed = calculateLiveStats(history, get().hrrScore, get().hrrClassification);
-      const stats = {
-        avgHr: computed.stats.avgHr,
-        maxHr: computed.stats.maxHr,
-        avgPower: computed.stats.avgPower,
-        maxPower: computed.stats.maxPower,
-        avgCadence: computed.stats.avgCadence,
-        maxCadence: computed.stats.maxCadence,
-        avgSpeed: computed.stats.avgSpeed,
-        maxSpeed: computed.stats.maxSpeed,
-        hrrScore: get().hrrScore !== null ? get().hrrScore! : undefined,
-        hrrClassification: get().hrrClassification !== null ? get().hrrClassification! : undefined,
+      // Pushes the save progress bar forward. The modal keeps rendering while
+      // the store is saving, so every update here is visible immediately.
+      const reportProgress = (saveSessionProgress: number, saveSessionPhase: SaveSessionPhase) => {
+        set({ isSavingSession: true, saveSessionProgress, saveSessionPhase });
       };
 
-      const newSession: WorkoutSession = {
-        id: `session_${Date.now()}`,
-        sessionStartTime,
-        date: new Date(sessionStartTime).toISOString(),
-        duration: elapsed,
-        stats,
-        history,
-        synced_to_google: false,
-        synced_to_supabase: false
-      };
+      try {
+        // Let the browser paint the "Saving…" state before heavy work starts,
+        // so the click never looks like a freeze.
+        reportProgress(5, 'preparing');
+        await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Persist full local data through IndexedDB; localStorage keeps only a compact fallback.
-      const updatedHistory = [newSession, ...sessionHistory];
-      set({ sessionHistory: updatedHistory });
-      persistSessionHistory(updatedHistory);
+        const computed = calculateLiveStats(history, get().hrrScore, get().hrrClassification);
+        const stats = {
+          avgHr: computed.stats.avgHr,
+          maxHr: computed.stats.maxHr,
+          avgPower: computed.stats.avgPower,
+          maxPower: computed.stats.maxPower,
+          avgCadence: computed.stats.avgCadence,
+          maxCadence: computed.stats.maxCadence,
+          avgSpeed: computed.stats.avgSpeed,
+          maxSpeed: computed.stats.maxSpeed,
+          hrrScore: get().hrrScore !== null ? get().hrrScore! : undefined,
+          hrrClassification: get().hrrClassification !== null ? get().hrrClassification! : undefined,
+        };
 
-      // Save to Supabase (Background)
-      const syncedSession = await syncSessionToSupabase(newSession);
-      if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
-        console.warn('[Supabase] Workout sync pending:', syncedSession.supabase_sync_error);
+        const newSession: WorkoutSession = {
+          id: `session_${Date.now()}`,
+          sessionStartTime,
+          date: new Date(sessionStartTime).toISOString(),
+          duration: elapsed,
+          stats,
+          history,
+          synced_to_google: false,
+          synced_to_supabase: false
+        };
+
+        // Persist full local data through IndexedDB; localStorage keeps only a compact fallback.
+        reportProgress(20, 'local');
+        const updatedHistory = [newSession, ...sessionHistory];
+        set({ sessionHistory: updatedHistory });
+        await persistSessionHistory(updatedHistory);
+
+        // Save to Supabase (Background). This is the slowest step (config
+        // fetch + row lookup + insert of the full history payload), so the
+        // bar holds at 40% with an animated shimmer until it settles.
+        reportProgress(40, 'sync');
+        const syncedSession = await syncSessionToSupabase(newSession);
+        if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
+          console.warn('[Supabase] Workout sync pending:', syncedSession.supabase_sync_error);
+        }
+
+        reportProgress(80, 'finalizing');
+        set((state) => {
+          const nextHistory = state.sessionHistory.map(session =>
+            session.id === syncedSession.id ? syncedSession : session
+          );
+          persistSessionHistory(nextHistory);
+          return { sessionHistory: nextHistory };
+        });
+
+        // Clear current workout after saving
+        reportProgress(95, 'finalizing');
+        get().discardSession();
+
+        // Hold the completed state briefly so the modal shows "Saved ✓"
+        // before the caller closes it.
+        reportProgress(100, 'done');
+        await new Promise(resolve => setTimeout(resolve, 350));
+      } catch (error) {
+        console.error('Failed to save workout session:', error);
+        set({ isSavingSession: false, saveSessionPhase: 'idle' });
+        throw error;
+      } finally {
+        set({ isSavingSession: false, saveSessionPhase: 'idle' });
       }
-
-      set((state) => {
-        const nextHistory = state.sessionHistory.map(session =>
-          session.id === syncedSession.id ? syncedSession : session
-        );
-        persistSessionHistory(nextHistory);
-        return { sessionHistory: nextHistory };
-      });
-
-      // Clear current workout after saving
-      get().discardSession();
     },
 
     syncPendingSupabaseSessions: async () => {

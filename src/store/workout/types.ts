@@ -69,6 +69,14 @@ export interface LiveWorkoutTotals {
   speedTime: number;
 }
 
+export type SaveSessionPhase =
+  | 'idle'
+  | 'preparing'
+  | 'local'
+  | 'sync'
+  | 'finalizing'
+  | 'done';
+
 export interface ImportTcxResult {
   imported: number;
   skipped: number;
@@ -115,6 +123,12 @@ export interface WorkoutStateFields {
   supabaseHistoryLoadedCount: number;
   hasMoreSupabaseHistory: boolean;
   supabaseSyncError: SupabaseErrorInfo | null;
+  /** True while saveSession() is running; drives the summary-modal progress bar. */
+  isSavingSession: boolean;
+  /** 0–100 save progress, reported by saveSession() as it advances. */
+  saveSessionProgress: number;
+  /** Current save stage, used to pick a localized progress label. */
+  saveSessionPhase: SaveSessionPhase;
 }
 
 export interface WorkoutActions {
