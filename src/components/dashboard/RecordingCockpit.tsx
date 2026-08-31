@@ -9,7 +9,7 @@ import { useI18n } from '@/i18n';
 import { useResistanceAdvisor } from '@/hooks/useResistanceAdvisor';
 import type { RiderProfile, TelemetrySnapshot, WorkoutView } from '@/lib/cockpit-types';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
-import type { LiveWorkoutStats } from '@/store/useWorkoutStore';
+import { useWorkoutStore, type LiveWorkoutStats } from '@/store/useWorkoutStore';
 
 interface RecordingCockpitProps {
   currentData: TelemetrySnapshot;
@@ -46,6 +46,7 @@ interface StripMetricProps {
   colorClass: string;
   progress: number;
   detail: string;
+  badge?: ReactNode;
   isWaiting?: boolean;
 }
 
@@ -138,7 +139,8 @@ const StripMetric = ({
   colorClass,
   progress,
   detail,
-  isWaiting = false
+  isWaiting = false,
+  badge
 }: StripMetricProps) => (
   <section className={`vp-panel min-h-[118px] flex flex-col justify-between ${isWaiting ? 'opacity-70' : ''}`}>
     <div className="flex items-center justify-between gap-3">
@@ -146,7 +148,10 @@ const StripMetric = ({
         <span className={colorClass}>{icon}</span>
         {label}
       </div>
-      <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted">{detail}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        {badge}
+        <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-vp-muted truncate">{detail}</span>
+      </div>
     </div>
 
     <div className="flex items-end justify-between gap-4">
@@ -261,6 +266,15 @@ export const RecordingCockpit = ({
   const cadence = currentData.cadence || 0;
   const power = currentData.power || 0;
   const calories = currentData.calories || 0;
+  // Which calorie source is feeding the accumulator right now? Mirrors the
+  // exact flag calculateSessionCalories uses: power output when a power meter
+  // is (or was) active this session, otherwise the FTMS sensor's total energy.
+  const hasPowerSource = useWorkoutStore(state => state.hasPowerSource);
+  const calorieSource: 'power' | 'sensor' | 'none' = hasPowerSource
+    ? 'power'
+    : calories > 0
+      ? 'sensor'
+      : 'none';
   const resistance = currentData.resistance || 0;
   const activeHrZoneIndex = getActiveHrZoneIndex(currentData.hr, userProfile.maxHr);
   const activeHrZone = activeHrZoneIndex >= 0 ? HR_ZONES[activeHrZoneIndex] : null;
@@ -410,7 +424,24 @@ export const RecordingCockpit = ({
           icon={<Zap size={13} />}
           colorClass="text-pink-400"
           progress={(calories % 500) / 5}
-          detail={power ? `${Math.round(power * 3.6)} kcal/hr` : t('waiting')}
+          detail={
+            calorieSource === 'power'
+              ? `${Math.round(power * 3.6)} kcal/hr`
+              : calorieSource === 'sensor'
+                ? t('sensor')
+                : t('waiting')
+          }
+          badge={
+            calorieSource === 'power' ? (
+              <span title={t('Calories calculated from power output')}>
+                <StatusPill compact label={t('Power')} tone="warning" icon={<Zap size={10} />} />
+              </span>
+            ) : calorieSource === 'sensor' ? (
+              <span title={t('Calories from bike sensor')}>
+                <StatusPill compact label={t('Sensor')} tone="info" icon={<Activity size={10} />} />
+              </span>
+            ) : undefined
+          }
           isWaiting={!calories}
         />
         <ResistanceStripMetric
