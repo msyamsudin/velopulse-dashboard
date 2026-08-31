@@ -1,6 +1,7 @@
 import { Activity, Bike, ChevronRight, Heart, Radio, Settings, Timer, Zap } from 'lucide-react';
-import { type CSSProperties, type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
+import { calculateEdwardsTrimp } from '@/lib/training-load';
 import { HrZoneBar } from '../HrZoneBar';
 import { PowerGauge } from '../PowerGauge';
 import { CadenceGauge } from '../CadenceGauge';
@@ -9,7 +10,7 @@ import { useI18n } from '@/i18n';
 import { useResistanceAdvisor } from '@/hooks/useResistanceAdvisor';
 import type { RiderProfile, TelemetrySnapshot, WorkoutView } from '@/lib/cockpit-types';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
-import { useWorkoutStore, type LiveWorkoutStats } from '@/store/useWorkoutStore';
+import type { LiveWorkoutStats } from '@/store/useWorkoutStore';
 
 interface RecordingCockpitProps {
   currentData: TelemetrySnapshot;
@@ -265,17 +266,14 @@ export const RecordingCockpit = ({
   const speed = currentData.speed || 0;
   const cadence = currentData.cadence || 0;
   const power = currentData.power || 0;
-  const calories = currentData.calories || 0;
-  // Which calorie source is feeding the accumulator right now? Mirrors the
-  // exact flag calculateSessionCalories uses: power output when a power meter
-  // is (or was) active this session, otherwise the FTMS sensor's total energy.
-  const hasPowerSource = useWorkoutStore(state => state.hasPowerSource);
-  const calorieSource: 'power' | 'sensor' | 'none' = hasPowerSource
-    ? 'power'
-    : calories > 0
-      ? 'sensor'
-      : 'none';
   const resistance = currentData.resistance || 0;
+  // Live Edwards TRIMP from the session's recorded HR samples. Uses the same
+  // inputs as the saved-session path (history + elapsed + rider max HR), so the
+  // value on screen always matches the TRIMP stored with the finished workout.
+  const trimp = useMemo(
+    () => calculateEdwardsTrimp(workout.history, workout.elapsed, userProfile.maxHr),
+    [workout.history, workout.elapsed, userProfile.maxHr]
+  );
   const activeHrZoneIndex = getActiveHrZoneIndex(currentData.hr, userProfile.maxHr);
   const activeHrZone = activeHrZoneIndex >= 0 ? HR_ZONES[activeHrZoneIndex] : null;
   const hrZoneLabel = activeHrZone?.label || 'IDLE';
@@ -418,31 +416,14 @@ export const RecordingCockpit = ({
           isWaiting={!currentData.distance}
         />
         <StripMetric
-          label={t('Calories')}
-          value={calories || '--'}
-          unit="KCAL"
-          icon={<Zap size={13} />}
-          colorClass="text-pink-400"
-          progress={(calories % 500) / 5}
-          detail={
-            calorieSource === 'power'
-              ? `${Math.round(power * 3.6)} kcal/hr`
-              : calorieSource === 'sensor'
-                ? t('sensor')
-                : t('waiting')
-          }
-          badge={
-            calorieSource === 'power' ? (
-              <span title={t('Calories calculated from power output')}>
-                <StatusPill compact label={t('Power')} tone="warning" icon={<Zap size={10} />} />
-              </span>
-            ) : calorieSource === 'sensor' ? (
-              <span title={t('Calories from bike sensor')}>
-                <StatusPill compact label={t('Sensor')} tone="info" icon={<Activity size={10} />} />
-              </span>
-            ) : undefined
-          }
-          isWaiting={!calories}
+          label={t('TRIMP')}
+          value={trimp.score || '--'}
+          unit="pts"
+          icon={<Activity size={13} />}
+          colorClass="text-purple-300"
+          progress={(trimp.score / 150) * 100}
+          detail={trimp.score > 0 ? t(trimp.label) : t('waiting')}
+          isWaiting={trimp.score === 0}
         />
         <ResistanceStripMetric
           label={t('Resistance')}

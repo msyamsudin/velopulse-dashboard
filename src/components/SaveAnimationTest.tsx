@@ -99,6 +99,7 @@ export const SaveAnimationTest = () => {
           duration="10:00"
           calories={420}
           distance={4900}
+          maxHr={190}
           history={DUMMY_HISTORY}
           sessionStartTime={DUMMY_HISTORY[0].ts}
           isSaving={isSaving}

@@ -53,6 +53,16 @@ export interface DailySummaryDay {
   hasData: boolean;
 }
 
+/** One 7-day window of the Load Ratio chart: total TRIMP per rolling week. */
+export interface WeeklyLoadPoint {
+  /** Axis label, e.g. "3/4–10" (start month/day – end day). */
+  label: string;
+  /** Total Edwards TRIMP across all sessions in this window. */
+  trimp: number;
+  /** True for the most recent window (the acute week). */
+  isCurrent: boolean;
+}
+
 export interface PeriodSummaryEntry {
   key?: string;
   label: string;
@@ -136,4 +146,6 @@ export interface WorkoutHistoryData {
   comparisonSummary: ComparisonSummary | null;
   trainingLoadMetrics: TrainingLoadMetrics;
   weeklyDailyData: DailySummaryDay[];
+  /** Four rolling 7-day TRIMP windows backing the Load Ratio chart. */
+  loadRatioWeeklyData: WeeklyLoadPoint[];
 }

@@ -1,5 +1,5 @@
 import type { TrainingLoadMetrics } from '@/lib/training-load';
-import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, MetricKey, SummaryInsights, WorkoutSession } from '@/lib/history-types';
+import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, MetricKey, SummaryInsights, WeeklyLoadPoint, WorkoutSession } from '@/lib/history-types';
 import type { SummaryPeriod, SummaryRange } from './summary/constants';
 import { useHistorySummary } from './summary/useHistorySummary';
 import { SummaryHeader } from './summary/SummaryHeader';
@@ -24,6 +24,7 @@ export interface HistorySummaryProps {
   setWeeklyMetric: (metric: MetricKey) => void;
   normalizedChartData: HistoryChartPoint[];
   weeklyDailyData: DailySummaryDay[];
+  loadRatioWeeklyData: WeeklyLoadPoint[];
   summaryInsights: SummaryInsights | null;
   comparisonSummary: ComparisonSummary | null;
   trainingLoadMetrics: TrainingLoadMetrics;
@@ -41,6 +42,7 @@ export const HistorySummary = ({
   setWeeklyMetric,
   normalizedChartData,
   weeklyDailyData,
+  loadRatioWeeklyData,
   summaryInsights,
   comparisonSummary,
   trainingLoadMetrics,
@@ -83,6 +85,7 @@ export const HistorySummary = ({
     weeklyMetric,
     normalizedChartData,
     weeklyDailyData,
+    loadRatioWeeklyData,
     summaryInsights,
     comparisonSummary,
     trainingLoadMetrics,

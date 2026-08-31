@@ -1,9 +1,9 @@
 import { Activity } from 'lucide-react';
 import { useI18n } from '@/i18n';
-import type { DailySummaryDay } from '@/lib/history-types';
+import type { WeeklyLoadPoint } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
 import { LoadRatioGauge } from './LoadRatioGauge';
-import { SevenDayLoadChart } from './SevenDayLoadChart';
+import { WeeklyLoadChart } from './WeeklyLoadChart';
 import type { LoadRatioDot } from './useHistorySummary';
 
 interface LoadGuidanceProps {
@@ -14,7 +14,7 @@ interface LoadGuidanceProps {
   loadRatioStatus: string;
   loadRatioDelta: string;
   loadRatioDots: LoadRatioDot[];
-  loadRatioChartData: DailySummaryDay[];
+  loadRatioChartData: WeeklyLoadPoint[];
   loadRatioChartMax: number;
   loadAnalysisText: string;
   loadAnalysisSummary: string;
@@ -147,7 +147,7 @@ export const LoadGuidance = ({
             />
           </div>
 
-          <SevenDayLoadChart
+          <WeeklyLoadChart
             loadRatioChartData={loadRatioChartData}
             loadRatioChartMax={loadRatioChartMax}
             acuteLoad={trainingLoadMetrics.acuteLoad}

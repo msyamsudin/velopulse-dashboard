@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, ChevronRight, Download, Heart, Loader2, Save, Timer, Trash2, Zap } from 'lucide-react';
+import { Activity, Check, ChevronRight, Download, Heart, Loader2, Save, Timer, Trash2, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { downloadTCX } from '../lib/export-service';
+import { calculateEdwardsTrimp } from '../lib/training-load';
 import { Panel, StatusPill } from './ui';
 import { useI18n } from '@/i18n';
 import type { HistoryData, SaveSessionPhase, WorkoutSession } from '@/store/useWorkoutStore';
@@ -23,6 +24,8 @@ interface SessionSummaryModalProps {
   duration: string;
   calories: number;
   distance: number;
+  /** Rider max HR, used to derive the TRIMP zone weights for the summary. */
+  maxHr: number;
   history?: HistoryData[];
   sessionStartTime?: number;
   /** True while saveSession() is running; drives the progress bar. */
@@ -40,6 +43,7 @@ interface ResultMetricProps {
   label: string;
   value: string;
   tone: string;
+  subValue?: string;
 }
 
 interface DetailMetricProps {
@@ -68,6 +72,7 @@ export const SessionSummaryModal = ({
   duration,
   calories,
   distance,
+  maxHr,
   history,
   sessionStartTime,
   isSaving = false,
@@ -86,10 +91,19 @@ export const SessionSummaryModal = ({
     duration,
     calories,
     distance,
+    maxHr,
     history,
     sessionStartTime,
   }));
   const canExport = Boolean(snapshot.history && snapshot.sessionStartTime);
+
+  // Edwards TRIMP for the captured session, computed from the same history +
+  // duration + max HR the saved workout will use, so the summary value matches
+  // the TRIMP shown in the training log afterwards.
+  const trimp = useMemo(
+    () => calculateEdwardsTrimp(snapshot.history, parseDurationSeconds(snapshot.duration), snapshot.maxHr),
+    [snapshot]
+  );
 
   const handleExport = () => {
     if (!snapshot.history || !snapshot.sessionStartTime) return;
@@ -145,11 +159,12 @@ export const SessionSummaryModal = ({
             <StatusPill label={`${snapshot.history?.length || 0} ${t('points')}`} tone={snapshot.history?.length ? 'ready' : 'neutral'} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <ResultMetric icon={<Timer size={15} />} label={t('Duration')} value={snapshot.duration} tone="text-vp-speed" />
             <ResultMetric icon={<ChevronRight size={15} />} label={t('Distance')} value={`${(snapshot.distance / 1000).toFixed(2)} KM`} tone="text-vp-distance" />
             <ResultMetric icon={<Zap size={15} />} label={t('Calories')} value={`${snapshot.calories} KCAL`} tone="text-vp-calories" />
             <ResultMetric icon={<Heart size={15} />} label={t('Avg HR')} value={`${snapshot.stats.avgHr} BPM`} tone="text-vp-hr" />
+            <ResultMetric icon={<Activity size={15} />} label={t('TRIMP')} value={`${trimp.score} pts`} subValue={t(trimp.label)} tone="text-purple-300" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -283,7 +298,7 @@ export const SessionSummaryModal = ({
   );
 };
 
-const ResultMetric = ({ icon, label, value, tone }: ResultMetricProps) => (
+const ResultMetric = ({ icon, label, value, tone, subValue }: ResultMetricProps) => (
   <div className="rounded-lg border border-vp-border bg-white/[0.025] p-4">
     <div className="mb-3 flex items-center justify-between gap-3">
       <div className="vp-label">{label}</div>
@@ -292,6 +307,11 @@ const ResultMetric = ({ icon, label, value, tone }: ResultMetricProps) => (
     <div className={`font-mono text-2xl font-black tracking-normal tabular-nums ${tone}`}>
       {value}
     </div>
+    {subValue && (
+      <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-vp-muted">
+        {subValue}
+      </div>
+    )}
   </div>
 );
 

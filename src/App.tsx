@@ -358,6 +358,7 @@ export default function App() {
             duration={formatTime(elapsed)}
             calories={currentData.calories}
             distance={currentData.distance}
+            maxHr={userProfile.maxHr}
             history={workoutHistory}
             sessionStartTime={sessionStartTime ?? 0}
             onSave={async () => {

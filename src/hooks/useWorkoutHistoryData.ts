@@ -15,6 +15,7 @@ import type {
   MetricKey,
   PeriodSummaryEntry,
   SummaryInsights,
+  WeeklyLoadPoint,
   WorkoutHistoryData,
 } from '@/lib/history-types';
 
@@ -307,6 +308,55 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     });
 
     return calculateTrainingLoadMetrics(Array.from(dailyLoads.values()));
+  }, [sessions, offsetDays, calculateFullStats]);
+
+  // Four rolling 7-day windows over the same 28-day span the Load Ratio uses:
+  // the last bar is the acute week (its total equals acuteLoad) and the first
+  // three form the chronic baseline, so the chart stays consistent with the
+  // ratio numbers shown beside it.
+  const loadRatioWeeklyData = useMemo<WeeklyLoadPoint[]>(() => {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - offsetDays);
+    endDate.setHours(23, 59, 59, 999);
+
+    const windows: { start: Date; end: Date }[] = [];
+    for (let i = 3; i >= 0; i--) {
+      const start = new Date(endDate);
+      start.setDate(start.getDate() - (i * 7 + 6));
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      windows.push({ start, end });
+    }
+
+    const windowTrimp = windows.map(() => 0);
+    sessions.forEach(session => {
+      const sessionDate = new Date(session.date);
+      if (Number.isNaN(sessionDate.getTime()) || sessionDate < windows[0].start || sessionDate > windows[3].end) return;
+
+      const load = calculateFullStats(session).trainingLoad.score || 0;
+      for (let w = 0; w < windows.length; w++) {
+        if (sessionDate >= windows[w].start && sessionDate <= windows[w].end) {
+          windowTrimp[w] += load;
+          break;
+        }
+      }
+    });
+
+    const formatWindowLabel = (start: Date, end: Date) => {
+      const startLabel = `${start.getMonth() + 1}/${start.getDate()}`;
+      const endLabel = start.getMonth() === end.getMonth()
+        ? String(end.getDate())
+        : `${end.getMonth() + 1}/${end.getDate()}`;
+      return `${startLabel}–${endLabel}`;
+    };
+
+    return windows.map((window, index) => ({
+      label: formatWindowLabel(window.start, window.end),
+      trimp: Math.round(windowTrimp[index] * 10) / 10,
+      isCurrent: index === windows.length - 1,
+    }));
   }, [sessions, offsetDays, calculateFullStats]);
 
   interface PeriodGroup {
@@ -640,6 +690,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     summaryInsights,
     comparisonSummary,
     trainingLoadMetrics,
-    weeklyDailyData
+    weeklyDailyData,
+    loadRatioWeeklyData
   };
 };

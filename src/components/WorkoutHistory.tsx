@@ -155,7 +155,7 @@ export const WorkoutHistory = ({
 
   const summaryInputSessions = viewMode === 'summary' ? sessions : [];
 
-  const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData } = useWorkoutHistoryData({
+  const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData, loadRatioWeeklyData } = useWorkoutHistoryData({
     sessions: summaryInputSessions,
     maxHr,
     summaryPeriod,
@@ -591,6 +591,7 @@ export const WorkoutHistory = ({
                   comparisonSummary={comparisonSummary}
                   trainingLoadMetrics={trainingLoadMetrics}
                   weeklyDailyData={weeklyDailyData}
+                  loadRatioWeeklyData={loadRatioWeeklyData}
                 />
               </div>
             )}

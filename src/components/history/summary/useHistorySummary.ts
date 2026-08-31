@@ -7,6 +7,7 @@ import type {
   HistoryChartPoint,
   MetricKey,
   SummaryInsights,
+  WeeklyLoadPoint,
   WorkoutSession,
 } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
@@ -47,6 +48,7 @@ export interface UseHistorySummaryInput {
   weeklyMetric: MetricKey;
   normalizedChartData: HistoryChartPoint[];
   weeklyDailyData: DailySummaryDay[];
+  loadRatioWeeklyData: WeeklyLoadPoint[];
   summaryInsights: SummaryInsights | null;
   comparisonSummary: ComparisonSummary | null;
   trainingLoadMetrics: TrainingLoadMetrics;
@@ -62,6 +64,7 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
     weeklyMetric,
     normalizedChartData,
     weeklyDailyData,
+    loadRatioWeeklyData,
     summaryInsights,
     comparisonSummary,
     trainingLoadMetrics,
@@ -214,9 +217,11 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
   const loadRatioDelta = trainingLoadDelta?.hasBaseline && typeof trainingLoadDelta.value === 'number'
     ? `${trainingLoadDelta.direction === 'up' ? '+' : trainingLoadDelta.direction === 'down' ? '-' : ''}${Math.abs(trainingLoadDelta.value)}%`
     : '--';
-  const loadRatioChartData = weeklyDailyData.slice(-7);
+  // Four rolling weeks (acute week last) over the same 28-day span the ratio
+  // uses, so the chart's last bar equals the acute load shown beside it.
+  const loadRatioChartData = loadRatioWeeklyData;
   const loadRatioChartMax = Math.max(
-    ...loadRatioChartData.map(day => day.trimp),
+    ...loadRatioChartData.map(point => point.trimp),
     trainingLoadMetrics.chronicLoad,
     1
   );
