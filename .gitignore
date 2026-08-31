@@ -12,6 +12,7 @@ coverage/
 src/data/
 scratch/
 docs/
+benchmark/
 next-env.d.ts
 ROADMAP.md
 .freebuff/
