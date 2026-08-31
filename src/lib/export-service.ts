@@ -33,6 +33,46 @@ export interface WorkoutSession {
 }
 
 /**
+ * Namespace for VeloPulse-specific TCX extensions. The standard Garmin
+ * TrainingCenterDatabase schema keeps Trackpoint <Extensions> open
+ * (xsd:any namespace="##other", processContents="lax"), so foreign elements
+ * are schema-valid and ignored by Garmin/Strava, while our own importer
+ * (and any analysis tooling) can read them back.
+ */
+export const VELOPULSE_EXTENSION_NS = 'https://velopulse.app/schemas/activity-extension/v1';
+
+const renderTrackpoints = (history: HistoryData[], sessionStartTime: number) => {
+  let trackpoints = '';
+
+  history.forEach((point, index) => {
+    // Calculate timestamp for each point
+    // We use sessionStartTime + index * 1000ms as a base
+    // Strava expects ISO8601 format
+    const pointTime = new Date(sessionStartTime + index * 1000).toISOString();
+
+    trackpoints += `
+          <Trackpoint>
+            <Time>${pointTime}</Time>
+            <DistanceMeters>${(point.distance || 0).toFixed(1)}</DistanceMeters>
+            ${point.hr > 0 ? `
+            <HeartRateBpm>
+              <Value>${Math.round(point.hr)}</Value>
+            </HeartRateBpm>` : ''}
+            ${point.cadence > 0 ? `<Cadence>${Math.round(point.cadence)}</Cadence>` : ''}
+            <Extensions>
+              <TPX xmlns="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
+                <Speed>${(point.speed / 3.6).toFixed(3)}</Speed>
+                ${point.power > 0 ? `<Watts>${Math.round(point.power)}</Watts>` : ''}
+              </TPX>
+              ${point.resistance > 0 ? `<vp:Resistance>${Math.round(point.resistance)}</vp:Resistance>` : ''}
+            </Extensions>
+          </Trackpoint>`;
+  });
+
+  return trackpoints;
+};
+
+/**
  * Reintegrates calories from the power series when the stored column is
  * unusable (legacy sessions whose per-second rounding froze it at ~0).
  * Shared by the TCX and CSV/JSON/PDF exporters so every format agrees.
@@ -92,36 +132,13 @@ const buildLapSummary = (session: WorkoutSession) => {
 export const generateTCX = (session: WorkoutSession): string => {
   const startTime = new Date(session.sessionStartTime).toISOString();
   
-  let trackpoints = '';
-  
-  session.history.forEach((point, index) => {
-    // Calculate timestamp for each point
-    // We use sessionStartTime + index * 1000ms as a base
-    // Strava expects ISO8601 format
-    const pointTime = new Date(session.sessionStartTime + index * 1000).toISOString();
-    
-    trackpoints += `
-          <Trackpoint>
-            <Time>${pointTime}</Time>
-            <DistanceMeters>${(point.distance || 0).toFixed(1)}</DistanceMeters>
-            ${point.hr > 0 ? `
-            <HeartRateBpm>
-              <Value>${Math.round(point.hr)}</Value>
-            </HeartRateBpm>` : ''}
-            ${point.cadence > 0 ? `<Cadence>${Math.round(point.cadence)}</Cadence>` : ''}
-            <Extensions>
-              <TPX xmlns="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
-                <Speed>${(point.speed / 3.6).toFixed(3)}</Speed>
-                ${point.power > 0 ? `<Watts>${Math.round(point.power)}</Watts>` : ''}
-              </TPX>
-            </Extensions>
-          </Trackpoint>`;
-  });
+  const trackpoints = renderTrackpoints(session.history || [], session.sessionStartTime);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <TrainingCenterDatabase 
   xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" 
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xmlns:vp="${VELOPULSE_EXTENSION_NS}"
   xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd">
   <Activities>
     <Activity Sport="Biking">
@@ -164,28 +181,7 @@ export const generateCombinedTCX = (sessions: WorkoutSession[]): string => {
   
   sessions.forEach(session => {
     const startTime = new Date(session.sessionStartTime).toISOString();
-    let trackpoints = '';
-    
-    session.history.forEach((point, index) => {
-      const pointTime = new Date(session.sessionStartTime + index * 1000).toISOString();
-      
-      trackpoints += `
-          <Trackpoint>
-            <Time>${pointTime}</Time>
-            <DistanceMeters>${(point.distance || 0).toFixed(1)}</DistanceMeters>
-            ${point.hr > 0 ? `
-            <HeartRateBpm>
-              <Value>${Math.round(point.hr)}</Value>
-            </HeartRateBpm>` : ''}
-            ${point.cadence > 0 ? `<Cadence>${Math.round(point.cadence)}</Cadence>` : ''}
-            <Extensions>
-              <TPX xmlns="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
-                <Speed>${(point.speed / 3.6).toFixed(3)}</Speed>
-                ${point.power > 0 ? `<Watts>${Math.round(point.power)}</Watts>` : ''}
-              </TPX>
-            </Extensions>
-          </Trackpoint>`;
-    });
+    const trackpoints = renderTrackpoints(session.history || [], session.sessionStartTime);
 
     activities += `
     <Activity Sport="Biking">
@@ -202,6 +198,7 @@ export const generateCombinedTCX = (sessions: WorkoutSession[]): string => {
 <TrainingCenterDatabase 
   xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" 
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xmlns:vp="${VELOPULSE_EXTENSION_NS}"
   xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd">
   <Activities>${activities}
   </Activities>

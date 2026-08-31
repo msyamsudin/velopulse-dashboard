@@ -20,9 +20,9 @@ describe('parseTCXWorkoutSessions', () => {
       },
       synced_to_google: false,
       history: [
-        { time: '10:00:00', hr: 120, cadence: 80, power: 150, speed: 21.6, distance: 0, resistance: 0, calories: 1 },
-        { time: '10:00:01', hr: 122, cadence: 82, power: 160, speed: 25.2, distance: 7, resistance: 0, calories: 2 },
-        { time: '10:00:02', hr: 125, cadence: 90, power: 180, speed: 28.8, distance: 15, resistance: 0, calories: 3 },
+        { time: '10:00:00', hr: 120, cadence: 80, power: 150, speed: 21.6, distance: 0, resistance: 40, calories: 1 },
+        { time: '10:00:01', hr: 122, cadence: 82, power: 160, speed: 25.2, distance: 7, resistance: 55, calories: 2 },
+        { time: '10:00:02', hr: 125, cadence: 90, power: 180, speed: 28.8, distance: 15, resistance: 70, calories: 3 },
       ],
     });
 
@@ -38,6 +38,7 @@ describe('parseTCXWorkoutSessions', () => {
       power: 160,
       speed: 25.2,
       distance: 7,
+      resistance: 55,
     });
     expect(sessions[0].stats).toMatchObject({
       avgHr: 122,

@@ -16,8 +16,8 @@ describe('generateTCX', () => {
     const session: WorkoutSession = {
       ...baseSession,
       history: [
-        { time: '00:00:01', ts: 1700000001000, hr: 130, cadence: 80, power: 190, speed: 25, distance: 10, resistance: 0, calories: 0.5 },
-        { time: '00:00:02', ts: 1700000002000, hr: 150, cadence: 82, power: 210, speed: 26, distance: 20, resistance: 0, calories: 1 },
+        { time: '00:00:01', ts: 1700000001000, hr: 130, cadence: 80, power: 190, speed: 25, distance: 10, resistance: 45, calories: 0.5 },
+        { time: '00:00:02', ts: 1700000002000, hr: 150, cadence: 82, power: 210, speed: 26, distance: 20, resistance: 50, calories: 1 },
       ],
     };
 
@@ -25,6 +25,36 @@ describe('generateTCX', () => {
 
     expect(tcx).toContain('<MaximumHeartRateBpm><Value>165</Value></MaximumHeartRateBpm>');
     expect(tcx).toContain('<AverageHeartRateBpm><Value>140</Value></AverageHeartRateBpm>');
+  });
+
+  it('writes the resistance extension per trackpoint', () => {
+    const session: WorkoutSession = {
+      ...baseSession,
+      history: [
+        { time: '00:00:01', ts: 1700000001000, hr: 130, cadence: 80, power: 190, speed: 25, distance: 10, resistance: 45, calories: 0.5 },
+        { time: '00:00:02', ts: 1700000002000, hr: 150, cadence: 82, power: 210, speed: 26, distance: 20, resistance: 50, calories: 1 },
+      ],
+    };
+
+    const tcx = generateTCX(session);
+
+    expect(tcx).toContain('xmlns:vp="https://velopulse.app/schemas/activity-extension/v1"');
+    expect(tcx).toContain('<vp:Resistance>45</vp:Resistance>');
+    expect(tcx).toContain('<vp:Resistance>50</vp:Resistance>');
+    expect(tcx.match(/<vp:Resistance>/g)).toHaveLength(2);
+  });
+
+  it('omits the resistance extension when the point has no resistance data', () => {
+    const session: WorkoutSession = {
+      ...baseSession,
+      history: [
+        { time: '00:00:01', hr: 0, cadence: 0, power: 0, speed: 0, distance: 0, resistance: 0, calories: 45 },
+      ],
+    };
+
+    const tcx = generateTCX(session);
+
+    expect(tcx).not.toContain('<vp:Resistance>');
   });
 
   it('exports the accumulated calories for a power session', () => {

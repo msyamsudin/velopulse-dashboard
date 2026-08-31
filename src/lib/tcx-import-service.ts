@@ -58,9 +58,9 @@ const parseActivity = (activity: Element, index: number): WorkoutSession | null 
       hr: Math.round(toNumber(getFirstChildText(trackpoint, 'Value'))),
       cadence: Math.round(toNumber(getDirectChildText(trackpoint, 'Cadence'))),
       power: Math.round(toNumber(getFirstChildText(trackpoint, 'Watts'))),
+      resistance: Math.round(toNumber(getFirstChildText(trackpoint, 'Resistance'))),
       speed: Number((speedMetersPerSecond * 3.6).toFixed(1)),
       distance: toNumber(getDirectChildText(trackpoint, 'DistanceMeters')),
-      resistance: 0,
       calories: 0,
     };
   });
