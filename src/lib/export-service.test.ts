@@ -57,6 +57,27 @@ describe('generateTCX', () => {
     expect(tcx).not.toContain('<vp:Resistance>');
   });
 
+  it('writes lap-level max speed, average cadence and power/resistance summaries', () => {
+    const session: WorkoutSession = {
+      ...baseSession,
+      history: [
+        { time: '00:00:01', ts: 1700000001000, hr: 130, cadence: 80, power: 190, speed: 25, distance: 10, resistance: 45, calories: 0.5 },
+        { time: '00:00:02', ts: 1700000002000, hr: 150, cadence: 82, power: 210, speed: 26, distance: 20, resistance: 50, calories: 1 },
+      ],
+    };
+
+    const tcx = generateTCX(session);
+
+    expect(tcx).toContain(`<MaximumSpeed>${(26 / 3.6).toFixed(3)}</MaximumSpeed>`);
+    expect(tcx).toContain('<Cadence>80</Cadence>');
+    expect(tcx).toContain('<vp:AveragePower>200</vp:AveragePower>');
+    expect(tcx).toContain('<vp:MaxPower>300</vp:MaxPower>');
+    expect(tcx).toContain('<vp:AverageResistance>48</vp:AverageResistance>');
+    expect(tcx).toContain('<vp:MaxResistance>50</vp:MaxResistance>');
+    // Lap extensions must follow the track in schema order.
+    expect(tcx.indexOf('</Track>')).toBeLessThan(tcx.indexOf('<vp:AveragePower>'));
+  });
+
   it('exports the accumulated calories for a power session', () => {
     const history = Array.from({ length: 120 }, (_, i) => ({
       time: `00:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}`,

@@ -114,15 +114,54 @@ const buildLapSummary = (session: WorkoutSession) => {
   const lastPoint = session.history?.[session.history.length - 1];
   const avgHr = session.stats?.avgHr || 0;
   const maxHr = session.stats?.maxHr || 0;
+  const avgCadence = session.stats?.avgCadence || 0;
+  // HistoryData.speed is km/h; TCX MaximumSpeed is m/s.
+  const maxSpeedMps = (session.history || []).reduce(
+    (max, point) => Math.max(max, point.speed || 0),
+    0
+  ) / 3.6;
   return [
     `<TotalTimeSeconds>${session.duration}</TotalTimeSeconds>`,
     `<DistanceMeters>${(lastPoint?.distance || 0).toFixed(1)}</DistanceMeters>`,
-    maxHr > 0 ? `<MaximumHeartRateBpm><Value>${Math.round(maxHr)}</Value></MaximumHeartRateBpm>` : '',
+    maxSpeedMps > 0 ? `<MaximumSpeed>${maxSpeedMps.toFixed(3)}</MaximumSpeed>` : '',
     `<Calories>${getSessionCalories(session)}</Calories>`,
     avgHr > 0 ? `<AverageHeartRateBpm><Value>${Math.round(avgHr)}</Value></AverageHeartRateBpm>` : '',
+    maxHr > 0 ? `<MaximumHeartRateBpm><Value>${Math.round(maxHr)}</Value></MaximumHeartRateBpm>` : '',
     `<Intensity>Active</Intensity>`,
+    avgCadence > 0 ? `<Cadence>${Math.round(avgCadence)}</Cadence>` : '',
     `<TriggerMethod>Manual</TriggerMethod>`,
   ].filter(Boolean).join('\n        ');
+};
+
+/**
+ * VeloPulse-specific lap summaries (power + resistance). Emitted inside the
+ * Lap <Extensions> block, which per the TCX schema must follow </Track>.
+ */
+const buildLapExtensions = (session: WorkoutSession) => {
+  const avgPower = session.stats?.avgPower || 0;
+  const maxPower = session.stats?.maxPower || 0;
+  const resistances = (session.history || [])
+    .map(point => point.resistance || 0)
+    .filter(value => value > 0);
+  const avgResistance = resistances.length > 0
+    ? Math.round(resistances.reduce((sum, value) => sum + value, 0) / resistances.length)
+    : 0;
+  const maxResistance = resistances.length > 0
+    ? resistances.reduce((max, value) => Math.max(max, value), 0)
+    : 0;
+
+  const elements = [
+    avgPower > 0 ? `<vp:AveragePower>${Math.round(avgPower)}</vp:AveragePower>` : '',
+    maxPower > 0 ? `<vp:MaxPower>${Math.round(maxPower)}</vp:MaxPower>` : '',
+    avgResistance > 0 ? `<vp:AverageResistance>${avgResistance}</vp:AverageResistance>` : '',
+    maxResistance > 0 ? `<vp:MaxResistance>${maxResistance}</vp:MaxResistance>` : '',
+  ].filter(Boolean);
+
+  if (elements.length === 0) return '';
+  return `
+        <Extensions>
+          ${elements.join('\n          ')}
+        </Extensions>`;
 };
 
 /**
@@ -146,7 +185,7 @@ export const generateTCX = (session: WorkoutSession): string => {
       <Lap StartTime="${startTime}">
         ${buildLapSummary(session)}
         <Track>${trackpoints}
-        </Track>
+        </Track>${buildLapExtensions(session)}
       </Lap>
     </Activity>
   </Activities>
@@ -189,7 +228,7 @@ export const generateCombinedTCX = (sessions: WorkoutSession[]): string => {
       <Lap StartTime="${startTime}">
         ${buildLapSummary(session)}
         <Track>${trackpoints}
-        </Track>
+        </Track>${buildLapExtensions(session)}
       </Lap>
     </Activity>`;
   });
