@@ -273,13 +273,13 @@ export const renderShareCardToCanvas = (
 
   cursorY += 56;
 
-  // 3. Main Headline / Celebration Title
+  // 3. Main Headline / Celebration Title (No redundant session number repetition)
   const displayHeadline =
     headline ||
     (milestones.length > 0 ? `${milestones[0].icon} ${milestones[0].title}` : null) ||
     (personalRecords.length > 0 ? `${personalRecords[0].icon} ${personalRecords[0].title}` : null) ||
     (showComparison && deltas && deltas.avgPower > 0 ? '📈 PROGRESSION & EFFORT' : null) ||
-    `WORKOUT #${sessionNumber}`;
+    'WORKOUT PERFORMANCE';
 
   ctx.fillStyle = pal.textPrimary;
   ctx.font = '900 48px system-ui, -apple-system, sans-serif';
@@ -287,12 +287,11 @@ export const renderShareCardToCanvas = (
 
   cursorY += 36;
 
-  // Subtitle / Date & Duration Info & Session Number
+  // Subtitle / Date & Duration Info
   ctx.fillStyle = pal.textMuted;
   ctx.font = '500 22px "JetBrains Mono", monospace, system-ui';
   const durationText = formatDuration(outcome.duration);
-  const comparisonSubtitle = showComparison && resolvedPrevSession ? '  •  vs Last Ride' : '';
-  ctx.fillText(`🚴 Ride #${sessionNumber}   ⏱️ ${durationText}   📅 ${dateFormatted}${comparisonSubtitle}`, padX, cursorY);
+  ctx.fillText(`📅 ${dateFormatted}   ⏱️ ${durationText}   📍 Indoor Trainer`, padX, cursorY);
 
   cursorY += 46;
 
@@ -307,7 +306,7 @@ export const renderShareCardToCanvas = (
         id: 'comp_power',
         type: 'pr',
         title: `+${deltas.avgPower}W Avg Power${pctStr}`,
-        subtitle: 'vs previous ride',
+        subtitle: 'power improvement',
         icon: '⚡',
         valueFormatted: `+${deltas.avgPower} W`,
         tier: 'silver',
@@ -318,7 +317,7 @@ export const renderShareCardToCanvas = (
         id: 'comp_dist',
         type: 'distance',
         title: `+${deltas.distance.toFixed(1)} km Distance`,
-        subtitle: 'longer session',
+        subtitle: 'endurance gain',
         icon: '🚴',
         valueFormatted: `+${deltas.distance.toFixed(1)} km`,
         tier: 'silver',
@@ -367,7 +366,7 @@ export const renderShareCardToCanvas = (
     cursorY += 62;
   }
 
-  // 5. Main Metric Grid (Big Clear Numbers + Prominent Comparison Bars)
+  // 5. Main Metric Grid (Big Clear Numbers + Clean Delta Comparison Bars)
   interface MetricItem {
     label: string;
     value: string;
@@ -476,9 +475,9 @@ export const renderShareCardToCanvas = (
     ctx.font = 'bold 17px "JetBrains Mono", monospace, system-ui';
     ctx.fillText(m.unit, mx + 18 + valWidth + 8, my + (hasDeltas ? 75 : cardH - 25));
 
-    // Prominent, Large Comparison Row at the bottom of the card
+    // Clean, Prominent Comparison Delta Row (without repeated "vs prev" suffix)
     if (m.delta) {
-      const deltaStr = `${m.delta.positive ? '▲' : '▼'} ${m.delta.text} vs prev`;
+      const deltaStr = `${m.delta.positive ? '▲' : '▼'} ${m.delta.text}`;
       const pillX = mx + 14;
       const pillY = my + cardH - 36;
       const pillW = cardW - 28;
@@ -493,7 +492,7 @@ export const renderShareCardToCanvas = (
 
       ctx.fillStyle = m.delta.positive ? '#4ade80' : '#f87171';
       ctx.font = 'bold 13px "JetBrains Mono", monospace, system-ui';
-      ctx.fillText(deltaStr, pillX + 10, pillY + 18);
+      ctx.fillText(deltaStr, pillX + 12, pillY + 18);
     }
   });
 
