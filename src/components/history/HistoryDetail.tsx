@@ -1,16 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, Download, Route, Flame, Cloud, CloudOff, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, Download, Route, Flame, Cloud, CloudOff, Trash2, Share2, Trophy, Sparkles } from 'lucide-react';
 import { StackedWorkoutChart } from './StackedWorkoutChart';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { downloadTCX } from '../../lib/export-service';
 import { generateSessionInsights, getInsightToneClasses, getMetricDelta, getSessionOutcome, getWorkoutQuality, getZoneInsight } from '../../lib/workout-analysis';
+import { detectSessionAchievements } from '../../lib/milestone-records';
+import { ShareWorkoutCardModal } from './ShareWorkoutCardModal';
 import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
 import type { FullWorkoutStats, WorkoutZoneStat } from '@/lib/history-types';
 
 interface HistoryDetailProps {
   session: WorkoutSession;
+  allSessions?: WorkoutSession[];
   fullStats: FullWorkoutStats;
   previousSession?: WorkoutSession;
   previousFullStats?: FullWorkoutStats;
@@ -115,6 +118,7 @@ const MiniMetric = ({ label, value, unit, icon, colorClass }: { label: string; v
 
 export const HistoryDetail = ({
   session,
+  allSessions,
   fullStats,
   previousSession,
   previousFullStats,
@@ -125,10 +129,15 @@ export const HistoryDetail = ({
 }: HistoryDetailProps) => {
   const [isDetailReady, setIsDetailReady] = useState(false);
   const [showZoneBpm, setShowZoneBpm] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const chartHistory = useMemo(
     () => sampleHistoryForChart(session?.history || []),
     [session?.history]
   );
+
+  const achievements = useMemo(() => {
+    return detectSessionAchievements(session, allSessions && allSessions.length > 0 ? allSessions : [session]);
+  }, [session, allSessions]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsDetailReady(true), 350);
@@ -146,75 +155,130 @@ export const HistoryDetail = ({
   const hrrClassification = session.stats?.hrrClassification || 'Not classified';
 
   return (
-    <motion.div
-      key="detail"
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      className="fixed inset-0 z-100 bg-hw-bg/95 backdrop-blur-xl p-4 md:p-8 flex flex-col overflow-y-auto"
-    >
-      <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-3 rounded-full bg-hw-muted/10 border border-white/10 hover:bg-hw-accent hover:text-hw-bg transition-all"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-bold tracking-tight uppercase font-mono">
-                Workout <span className="text-hw-accent">Report</span>
-              </h2>
-              <span className={`rounded border px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
-                {quality.label}
-              </span>
-              {session.synced_to_supabase ? (
-                <span className="inline-flex items-center gap-1 rounded border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-emerald-300">
-                  <Cloud size={10} />
-                  Supabase synced
+    <>
+      <motion.div
+        key="detail"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        className="fixed inset-0 z-100 bg-hw-bg/95 backdrop-blur-xl p-4 md:p-8 flex flex-col overflow-y-auto"
+      >
+        <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="p-3 rounded-full bg-hw-muted/10 border border-white/10 hover:bg-hw-accent hover:text-hw-bg transition-all"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-2xl font-bold tracking-tight uppercase font-mono">
+                  Workout <span className="text-hw-accent">Report</span>
+                </h2>
+                <span className={`rounded border px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
+                  {quality.label}
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded border border-yellow-400/25 bg-yellow-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-yellow-300">
-                  <CloudOff size={10} />
-                  Supabase pending
-                </span>
-              )}
+                {session.synced_to_supabase ? (
+                  <span className="inline-flex items-center gap-1 rounded border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-emerald-300">
+                    <Cloud size={10} />
+                    Supabase synced
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded border border-yellow-400/25 bg-yellow-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-yellow-300">
+                    <CloudOff size={10} />
+                    Supabase pending
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-hw-muted text-xs font-mono uppercase tracking-widest mt-1">
+                <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(session.date)}</span>
+                <span className="w-1 h-1 rounded-full bg-hw-muted/30" />
+                <span className="flex items-center gap-1"><Timer size={12} /> {formatDuration(session.duration)}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-hw-muted text-xs font-mono uppercase tracking-widest mt-1">
-              <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(session.date)}</span>
-              <span className="w-1 h-1 rounded-full bg-hw-muted/30" />
-              <span className="flex items-center gap-1"><Timer size={12} /> {formatDuration(session.duration)}</span>
-            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="px-4 py-2 rounded border border-cyan-400/40 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20 font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-[0_0_12px_rgba(0,240,255,0.15)]"
+              title="Generate visual card for Instagram, X, or WhatsApp"
+            >
+              <Share2 size={12} />
+              Share Card
+            </button>
+            <button
+              onClick={() => downloadTCX(session)}
+              className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-accent hover:text-hw-accent font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
+              title="Export for Strava/Garmin manual upload"
+            >
+              <Download size={12} />
+              Export TCX
+            </button>
+            {onDeleteSession && (
+              <button
+                onClick={() => onDeleteSession(session.id)}
+                className="px-4 py-2 rounded border border-red-400/30 text-red-400 hover:bg-red-500 hover:border-red-500 hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
+              >
+                <Trash2 size={12} />
+                Delete Workout
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-muted hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all"
+            >
+              Close Dashboard
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => downloadTCX(session)}
-            className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-accent hover:text-hw-accent font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
-            title="Export for Strava/Garmin manual upload"
-          >
-            <Download size={12} />
-            Export TCX
-          </button>
-          {onDeleteSession && (
-            <button
-              onClick={() => onDeleteSession(session.id)}
-              className="px-4 py-2 rounded border border-red-400/30 text-red-400 hover:bg-red-500 hover:border-red-500 hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
-            >
-              <Trash2 size={12} />
-              Delete Workout
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded border border-hw-muted/30 text-hw-muted hover:border-hw-muted hover:text-white font-mono text-[10px] uppercase tracking-widest transition-all"
-          >
-            Close Dashboard
-          </button>
-        </div>
-      </div>
+        {/* Milestone & Personal Records Celebration Bar */}
+        {achievements.hasAchievements && (
+          <div className="max-w-7xl mx-auto w-full mb-6">
+            <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/5 p-4 relative overflow-hidden shadow-lg">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300 text-xl shrink-0">
+                    {achievements.isCenturion ? '👑' : '🏆'}
+                  </div>
+                  <div>
+                    <div className="text-xs font-mono uppercase tracking-[0.2em] font-bold text-amber-300 flex items-center gap-2">
+                      <Sparkles size={14} />
+                      {achievements.isCenturion ? 'Centurion Milestone Reached!' : 'Workout Achievements Unlocked!'}
+                    </div>
+                    <div className="text-sm font-bold text-white mt-0.5">
+                      {achievements.isCenturion
+                        ? 'Congratulations on completing your 100th recorded ride!'
+                        : 'New personal records or milestone milestones logged in this session.'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {[...achievements.milestones, ...achievements.personalRecords].map(badge => (
+                    <div
+                      key={badge.id}
+                      className="px-3 py-1.5 rounded-lg bg-black/40 border border-amber-400/30 text-xs font-mono text-white flex items-center gap-2"
+                    >
+                      <span>{badge.icon}</span>
+                      <span className="font-bold text-amber-200">{badge.title}</span>
+                      <span className="text-white/40 text-[10px]">{badge.subtitle}</span>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-400 text-black font-mono font-bold text-xs uppercase tracking-wider hover:bg-amber-300 transition-colors flex items-center gap-1.5"
+                  >
+                    <Share2 size={12} />
+                    Share Trophy
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       <div className="max-w-7xl mx-auto w-full flex flex-col gap-6">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -371,5 +435,15 @@ export const HistoryDetail = ({
         </div>
       </div>
     </motion.div>
+
+    {isShareModalOpen && (
+      <ShareWorkoutCardModal
+        session={session}
+        allSessions={allSessions}
+        maxHr={maxHr}
+        onClose={() => setIsShareModalOpen(false)}
+      />
+    )}
+  </>
   );
 };

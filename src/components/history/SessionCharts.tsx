@@ -10,9 +10,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, Calendar } from 'lucide-react';
+import { Activity, Calendar, Trophy, Sparkles } from 'lucide-react';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 import { calculateEdwardsTrimp } from '../../lib/training-load';
+import { detectSessionAchievements } from '../../lib/milestone-records';
 import { getSafeMaxHr } from '@/lib/constants';
 import { RANGE_OPTIONS, RECORD_RANGE_DAYS, type SummaryRange } from './summary/constants';
 import { EmptyState, StatusPill } from '../ui';
@@ -59,6 +60,9 @@ export interface SessionChartPoint {
   avgPower: number;
   quality: string;
   fill: string;
+  hasAchievement?: boolean;
+  isCenturion?: boolean;
+  achievementLabels?: string[];
 }
 
 /** One day on the chart; its sessions render as stacked segments. */
@@ -166,6 +170,12 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
         ? ''
         : date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+      const achievements = detectSessionAchievements(session, sessions);
+      const achievementLabels = [
+        ...achievements.milestones.map(m => `${m.icon} ${m.title}`),
+        ...achievements.personalRecords.map(pr => `${pr.icon} ${pr.title}`),
+      ];
+
       return {
         id: session.id,
         ts,
@@ -178,7 +188,10 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
         avgHr: session.stats?.avgHr || 0,
         avgPower: outcome.avgPower,
         quality: quality.label,
-        fill: QUALITY_HEX[quality.label] ?? '#94a3b8',
+        fill: achievements.isCenturion ? '#f59e0b' : QUALITY_HEX[quality.label] ?? '#94a3b8',
+        hasAchievement: achievements.hasAchievements,
+        isCenturion: achievements.isCenturion,
+        achievementLabels,
       };
     });
 
@@ -337,16 +350,34 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 content={({ active, payload }) => {
                   if (!active || !payload || payload.length === 0) return null;
-                  const day = payload[0].payload as DayChartPoint;
+                    const day = payload[0].payload as DayChartPoint;
                   const config = metricConfigByKey[metric];
+                  const dayHasAchievements = day.sessions.some(s => s.hasAchievement);
                   return (
-                    <div className="min-w-[210px] rounded-lg border border-white/10 bg-[#1a1a1a] px-4 py-3 shadow-xl">
+                    <div className="min-w-[220px] rounded-lg border border-white/10 bg-[#1a1a1a] px-4 py-3 shadow-xl">
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-[10px] font-mono uppercase tracking-widest text-vp-muted">{day.fullLabel}</span>
                         <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">
                           {day.sessions.length} {t('sessions')}
                         </span>
                       </div>
+
+                      {dayHasAchievements && (
+                        <div className="mt-2 mb-1 p-2 rounded bg-amber-400/10 border border-amber-400/30">
+                          <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest font-bold text-amber-300">
+                            <Trophy size={10} />
+                            {t('Achievements Recorded')}
+                          </div>
+                          <div className="mt-1 space-y-0.5">
+                            {day.sessions.flatMap(s => s.achievementLabels).map((lbl, i) => (
+                              <div key={i} className="text-[9px] font-mono text-amber-100 flex items-center gap-1">
+                                <span>•</span> {lbl}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-2 space-y-1">
                         {day.sessions.map(session => {
                           const value = resolveSessionMetric(session, metric);
@@ -356,6 +387,7 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
                                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: session.fill }} />
                                 <span>{session.timeLabel}</span>
                                 <span className="text-[8px] opacity-50">{session.quality}</span>
+                                {session.hasAchievement && <span className="text-[9px]">🏆</span>}
                               </span>
                               <span className="text-right text-white">
                                 {metric === 'distance' ? session.distanceKm.toFixed(2) : metric === 'duration' ? formatDuration(session.duration) : metric === 'trimp' ? Math.round(session.trimp) : Math.round(value)} <span className="text-[8px] opacity-40">{config.unit}</span>
@@ -405,29 +437,39 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
                     if (session) onSelectSession(session.id);
                   }}
                 >
-                  {dayPoints.map(day => (
-                    <Cell
-                      key={day.key}
-                      fill={day.sessions[segmentIndex]?.fill ?? 'transparent'}
-                      fillOpacity={0.85}
-                      stroke="rgba(0,0,0,0.55)"
-                      strokeWidth={1}
-                    />
-                  ))}
+                  {dayPoints.map(day => {
+                    const session = day.sessions[segmentIndex];
+                    const isSpecial = session?.hasAchievement;
+                    return (
+                      <Cell
+                        key={day.key}
+                        fill={session?.fill ?? 'transparent'}
+                        fillOpacity={isSpecial ? 1 : 0.85}
+                        stroke={isSpecial ? '#fbbf24' : 'rgba(0,0,0,0.55)'}
+                        strokeWidth={isSpecial ? 2 : 1}
+                      />
+                    );
+                  })}
                 </Bar>
               ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-vp-border pt-3">
-          <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-vp-muted">{t('Intensity')}</span>
-          {QUALITY_ORDER.map(quality => (
-            <span key={quality} className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-vp-muted">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: QUALITY_HEX[quality] }} />
-              {quality}
-            </span>
-          ))}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-vp-border pt-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-vp-muted">{t('Intensity')}</span>
+            {QUALITY_ORDER.map(quality => (
+              <span key={quality} className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-vp-muted">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: QUALITY_HEX[quality] }} />
+                {quality}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-[9px] font-mono text-amber-300 uppercase tracking-widest">
+            <Trophy size={11} className="text-amber-400" />
+            <span>{t('Gold Border = Milestone / Record')}</span>
+          </div>
         </div>
       </div>
     </div>

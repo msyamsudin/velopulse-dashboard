@@ -604,6 +604,7 @@ export const WorkoutHistory = ({
       ) : (
         <HistoryDetail 
           session={selectedSession}
+          allSessions={sessions}
           fullStats={fullStats}
           previousSession={previousSession}
           previousFullStats={previousFullStats}

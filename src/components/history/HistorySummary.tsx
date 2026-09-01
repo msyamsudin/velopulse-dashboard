@@ -6,6 +6,7 @@ import { SummaryHeader } from './summary/SummaryHeader';
 import { QuickStats } from './summary/QuickStats';
 import { AutoInsights } from './summary/AutoInsights';
 import { PersonalRecords } from './summary/PersonalRecords';
+import { MilestoneProgressBanner } from './summary/MilestoneProgressBanner';
 import { TrendChart } from './summary/TrendChart';
 import { TrainingLoadOverview } from './summary/TrainingLoadOverview';
 import { LoadGuidance } from './summary/LoadGuidance';
@@ -100,6 +101,8 @@ export const HistorySummary = ({
         summaryRange={summaryRange}
         setSummaryRange={setSummaryRange}
       />
+
+      <MilestoneProgressBanner sessions={sessions} />
 
       <QuickStats
         summaryInsights={summaryInsights}
