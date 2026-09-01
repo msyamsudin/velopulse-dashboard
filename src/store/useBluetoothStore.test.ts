@@ -13,6 +13,7 @@ const makeState = (overrides: Partial<BluetoothParseState> = {}): BluetoothParse
   cumulativeCalories: 0,
   lastRawDistance: 0,
   lastRawCalories: 0,
+  distanceFromDevice: false,
   csc: {
     lastWheelRevs: -1,
     lastWheelEventTime: -1,
@@ -85,6 +86,7 @@ describe('parseFtmsIndoorBikeData', () => {
       ...state,
       cumulativeDistance: firstResult.trackerUpdates.cumulativeDistance ?? 0,
       lastRawDistance: firstResult.trackerUpdates.lastRawDistance ?? 0,
+      distanceFromDevice: firstResult.trackerUpdates.distanceFromDevice ?? false,
     };
     const secondResult = parseFtmsIndoorBikeData(second, stateAfterFirst, 2000);
 
@@ -106,6 +108,40 @@ describe('parseFtmsIndoorBikeData', () => {
     const secondResult = parseFtmsIndoorBikeData(second, stateAfterFirst, 2000);
 
     expect(secondResult.updates.calories).toBe(105);
+  });
+
+  it('integrates speed into distance when the bike never reports Total Distance', () => {
+    // flags 0x0000: speed only; speed = 900 / 100 = 9 km/h
+    const packet = makeView([0x00, 0x00, 0x84, 0x03]);
+    const state = makeState({ lastUpdate: { speed: 1000 } });
+
+    // 1 s later: 9 km/h = 2.5 m/s × 1 s = 2.5 m
+    const result = parseFtmsIndoorBikeData(packet, state, 2000);
+
+    expect(result.updates.distance).toBeCloseTo(2.5, 1);
+    expect(result.trackerUpdates.cumulativeDistance).toBeCloseTo(2.5, 1);
+  });
+
+  it('does not fall back to speed once the device reports Total Distance', () => {
+    const packet = makeView([0x00, 0x00, 0x84, 0x03]); // speed 9 km/h only
+    const state = makeState({ distanceFromDevice: true, lastUpdate: { speed: 1000 }, cumulativeDistance: 5000 });
+
+    const result = parseFtmsIndoorBikeData(packet, state, 2000);
+
+    expect(result.updates.distance).toBeUndefined();
+  });
+
+  it('rebases cumulative distance onto the device total when the first Total Distance arrives', () => {
+    // flags 0x0010: speed (bit0 clear => present) + total distance.
+    // speed = 500 / 100 = 5 km/h; distance = 1000 m.
+    const packet = makeView([0x10, 0x00, 0xf4, 0x01, 0xe8, 0x03, 0x00]);
+    const state = makeState({ cumulativeDistance: 42.5, lastUpdate: { speed: 1000 } }); // speed-fallback period
+
+    const result = parseFtmsIndoorBikeData(packet, state, 3000);
+
+    expect(result.updates.distance).toBe(1000); // device total wins over the 42.5 m estimate
+    expect(result.trackerUpdates.cumulativeDistance).toBe(1000);
+    expect(result.trackerUpdates.distanceFromDevice).toBe(true);
   });
 });
 

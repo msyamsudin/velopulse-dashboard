@@ -26,6 +26,7 @@ export type BluetoothParseState = Pick<
   | 'cumulativeCalories'
   | 'lastRawDistance'
   | 'lastRawCalories'
+  | 'distanceFromDevice'
   | 'csc'
   | 'wheelCircumferenceM'
 >;
@@ -47,6 +48,9 @@ interface BluetoothState {
   cumulativeCalories: number;
   lastRawDistance: number;
   lastRawCalories: number;
+  /** True once the bike's FTMS Total Distance field has been seen; locks the
+   *  device counter as the distance source (disables the speed-derived fallback). */
+  distanceFromDevice: boolean;
 
   // CSC (Cycling Speed & Cadence) tracking
   csc: CscTracker;
@@ -117,7 +121,7 @@ export const parseFtmsIndoorBikeData = (
   let offset = 2;
   const updates: Partial<BluetoothData> = {};
   const lastUpdate = { ...state.lastUpdate };
-  const trackerUpdates: Partial<Pick<BluetoothState, 'cumulativeDistance' | 'cumulativeCalories' | 'lastRawDistance' | 'lastRawCalories'>> = {};
+  const trackerUpdates: Partial<Pick<BluetoothState, 'cumulativeDistance' | 'cumulativeCalories' | 'lastRawDistance' | 'lastRawCalories' | 'distanceFromDevice'>> = {};
 
   if (!(flags & 0x0001)) {
     updates.speed = value.getUint16(offset, true) / 100;
@@ -137,15 +141,25 @@ export const parseFtmsIndoorBikeData = (
     const d3 = value.getUint8(offset + 2);
     const rawDistance = d1 + (d2 << 8) + (d3 << 16);
 
-    const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance)
-      ? rawDistance
-      : Math.max(0, rawDistance - state.lastRawDistance);
+    if (!state.distanceFromDevice) {
+      // First real Total Distance: the device's own counter is authoritative.
+      // Rebase so any speed-derived estimate accumulated before this packet is
+      // dropped instead of double-counted.
+      trackerUpdates.distanceFromDevice = true;
+      trackerUpdates.cumulativeDistance = rawDistance;
+      trackerUpdates.lastRawDistance = rawDistance;
+      updates.distance = rawDistance;
+    } else {
+      const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance)
+        ? rawDistance
+        : Math.max(0, rawDistance - state.lastRawDistance);
 
-    const newCumulative = state.cumulativeDistance + delta;
+      const newCumulative = state.cumulativeDistance + delta;
 
-    updates.distance = newCumulative;
-    trackerUpdates.cumulativeDistance = newCumulative;
-    trackerUpdates.lastRawDistance = rawDistance;
+      updates.distance = newCumulative;
+      trackerUpdates.cumulativeDistance = newCumulative;
+      trackerUpdates.lastRawDistance = rawDistance;
+    }
 
     offset += 3;
   }
@@ -192,6 +206,23 @@ export const parseFtmsIndoorBikeData = (
   if (flags & 0x2000) offset += 2;
   // Remaining Time (uint16)
   if (flags & 0x4000) offset += 2;
+
+  // Fallback: many indoor bikes never report Total Distance. While no distance
+  // packet has ever been seen, integrate speed over the inter-packet interval
+  // (bike-computer style) so the ride still accumulates distance. Once the
+  // device sends a real Total Distance, that counter becomes authoritative and
+  // this fallback is disabled. Δt is clamped so a long dropout cannot inject a
+  // huge single interval.
+  if (updates.distance === undefined && updates.speed !== undefined && !state.distanceFromDevice) {
+    const prevSpeedTs = state.lastUpdate.speed;
+    if (prevSpeedTs !== undefined && now > prevSpeedTs) {
+      const dt = Math.min((now - prevSpeedTs) / 1000, 5);
+      const meters = (updates.speed / 3.6) * dt;
+      const newCumulative = state.cumulativeDistance + meters;
+      updates.distance = newCumulative;
+      trackerUpdates.cumulativeDistance = newCumulative;
+    }
+  }
 
   return { updates, lastUpdate, trackerUpdates };
 };
@@ -336,6 +367,13 @@ const establishHr = async (device: BluetoothDevice, set: BluetoothSetState, get:
     if (!value) return;
     handleHeartRateValue(value, set, get);
   });
+
+  // Surface unexpected drops (battery died, walked away, etc.) so the UI can
+  // flip the strap to offline and offer a reconnect — a session keeps running.
+  device.addEventListener('gattserverdisconnected', () => {
+    set({ hrConnected: false, hrDevice: null });
+    addLog('Heart rate device disconnected');
+  });
 };
 
 /** Same as establishHr, for the bike: FTMS Indoor Bike Data with CSC fallback. */
@@ -368,6 +406,13 @@ const establishBike = async (device: BluetoothDevice, set: BluetoothSetState, ge
       handleCscMeasurement(value, set);
     });
   }
+
+  // Surface unexpected drops (dead battery, cable pull, etc.) so the UI can
+  // flip the bike to offline and offer a reconnect without stopping the ride.
+  device.addEventListener('gattserverdisconnected', () => {
+    set({ bikeConnected: false, bikeDevice: null });
+    addLog('Bike device disconnected');
+  });
 };
 
 /**
@@ -409,6 +454,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   cumulativeCalories: 0,
   lastRawDistance: 0,
   lastRawCalories: 0,
+  distanceFromDevice: false,
   csc: {
     lastWheelRevs: -1,
     lastWheelEventTime: -1,
@@ -475,6 +521,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       cumulativeCalories: 0,
       lastRawDistance: 0,
       lastRawCalories: 0,
+      distanceFromDevice: false,
       csc: {
         lastWheelRevs: -1,
         lastWheelEventTime: -1,

@@ -1,4 +1,4 @@
-import { Activity, Bike, Compass, Flame, Heart, Maximize2, Minimize2, Radio, Route, Square, Timer, Zap } from 'lucide-react';
+import { Activity, Bike, Compass, Flame, Heart, Maximize2, Minimize2, Radio, RefreshCw, Route, Square, Timer, Zap } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useMemo, useState } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
 import { calculateEdwardsTrimp } from '@/lib/training-load';
@@ -13,6 +13,7 @@ import type { RiderProfile, TelemetrySnapshot, WorkoutView } from '@/lib/cockpit
 import { useBluetoothStore } from '@/store/useBluetoothStore';
 import { useResistancePlanStore } from '@/store/useResistancePlanStore';
 import { useWorkoutStore, type LiveWorkoutStats } from '@/store/useWorkoutStore';
+import { formatDistanceMeters } from '@/utils/formatters';
 
 interface RecordingCockpitProps {
   currentData: TelemetrySnapshot;
@@ -27,6 +28,9 @@ interface RecordingCockpitProps {
   chartAvailable?: boolean;
   onOpenChart?: () => void;
   onStopSession?: () => void;
+  /** Re-open the Web Bluetooth picker for the HR strap / bike without stopping the session. */
+  onReconnectHr?: () => void;
+  onReconnectBike?: () => void;
 }
 
 interface MainEngineCardProps {
@@ -229,13 +233,15 @@ export const RecordingCockpit = ({
   chartAvailable = false,
   onOpenChart,
   onStopSession,
+  onReconnectHr,
+  onReconnectBike,
 }: RecordingCockpitProps) => {
   const { t } = useI18n();
   const [hudView, setHudView] = useState<'pro' | 'focus'>('pro');
 
   const safeMaxHr = userProfile.maxHr > 0 ? userProfile.maxHr : 1;
   const hrPct = currentData.hr > 0 ? Math.round((currentData.hr / safeMaxHr) * 100) : 0;
-  const distanceKm = currentData.distance ? (currentData.distance / 1000).toFixed(2) : '--';
+  const distanceDisplay = formatDistanceMeters(currentData.distance);
   const speed = currentData.speed || 0;
   const cadence = currentData.cadence || 0;
   const power = currentData.power || 0;
@@ -341,25 +347,39 @@ export const RecordingCockpit = ({
 
         {/* Center: Device & Metric Badges */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* HR Strap Status */}
-          <div
+          {/* HR Strap Status + Reconnect */}
+          <button
+            type="button"
+            onClick={onReconnectHr}
+            disabled={hrConnected || !onReconnectHr}
+            title={t(hrConnected ? 'Heart rate monitor connected' : 'Connect heart rate monitor')}
             className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono transition-colors ${
-              hrConnected ? 'border-vp-hr/30 bg-vp-hr/10 text-vp-hr' : 'border-vp-border bg-white/[0.02] text-vp-dim'
+              hrConnected
+                ? 'border-vp-hr/30 bg-vp-hr/10 text-vp-hr cursor-default'
+                : 'border-vp-border bg-white/[0.02] text-vp-dim hover:border-vp-hr/50 hover:text-vp-hr cursor-pointer'
             }`}
           >
             <Heart size={13} className={hrConnected && currentData.hr > 0 ? 'animate-pulse' : ''} />
             <span className="font-bold">{hrConnected ? `${currentData.hr || '--'} BPM` : 'HR Offline'}</span>
-          </div>
+            {!hrConnected && <RefreshCw size={12} className="animate-pulse" />}
+          </button>
 
-          {/* Bike Status */}
-          <div
+          {/* Bike Status + Reconnect */}
+          <button
+            type="button"
+            onClick={onReconnectBike}
+            disabled={bikeConnected || !onReconnectBike}
+            title={t(bikeConnected ? 'Stationary bike connected' : 'Connect stationary bike')}
             className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono transition-colors ${
-              bikeConnected ? 'border-vp-accent/30 bg-vp-accent/10 text-vp-accent' : 'border-vp-border bg-white/[0.02] text-vp-dim'
+              bikeConnected
+                ? 'border-vp-accent/30 bg-vp-accent/10 text-vp-accent cursor-default'
+                : 'border-vp-border bg-white/[0.02] text-vp-dim hover:border-vp-accent/50 hover:text-vp-accent cursor-pointer'
             }`}
           >
             <Bike size={13} />
             <span className="font-bold">{bikeConnected ? `${power}W · ${cadence}RPM` : 'Bike Offline'}</span>
-          </div>
+            {!bikeConnected && <RefreshCw size={12} className="animate-pulse" />}
+          </button>
 
           {/* HR Zone Badge */}
           {currentData.hr > 0 && (
@@ -628,7 +648,7 @@ export const RecordingCockpit = ({
 
           {/* 4. BOTTOM ACCUMULATOR RIBBON (6 Key Metrics) */}
           <footer className="shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 vp-panel p-2.5">
-            <AccumCell label={t('Distance')} value={distanceKm} unit="KM" colorClass="text-vp-distance" />
+            <AccumCell label={t('Distance')} value={distanceDisplay?.value ?? '--'} unit={distanceDisplay?.unit ?? 'KM'} colorClass="text-vp-distance" />
             <AccumCell label={t('Calories')} value={calories || '--'} unit="KCAL" colorClass="text-vp-calories" />
             <AccumCell label={t('Avg HR')} value={liveStats.avgHr || '--'} unit="BPM" colorClass="text-vp-hr" />
             <AccumCell label={t('Avg Power')} value={liveStats.avgPower || '--'} unit="W" colorClass="text-vp-power" />
@@ -725,7 +745,7 @@ export const RecordingCockpit = ({
                 <span>{t('Speed')} & {t('Distance')}</span>
               </div>
               <div className="px-2.5 py-1 rounded-md border border-vp-speed/30 bg-vp-speed/10 font-mono text-xs font-bold text-vp-speed">
-                {distanceKm} KM
+                {distanceDisplay ? `${distanceDisplay.value} ${distanceDisplay.unit}` : '--'}
               </div>
             </div>
 

@@ -411,6 +411,8 @@ export default function App() {
                     chartAvailable={chartAvailable}
                     onOpenChart={() => setViewMode('telemetry')}
                     onStopSession={handleStopRecording}
+                    onReconnectHr={connectHeartRate}
+                    onReconnectBike={connectBike}
                   />
                 ) : (
                   <PreRideCockpit
