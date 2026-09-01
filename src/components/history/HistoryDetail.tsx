@@ -176,6 +176,11 @@ export const HistoryDetail = ({
                 <h2 className="text-2xl font-bold tracking-tight uppercase font-mono">
                   Workout <span className="text-hw-accent">Report</span>
                 </h2>
+                {achievements.sessionIndex > 0 && (
+                  <span className="rounded border border-hw-accent/30 bg-hw-accent/10 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-hw-accent font-bold">
+                    Ride #{achievements.sessionIndex}
+                  </span>
+                )}
                 <span className={`rounded border px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
                   {quality.label}
                 </span>

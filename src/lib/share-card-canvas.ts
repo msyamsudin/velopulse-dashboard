@@ -156,6 +156,18 @@ export const renderShareCardToCanvas = (
     ? 'Recent Workout'
     : sessionDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
+  // Resolve session number (Latihan ke-N)
+  let sessionNumber = 1;
+  if (allSessions && allSessions.length > 0) {
+    const sorted = [...allSessions].sort((a, b) => {
+      const tA = a.sessionStartTime || new Date(a.date).getTime() || 0;
+      const tB = b.sessionStartTime || new Date(b.date).getTime() || 0;
+      return tA - tB;
+    });
+    const idx = sorted.findIndex(s => s.id === session.id);
+    if (idx !== -1) sessionNumber = idx + 1;
+  }
+
   // Resolve previous session for comparison (either directly provided or from allSessions)
   let resolvedPrevSession: WorkoutSession | undefined = previousSession;
   if (!resolvedPrevSession && allSessions && allSessions.length > 1) {
@@ -177,11 +189,15 @@ export const renderShareCardToCanvas = (
   // Comparison deltas
   const deltas = showComparison && prevOutcome ? {
     distance: outcome.distanceKm - prevOutcome.distanceKm,
+    distancePct: prevOutcome.distanceKm > 0 ? ((outcome.distanceKm - prevOutcome.distanceKm) / prevOutcome.distanceKm) * 100 : null,
     calories: outcome.calories - prevOutcome.calories,
+    caloriesPct: prevOutcome.calories > 0 ? ((outcome.calories - prevOutcome.calories) / prevOutcome.calories) * 100 : null,
     avgPower: (session.stats?.avgPower || 0) - (resolvedPrevSession?.stats?.avgPower || 0),
+    avgPowerPct: (resolvedPrevSession?.stats?.avgPower || 0) > 0 ? (((session.stats?.avgPower || 0) - (resolvedPrevSession?.stats?.avgPower || 0)) / (resolvedPrevSession?.stats?.avgPower || 1)) * 100 : null,
     maxPower: (session.stats?.maxPower || 0) - (resolvedPrevSession?.stats?.maxPower || 0),
     avgHr: (session.stats?.avgHr || 0) - (resolvedPrevSession?.stats?.avgHr || 0),
     avgSpeed: currentSpeed - prevSpeed,
+    avgSpeedPct: prevSpeed > 0 ? ((currentSpeed - prevSpeed) / prevSpeed) * 100 : null,
   } : null;
 
   // 1. Background gradient
@@ -225,17 +241,19 @@ export const renderShareCardToCanvas = (
 
   // Margin and layout constants
   const padX = 72;
-  let cursorY = aspect === 'story' ? 120 : 80;
+  let cursorY = aspect === 'story' ? 115 : 75;
 
-  // 2. Top Header Brand Bar
+  // 2. Top Header Brand Bar with Latihan ke-N
   ctx.fillStyle = pal.accentPrimary;
   ctx.font = 'bold 22px "JetBrains Mono", monospace, system-ui';
-  ctx.letterSpacing = '4px';
+  ctx.letterSpacing = '3px';
   ctx.fillText('⚡ VELOPULSE CYCLING LOG', padX, cursorY);
 
-  // Top Right Pill (Intensity or Comparison tag)
-  const tagText = quality.label.toUpperCase();
-  const tagWidth = 140;
+  // Top Right Pill (RIDE #N + Intensity)
+  const tagText = `RIDE #${sessionNumber} • ${quality.label.toUpperCase()}`;
+  ctx.font = 'bold 15px "JetBrains Mono", monospace, system-ui';
+  const tagTextWidth = ctx.measureText(tagText).width;
+  const tagWidth = tagTextWidth + 30;
   const tagHeight = 36;
   const tagX = width - padX - tagWidth;
   const tagY = cursorY - 26;
@@ -247,10 +265,9 @@ export const renderShareCardToCanvas = (
   ctx.stroke();
 
   ctx.fillStyle = pal.accentPrimary;
-  ctx.font = 'bold 16px "JetBrains Mono", monospace, system-ui';
-  ctx.letterSpacing = '2px';
+  ctx.letterSpacing = '1.5px';
   ctx.textAlign = 'center';
-  ctx.fillText(tagText, tagX + tagWidth / 2, tagY + 24);
+  ctx.fillText(tagText, tagX + tagWidth / 2, tagY + 23);
   ctx.textAlign = 'left';
   ctx.letterSpacing = '0px';
 
@@ -262,7 +279,7 @@ export const renderShareCardToCanvas = (
     (milestones.length > 0 ? `${milestones[0].icon} ${milestones[0].title}` : null) ||
     (personalRecords.length > 0 ? `${personalRecords[0].icon} ${personalRecords[0].title}` : null) ||
     (showComparison && deltas && deltas.avgPower > 0 ? '📈 PROGRESSION & EFFORT' : null) ||
-    'WORKOUT PERFORMANCE';
+    `WORKOUT #${sessionNumber}`;
 
   ctx.fillStyle = pal.textPrimary;
   ctx.font = '900 48px system-ui, -apple-system, sans-serif';
@@ -270,14 +287,14 @@ export const renderShareCardToCanvas = (
 
   cursorY += 36;
 
-  // Subtitle / Date & Duration Info
+  // Subtitle / Date & Duration Info & Session Number
   ctx.fillStyle = pal.textMuted;
   ctx.font = '500 22px "JetBrains Mono", monospace, system-ui';
   const durationText = formatDuration(outcome.duration);
-  const comparisonSubtitle = showComparison && resolvedPrevSession ? '  •  vs Prev Workout' : '';
-  ctx.fillText(`📅 ${dateFormatted}   ⏱️ ${durationText}   📍 Indoor Trainer${comparisonSubtitle}`, padX, cursorY);
+  const comparisonSubtitle = showComparison && resolvedPrevSession ? '  •  vs Last Ride' : '';
+  ctx.fillText(`🚴 Ride #${sessionNumber}   ⏱️ ${durationText}   📅 ${dateFormatted}${comparisonSubtitle}`, padX, cursorY);
 
-  cursorY += 48;
+  cursorY += 46;
 
   // 4. Milestone, PR, or Progression Badges Ribbon
   let allBadges = [...milestones, ...personalRecords];
@@ -285,17 +302,18 @@ export const renderShareCardToCanvas = (
   // If no milestones/PRs but comparison is active and has improvements, create comparison badges
   if (allBadges.length === 0 && deltas) {
     if (deltas.avgPower > 0) {
+      const pctStr = deltas.avgPowerPct ? ` (+${deltas.avgPowerPct.toFixed(1)}%)` : '';
       allBadges.push({
         id: 'comp_power',
         type: 'pr',
-        title: `+${deltas.avgPower}W Power`,
+        title: `+${deltas.avgPower}W Avg Power${pctStr}`,
         subtitle: 'vs previous ride',
         icon: '⚡',
         valueFormatted: `+${deltas.avgPower} W`,
         tier: 'silver',
       });
     }
-    if (deltas.distance > 0.5) {
+    if (deltas.distance > 0.3) {
       allBadges.push({
         id: 'comp_dist',
         type: 'distance',
@@ -306,11 +324,11 @@ export const renderShareCardToCanvas = (
         tier: 'silver',
       });
     }
-    if (deltas.avgSpeed > 0.5) {
+    if (deltas.avgSpeed > 0.3) {
       allBadges.push({
         id: 'comp_speed',
         type: 'pr',
-        title: `+${deltas.avgSpeed.toFixed(1)} km/h Speed`,
+        title: `+${deltas.avgSpeed.toFixed(1)} km/h Avg Speed`,
         subtitle: 'faster pace',
         icon: '🚀',
         valueFormatted: `+${deltas.avgSpeed.toFixed(1)} km/h`,
@@ -346,22 +364,30 @@ export const renderShareCardToCanvas = (
       }
     });
 
-    cursorY += 64;
+    cursorY += 62;
   }
 
-  // 5. Main Metric Grid (Big Numbers + Delta comparison pills)
+  // 5. Main Metric Grid (Big Clear Numbers + Prominent Comparison Bars)
   interface MetricItem {
     label: string;
     value: string;
     unit: string;
     color: string;
-    delta?: { text: string; positive: boolean } | null;
+    delta?: { text: string; subText?: string; positive: boolean } | null;
   }
 
-  const formatDeltaText = (deltaVal: number, unit: string, decimals = 0, invertGood = false): { text: string; positive: boolean } | null => {
+  const formatDeltaText = (
+    deltaVal: number,
+    unit: string,
+    decimals = 0,
+    pctVal: number | null = null,
+    invertGood = false
+  ): { text: string; subText?: string; positive: boolean } | null => {
     if (Math.abs(deltaVal) < 0.01) return null;
     const sign = deltaVal > 0 ? '+' : '';
-    const formatted = `${sign}${deltaVal.toFixed(decimals)}${unit ? ' ' + unit : ''}`;
+    const pctSign = pctVal && pctVal > 0 ? '+' : '';
+    const pctStr = pctVal !== null ? ` (${pctSign}${pctVal.toFixed(1)}%)` : '';
+    const formatted = `${sign}${deltaVal.toFixed(decimals)}${unit ? ' ' + unit : ''}${pctStr}`;
     const positive = invertGood ? deltaVal < 0 : deltaVal > 0;
     return { text: formatted, positive };
   };
@@ -372,21 +398,21 @@ export const renderShareCardToCanvas = (
       value: outcome.distanceKm.toFixed(2),
       unit: 'KM',
       color: pal.accentPrimary,
-      delta: deltas ? formatDeltaText(deltas.distance, 'km', 1) : null,
+      delta: deltas ? formatDeltaText(deltas.distance, 'km', 1, deltas.distancePct) : null,
     },
     {
       label: 'CALORIES',
       value: String(outcome.calories),
       unit: 'KCAL',
       color: pal.accentSecondary,
-      delta: deltas ? formatDeltaText(deltas.calories, 'kcal', 0) : null,
+      delta: deltas ? formatDeltaText(deltas.calories, 'kcal', 0, deltas.caloriesPct) : null,
     },
     {
       label: 'AVG POWER',
       value: String(session.stats?.avgPower || 0),
       unit: 'W',
       color: '#facc15',
-      delta: deltas ? formatDeltaText(deltas.avgPower, 'W', 0) : null,
+      delta: deltas ? formatDeltaText(deltas.avgPower, 'W', 0, deltas.avgPowerPct) : null,
     },
     {
       label: 'MAX POWER',
@@ -400,14 +426,14 @@ export const renderShareCardToCanvas = (
       value: String(session.stats?.avgHr || 0),
       unit: 'BPM',
       color: '#f43f5e',
-      delta: deltas ? formatDeltaText(deltas.avgHr, 'bpm', 0, true) : null,
+      delta: deltas ? formatDeltaText(deltas.avgHr, 'bpm', 0, null, true) : null,
     }] : []),
     {
       label: 'AVG SPEED',
       value: currentSpeed.toFixed(1),
       unit: 'KM/H',
       color: '#38bdf8',
-      delta: deltas ? formatDeltaText(deltas.avgSpeed, 'km/h', 1) : null,
+      delta: deltas ? formatDeltaText(deltas.avgSpeed, 'km/h', 1, deltas.avgSpeedPct) : null,
     },
   ];
 
@@ -415,7 +441,8 @@ export const renderShareCardToCanvas = (
   const cardGap = 20;
   const gridWidth = width - (padX * 2);
   const cardW = (gridWidth - (cardGap * (cols - 1))) / cols;
-  const cardH = aspect === 'story' ? 140 : 110;
+  const hasDeltas = deltas !== null;
+  const cardH = aspect === 'story' ? (hasDeltas ? 165 : 140) : (hasDeltas ? 142 : 115);
 
   metrics.slice(0, 6).forEach((m, idx) => {
     const row = Math.floor(idx / cols);
@@ -428,46 +455,46 @@ export const renderShareCardToCanvas = (
     ctx.fillStyle = pal.cardBg;
     ctx.fill();
     ctx.strokeStyle = pal.cardBorder;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.stroke();
 
     // Metric Label
     ctx.fillStyle = pal.textMuted;
     ctx.font = 'bold 15px "JetBrains Mono", monospace, system-ui';
-    ctx.letterSpacing = '1px';
-    ctx.fillText(m.label, mx + 20, my + 32);
+    ctx.letterSpacing = '1.2px';
+    ctx.fillText(m.label, mx + 18, my + 30);
 
-    // Delta pill on top right of metric box (if available)
-    if (m.delta) {
-      const deltaStr = m.delta.text;
-      ctx.font = 'bold 12px "JetBrains Mono", monospace, system-ui';
-      const dWidth = ctx.measureText(deltaStr).width + 16;
-      const dHeight = 22;
-      const dx = mx + cardW - dWidth - 14;
-      const dy = my + 16;
-
-      drawRoundedRect(ctx, dx, dy, dWidth, dHeight, 6);
-      ctx.fillStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
-      ctx.fill();
-      ctx.strokeStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.fillStyle = m.delta.positive ? '#4ade80' : '#f87171';
-      ctx.fillText(deltaStr, dx + 8, dy + 15);
-    }
-
-    // Metric Value
+    // Metric Value (Big and clear)
     ctx.fillStyle = pal.textPrimary;
-    ctx.font = '900 36px "JetBrains Mono", monospace, system-ui';
+    ctx.font = '900 38px "JetBrains Mono", monospace, system-ui';
     ctx.letterSpacing = '0px';
-    ctx.fillText(m.value, mx + 20, my + (cardH - 24));
+    ctx.fillText(m.value, mx + 18, my + (hasDeltas ? 75 : cardH - 24));
 
     // Metric Unit
     const valWidth = ctx.measureText(m.value).width;
     ctx.fillStyle = m.color;
-    ctx.font = '600 16px "JetBrains Mono", monospace, system-ui';
-    ctx.fillText(m.unit, mx + 20 + valWidth + 8, my + (cardH - 26));
+    ctx.font = 'bold 17px "JetBrains Mono", monospace, system-ui';
+    ctx.fillText(m.unit, mx + 18 + valWidth + 8, my + (hasDeltas ? 75 : cardH - 25));
+
+    // Prominent, Large Comparison Row at the bottom of the card
+    if (m.delta) {
+      const deltaStr = `${m.delta.positive ? '▲' : '▼'} ${m.delta.text} vs prev`;
+      const pillX = mx + 14;
+      const pillY = my + cardH - 36;
+      const pillW = cardW - 28;
+      const pillH = 26;
+
+      drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 6);
+      ctx.fillStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.18)' : 'rgba(239, 68, 68, 0.18)';
+      ctx.fill();
+      ctx.strokeStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.45)' : 'rgba(239, 68, 68, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = m.delta.positive ? '#4ade80' : '#f87171';
+      ctx.font = 'bold 13px "JetBrains Mono", monospace, system-ui';
+      ctx.fillText(deltaStr, pillX + 10, pillY + 18);
+    }
   });
 
   const numRows = Math.ceil(Math.min(metrics.length, 6) / cols);
