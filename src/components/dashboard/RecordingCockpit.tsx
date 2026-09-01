@@ -1,4 +1,4 @@
-import { Activity, Bike, Compass, Flame, Heart, Maximize2, Minimize2, Radio, RefreshCw, Route, Square, Timer, Zap } from 'lucide-react';
+import { Activity, Bike, Compass, Flame, Heart, Maximize2, Minimize2, Radio, RefreshCw, Route, Square, Timer, Zap, Trophy } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useMemo, useState } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
 import { calculateEdwardsTrimp } from '@/lib/training-load';
@@ -12,14 +12,16 @@ import { useResistanceAdvisor } from '@/hooks/useResistanceAdvisor';
 import type { RiderProfile, TelemetrySnapshot, WorkoutView } from '@/lib/cockpit-types';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
 import { useResistancePlanStore } from '@/store/useResistancePlanStore';
-import { useWorkoutStore, type LiveWorkoutStats } from '@/store/useWorkoutStore';
+import { useWorkoutStore, type LiveWorkoutStats, type WorkoutSession } from '@/store/useWorkoutStore';
 import { formatDistanceMeters } from '@/utils/formatters';
+import { RecordPacerPanel } from './RecordPacerPanel';
 
 interface RecordingCockpitProps {
   currentData: TelemetrySnapshot;
   liveStats: LiveWorkoutStats;
   userProfile: RiderProfile;
   workout: WorkoutView;
+  sessions?: WorkoutSession[];
   hrConnected: boolean;
   bikeConnected: boolean;
   hrrStatus?: 'idle' | 'detecting' | 'buffer' | 'measuring' | 'complete';
@@ -225,6 +227,7 @@ export const RecordingCockpit = ({
   liveStats,
   userProfile,
   workout,
+  sessions = [],
   hrConnected,
   bikeConnected,
   hrrStatus = 'idle',
@@ -238,6 +241,7 @@ export const RecordingCockpit = ({
 }: RecordingCockpitProps) => {
   const { t } = useI18n();
   const [hudView, setHudView] = useState<'pro' | 'focus'>('pro');
+  const [showRecordPacer, setShowRecordPacer] = useState(false);
 
   const safeMaxHr = userProfile.maxHr > 0 ? userProfile.maxHr : 1;
   const hrPct = currentData.hr > 0 ? Math.round((currentData.hr / safeMaxHr) * 100) : 0;
@@ -430,6 +434,21 @@ export const RecordingCockpit = ({
             </button>
           </div>
 
+          {/* Target PR Pacer Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowRecordPacer(!showRecordPacer)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase transition-all ${
+              showRecordPacer
+                ? 'border-amber-400/60 bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.25)]'
+                : 'border-vp-border bg-white/[0.03] text-vp-muted hover:border-amber-400/40 hover:text-amber-300'
+            }`}
+            title={t('Live PR target pacer')}
+          >
+            <Trophy size={13} className={showRecordPacer ? 'text-amber-300' : 'text-vp-muted'} />
+            <span className="hidden sm:inline">{t('Target PR')}</span>
+          </button>
+
           {/* Live Telemetry Chart */}
           {onOpenChart && (
             <button
@@ -470,6 +489,17 @@ export const RecordingCockpit = ({
           )}
         </div>
       </header>
+
+      {/* ──────────────── Optional PR Target Pacer Panel ──────────────── */}
+      {showRecordPacer && (
+        <RecordPacerPanel
+          currentData={currentData}
+          liveStats={liveStats}
+          workout={workout}
+          sessions={sessions}
+          onClose={() => setShowRecordPacer(false)}
+        />
+      )}
 
       {/* ──────────────── MAIN HUD DISPLAY AREA ──────────────── */}
       {hudView === 'pro' ? (

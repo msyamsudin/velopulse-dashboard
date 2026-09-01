@@ -395,6 +395,7 @@ export default function App() {
                     liveStats={liveStats}
                     userProfile={userProfile}
                     workout={{ history: workoutHistory, elapsed, formatTime }}
+                    sessions={sessionHistory}
                     hrConnected={hrConnected}
                     bikeConnected={bikeConnected}
                     hrrStatus={hrr.status}
