@@ -1,5 +1,5 @@
 import type { WorkoutSession, HistoryData } from '@/store/useWorkoutStore';
-import { getSessionOutcome, getWorkoutQuality } from './workout-analysis';
+import { getSessionOutcome } from './workout-analysis';
 import { formatDuration } from '../utils/formatters';
 import type { MilestoneBadge } from './milestone-records';
 
@@ -92,7 +92,6 @@ export const renderShareCardToCanvas = (
   const {
     session,
     allSessions,
-    previousSession,
     aspect = 'square',
     theme = 'neon',
     headline,
@@ -102,7 +101,6 @@ export const renderShareCardToCanvas = (
     showChart = true,
     showComparison = true,
     customNote,
-    maxHr = 190,
   } = options;
 
   const width = 1080;
@@ -117,7 +115,6 @@ export const renderShareCardToCanvas = (
 
   const pal = THEMES[theme] || THEMES.neon;
   const outcome = getSessionOutcome(session);
-  const quality = getWorkoutQuality(session, maxHr);
   const sessionDate = new Date(session.sessionStartTime || session.date || Date.now());
   const dateFormatted = Number.isNaN(sessionDate.getTime())
     ? 'Recent Workout'
@@ -135,47 +132,59 @@ export const renderShareCardToCanvas = (
     if (idx !== -1) sessionNumber = idx + 1;
   }
 
-  // Previous session for comparison
-  let resolvedPrevSession: WorkoutSession | undefined = previousSession;
-  if (!resolvedPrevSession && allSessions && allSessions.length > 1) {
-    const sorted = [...allSessions].sort((a, b) => {
-      const tA = a.sessionStartTime || new Date(a.date).getTime() || 0;
-      const tB = b.sessionStartTime || new Date(b.date).getTime() || 0;
-      return tA - tB;
+  // Comparison baseline: average of all other logged rides (current excluded)
+  const baselineSessions = (allSessions ?? []).filter(s => s.id !== session.id);
+  let baseline: {
+    distanceKm: number;
+    calories: number;
+    duration: number;
+    avgPower: number;
+    maxPower: number;
+    avgHr: number;
+    speed: number;
+  } | null = null;
+
+  if (showComparison && baselineSessions.length > 0) {
+    let distanceKm = 0;
+    let calories = 0;
+    let duration = 0;
+    let avgPower = 0;
+    let maxPower = 0;
+    let avgHr = 0;
+    let speed = 0;
+    baselineSessions.forEach(s => {
+      const o = getSessionOutcome(s);
+      distanceKm += o.distanceKm;
+      calories += o.calories;
+      duration += o.duration;
+      avgPower += s.stats?.avgPower || 0;
+      maxPower += s.stats?.maxPower || 0;
+      avgHr += s.stats?.avgHr || 0;
+      speed += o.duration > 0 ? o.distanceKm / (o.duration / 3600) : 0;
     });
-    const currIdx = sorted.findIndex(s => s.id === session.id);
-    if (currIdx > 0) {
-      resolvedPrevSession = sorted[currIdx - 1];
-    }
+    const n = baselineSessions.length;
+    baseline = { distanceKm: distanceKm / n, calories: calories / n, duration: duration / n, avgPower: avgPower / n, maxPower: maxPower / n, avgHr: avgHr / n, speed: speed / n };
   }
 
-  const prevOutcome = resolvedPrevSession ? getSessionOutcome(resolvedPrevSession) : null;
-  const prevSpeed = prevOutcome && prevOutcome.duration > 0 ? (prevOutcome.distanceKm / (prevOutcome.duration / 3600)) : 0;
   const currentSpeed = outcome.duration > 0 ? (outcome.distanceKm / (outcome.duration / 3600)) : 0;
 
-  const deltas = showComparison && prevOutcome ? {
-    distance: outcome.distanceKm - prevOutcome.distanceKm,
-    distancePct: prevOutcome.distanceKm > 0 ? ((outcome.distanceKm - prevOutcome.distanceKm) / prevOutcome.distanceKm) * 100 : null,
-    calories: outcome.calories - prevOutcome.calories,
-    caloriesPct: prevOutcome.calories > 0 ? ((outcome.calories - prevOutcome.calories) / prevOutcome.calories) * 100 : null,
-    avgPower: (session.stats?.avgPower || 0) - (resolvedPrevSession?.stats?.avgPower || 0),
-    avgPowerPct: (resolvedPrevSession?.stats?.avgPower || 0) > 0 ? (((session.stats?.avgPower || 0) - (resolvedPrevSession?.stats?.avgPower || 0)) / (resolvedPrevSession?.stats?.avgPower || 1)) * 100 : null,
-    maxPower: (session.stats?.maxPower || 0) - (resolvedPrevSession?.stats?.maxPower || 0),
-    avgHr: (session.stats?.avgHr || 0) - (resolvedPrevSession?.stats?.avgHr || 0),
-    avgSpeed: currentSpeed - prevSpeed,
-    avgSpeedPct: prevSpeed > 0 ? ((currentSpeed - prevSpeed) / prevSpeed) * 100 : null,
+  const deltas = baseline ? {
+    distance: outcome.distanceKm - baseline.distanceKm,
+    distancePct: baseline.distanceKm > 0 ? ((outcome.distanceKm - baseline.distanceKm) / baseline.distanceKm) * 100 : null,
+    calories: outcome.calories - baseline.calories,
+    caloriesPct: baseline.calories > 0 ? ((outcome.calories - baseline.calories) / baseline.calories) * 100 : null,
+    avgPower: (session.stats?.avgPower || 0) - baseline.avgPower,
+    avgPowerPct: baseline.avgPower > 0 ? (((session.stats?.avgPower || 0) - baseline.avgPower) / baseline.avgPower) * 100 : null,
+    maxPower: (session.stats?.maxPower || 0) - baseline.maxPower,
+    avgHr: (session.stats?.avgHr || 0) - baseline.avgHr,
+    avgSpeed: currentSpeed - baseline.speed,
+    avgSpeedPct: baseline.speed > 0 ? ((currentSpeed - baseline.speed) / baseline.speed) * 100 : null,
   } : null;
 
-  // Duration comparisons: average across all logged rides + delta vs previous
-  let avgDuration: number | null = null;
-  if (allSessions && allSessions.length > 0) {
-    const total = allSessions.reduce((sum, s) => sum + getSessionOutcome(s).duration, 0);
-    avgDuration = total / allSessions.length;
-  }
-  const durationDelta = prevOutcome && prevOutcome.duration > 0
-    ? outcome.duration - prevOutcome.duration
-    : null;
-  const hasDurationCompare = avgDuration !== null || (durationDelta !== null && Math.abs(durationDelta) >= 1);
+  // Duration comparison: current ride vs the average of all other rides
+  const avgDuration = baseline ? baseline.duration : null;
+  const durationDelta = baseline ? outcome.duration - baseline.duration : null;
+  const hasDurationCompare = avgDuration !== null && Math.abs(durationDelta ?? 0) >= 1;
 
   const formatDeltaText = (
     deltaVal: number,
@@ -222,7 +231,7 @@ export const renderShareCardToCanvas = (
   ctx.font = mono(isStory ? 20 : 18);
   setSpacing('3.5px');
   ctx.fillStyle = pal.muted;
-  ctx.fillText(`VELOPULSE  /  RIDE #${sessionNumber}  /  ${quality.label.toUpperCase()}`, padX + 32, y);
+  ctx.fillText(`VELOPULSE  /  RIDE #${sessionNumber}`, padX + 32, y);
   setSpacing('0px');
 
   y += isStory ? 100 : 72;
@@ -290,8 +299,8 @@ export const renderShareCardToCanvas = (
 
   // Comparison line under the hero: average of all rides + delta vs last ride
   if (hasDurationCompare) {
-    y += isStory ? 54 : 42;
-    ctx.font = mono(isStory ? 20 : 17);
+    y += isStory ? 58 : 46;
+    ctx.font = mono(isStory ? 23 : 20);
     setSpacing('1.5px');
     let cx = padX;
     if (avgDuration !== null) {
@@ -302,7 +311,7 @@ export const renderShareCardToCanvas = (
     }
     if (durationDelta !== null && Math.abs(durationDelta) >= 1) {
       ctx.fillStyle = durationDelta > 0 ? pal.deltaUp : pal.deltaDown;
-      ctx.fillText(`${formatDurationDelta(durationDelta)} VS LAST RIDE`, cx, y);
+      ctx.fillText(`${formatDurationDelta(durationDelta)} VS AVG`, cx, y);
     }
     setSpacing('0px');
     y += isStory ? 46 : 34;
@@ -362,7 +371,7 @@ export const renderShareCardToCanvas = (
   const rows = Math.ceil(metrics.length / cols);
   const hasDeltas = deltas !== null;
   const cellH = hasChart
-    ? (isStory ? (hasDeltas ? 136 : 108) : (hasDeltas ? 96 : 78))
+    ? (isStory ? (hasDeltas ? 140 : 108) : (hasDeltas ? 102 : 78))
     : (isStory ? (hasDeltas ? 300 : 240) : (hasDeltas ? 172 : 138));
   const gridTop = y;
   const colW = contentW / 2;
@@ -391,10 +400,10 @@ export const renderShareCardToCanvas = (
     ctx.fillText(m.unit, x + valueW + (hasChart ? 10 : 12), valueBaseline);
 
     if (m.delta) {
-      ctx.font = mono(hasChart ? (isStory ? 17 : 15) : (isStory ? 28 : 22), '600');
+      ctx.font = mono(hasChart ? (isStory ? 20 : 18) : (isStory ? 34 : 27), '600');
       setSpacing('0.5px');
       ctx.fillStyle = m.delta.positive ? pal.deltaUp : pal.deltaDown;
-      ctx.fillText(m.delta.text, x, cellY + (hasChart ? (isStory ? 122 : 90) : (isStory ? 190 : 144)));
+      ctx.fillText(m.delta.text, x, cellY + (hasChart ? (isStory ? 126 : 94) : (isStory ? 200 : 150)));
       setSpacing('0px');
     }
   });

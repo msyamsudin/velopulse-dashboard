@@ -297,7 +297,7 @@ export const ShareWorkoutCardModal = ({
               <div className="space-y-2">
                 <label className="flex items-center justify-between text-xs font-mono text-white/80 cursor-pointer p-2 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/10">
                   <span className="flex items-center gap-2">
-                    <TrendingUp size={14} className="text-emerald-400" /> {t('Compare vs Last Workout')}
+                    <TrendingUp size={14} className="text-emerald-400" /> {t('Compare vs Ride Average')}
                   </span>
                   <input
                     type="checkbox"
