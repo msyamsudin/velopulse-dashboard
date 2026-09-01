@@ -410,6 +410,7 @@ export default function App() {
                     onStartHrr={hrr.startHrrManual}
                     chartAvailable={chartAvailable}
                     onOpenChart={() => setViewMode('telemetry')}
+                    onStopSession={handleStopRecording}
                   />
                 ) : (
                   <PreRideCockpit

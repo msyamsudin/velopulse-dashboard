@@ -7,6 +7,8 @@ interface StatusPillProps {
   icon?: ReactNode;
   tone?: StatusTone;
   compact?: boolean;
+  /** 'lg' for distance reading (workout cockpit); defaults to the compact 9px size. */
+  size?: 'sm' | 'lg';
   className?: string;
 }
 
@@ -23,11 +25,17 @@ export function StatusPill({
   icon,
   tone = 'neutral',
   compact = false,
+  size = 'sm',
   className = '',
 }: StatusPillProps) {
+  const sizeClass = size === 'lg'
+    ? 'px-3 py-1.5 text-[11px]'
+    : compact
+      ? 'px-2 py-1 text-[9px]'
+      : 'px-2.5 py-1.5 text-[9px]';
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-md border font-mono text-[9px] uppercase tracking-[0.14em] ${compact ? 'px-2 py-1' : 'px-2.5 py-1.5'} ${toneClass[tone]} ${className}`}
+      className={`inline-flex items-center gap-2 rounded-md border font-mono uppercase tracking-[0.14em] ${sizeClass} ${toneClass[tone]} ${className}`}
     >
       {icon}
       {label}

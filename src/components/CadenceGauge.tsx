@@ -67,14 +67,14 @@ export const CadenceGauge = ({ value, max, targetMax = 120 }: CadenceGaugeProps)
 
         {/* RPM Label in center */}
         <div className="absolute flex flex-col items-center justify-center leading-none">
-          <span className="text-[10px] font-black text-white">{value}</span>
-          <span className="text-[6px] font-mono text-hw-muted uppercase opacity-50">RPM</span>
+          <span className="text-sm font-black text-white">{value}</span>
+          <span className="text-[8px] font-mono text-hw-muted uppercase opacity-50">RPM</span>
         </div>
       </div>
 
       {/* Range Indicators */}
       <div className="flex-1 ml-4 flex flex-col justify-center gap-1.5">
-        <div className="flex justify-between items-center text-[10px] font-mono text-hw-muted/70 uppercase tracking-[0.16em]">
+        <div className="flex justify-between items-center text-[11px] font-mono text-hw-muted/70 uppercase tracking-[0.16em]">
           <span>Target</span>
           <span className="text-hw-accent">70-100</span>
         </div>
@@ -90,7 +90,7 @@ export const CadenceGauge = ({ value, max, targetMax = 120 }: CadenceGaugeProps)
             animate={{ left: `${(displayValue / targetMax) * 100}%` }}
           />
         </div>
-        <div className="flex justify-between items-center text-[9px] font-mono text-hw-muted/45">
+        <div className="flex justify-between items-center text-[10px] font-mono text-hw-muted/45">
           <span>0</span>
           <span>{targetMax}</span>
         </div>

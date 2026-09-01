@@ -26,9 +26,9 @@ export const PowerGauge = ({ power, ftp, weight }: PowerGaugeProps) => {
     <div className="flex flex-col w-full h-full justify-end gap-3 pb-1">
       {/* W/kg Secondary Metric */}
       <div className="flex justify-between items-center px-1 mb-1">
-        <span className="text-[10px] font-mono text-hw-muted uppercase tracking-[0.18em]">Intensity</span>
-        <span className={`text-[16px] leading-none font-black font-mono ${isHighIntensity ? 'text-hw-accent' : 'text-hw-muted'}`}>
-          {wkg} <span className="text-[10px] font-normal opacity-60">W/KG</span>
+        <span className="text-[11px] font-mono text-hw-muted uppercase tracking-[0.18em]">Intensity</span>
+        <span className={`text-lg leading-none font-black font-mono ${isHighIntensity ? 'text-hw-accent' : 'text-hw-muted'}`}>
+          {wkg} <span className="text-[11px] font-normal opacity-60">W/KG</span>
         </span>
       </div>
 
@@ -57,7 +57,7 @@ export const PowerGauge = ({ power, ftp, weight }: PowerGaugeProps) => {
             >
               {isActive && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[7px] font-black text-hw-bg uppercase">{zone.label}</span>
+                  <span className="text-[9px] font-black text-hw-bg uppercase">{zone.label}</span>
                 </div>
               )}
             </motion.div>
@@ -66,7 +66,7 @@ export const PowerGauge = ({ power, ftp, weight }: PowerGaugeProps) => {
       </div>
 
       {/* FTP Percentage Label */}
-      <div className="flex justify-between text-[8px] font-mono text-hw-muted/45 px-0.5 uppercase tracking-tight">
+      <div className="flex justify-between text-[10px] font-mono text-hw-muted/45 px-0.5 uppercase tracking-tight">
         <span>Recov</span>
         <span>Endur</span>
         <span>Tempo</span>

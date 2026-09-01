@@ -12,9 +12,11 @@ const ZONE_STYLES = [
 interface HrZoneBarProps {
   currentHr: number;
   maxHr: number;
+  /** Minutes spent in each HR zone (index 0-4 = Z1..Z5). Renders a Time-in-Zone chart when provided. */
+  zoneTimes?: number[];
 }
 
-export const HrZoneBar = ({ currentHr, maxHr }: HrZoneBarProps) => {
+export const HrZoneBar = ({ currentHr, maxHr, zoneTimes }: HrZoneBarProps) => {
   const absoluteZones = getAbsoluteHrZones(maxHr);
   const zones = absoluteZones.map((z, i) => ({
     ...z,
@@ -31,12 +33,12 @@ export const HrZoneBar = ({ currentHr, maxHr }: HrZoneBarProps) => {
     <div className="flex flex-col w-full h-full justify-end gap-3 pb-1">
       <div className="flex justify-between items-end px-1 gap-3">
         <div className="flex flex-col">
-          <span className="text-[10px] font-mono text-hw-muted/80 uppercase tracking-[0.16em]">Current Zone</span>
-          <span className="text-[18px] leading-none font-bold font-mono text-red-300">{currentZone}</span>
+          <span className="text-[11px] font-mono text-hw-muted/80 uppercase tracking-[0.16em]">Current Zone</span>
+          <span className="text-xl leading-none font-bold font-mono text-red-300">{currentZone}</span>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[10px] font-mono text-hw-muted/80 uppercase tracking-[0.16em]">% Max HR</span>
-          <span className="text-[16px] leading-none font-bold font-mono text-white">{hrPercent}%</span>
+          <span className="text-[11px] font-mono text-hw-muted/80 uppercase tracking-[0.16em]">% Max HR</span>
+          <span className="text-lg leading-none font-bold font-mono text-white">{hrPercent}%</span>
         </div>
       </div>
 
@@ -60,15 +62,15 @@ export const HrZoneBar = ({ currentHr, maxHr }: HrZoneBarProps) => {
             >
               {isActive && (
                 <div className="flex flex-col items-center justify-center leading-none relative z-10">
-                  <span className="text-[7px] font-bold text-hw-bg uppercase tracking-tighter opacity-70">{zone.label}</span>
-                  <span className="text-[9px] font-black text-hw-bg tracking-tight">{currentHr}</span>
+                  <span className="text-[9px] font-bold text-hw-bg uppercase tracking-tighter opacity-70">{zone.label}</span>
+                  <span className="text-[11px] font-black text-hw-bg tracking-tight">{currentHr}</span>
                 </div>
               )}
             </motion.div>
           );
         })}
       </div>
-      <div className="flex justify-between text-[8px] font-mono text-hw-muted/55 px-0.5">
+      <div className="flex justify-between text-[10px] font-mono text-hw-muted/55 px-0.5">
         {zones.map((zone, idx) => (
           <div key={idx} className="flex flex-col items-center flex-1">
             <span className="opacity-40">{zone.label}</span>
@@ -76,6 +78,37 @@ export const HrZoneBar = ({ currentHr, maxHr }: HrZoneBarProps) => {
           </div>
         ))}
       </div>
+
+      {zoneTimes && (() => {
+        const totalTime = zoneTimes.reduce((sum, m) => sum + m, 0);
+        return (
+        <div className="mt-1.5">
+          <div className="flex items-center justify-between px-0.5 mb-1">
+            <span className="text-[10px] font-mono text-hw-muted/70 uppercase tracking-[0.16em]">Time in Zone</span>
+            <span className="text-[11px] font-mono font-bold text-white">
+              {Math.round(totalTime)} MIN
+            </span>
+          </div>
+          <div className="flex w-full gap-1">
+            {zones.map((zone, idx) => {
+              const minutes = zoneTimes[idx] ?? 0;
+              const pct = totalTime > 0 ? (minutes / totalTime) * 100 : 0;
+              return (
+                <div key={zone.label} className="flex-1 flex flex-col items-center gap-0.5">
+                  <div className="w-full h-7 bg-hw-muted/10 rounded-sm flex items-end overflow-hidden">
+                    <div className={`w-full rounded-sm ${zone.activeColor}`} style={{ height: `${pct}%` }} />
+                  </div>
+                  <span className="text-[9px] font-mono text-hw-muted/70">{zone.label}</span>
+                  <span className="text-[9px] font-mono text-white/80">
+                    {minutes > 0 ? `${Math.round(minutes)}m` : '–'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        );
+      })()}
     </div>
   );
 };

@@ -192,8 +192,8 @@ export const PerformanceChart = ({
               }`}
             >
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.color, boxShadow: `0 0 6px ${m.color}` }} />
-              <span className="text-[9px] font-mono text-vp-text uppercase tracking-wider">{m.name}</span>
-              <span className="text-[7px] font-mono opacity-40">{m.yAxisId === 'left' ? 'L' : 'R'}</span>
+              <span className="text-[11px] font-mono text-vp-text uppercase tracking-wider">{m.name}</span>
+              <span className="text-[9px] font-mono opacity-40">{m.yAxisId === 'left' ? 'L' : 'R'}</span>
             </button>
           ))}
         </div>
@@ -209,7 +209,7 @@ export const PerformanceChart = ({
               <XAxis
                 dataKey="time"
                 stroke="#8e9299"
-                fontSize={9}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
                 hide={chartData.length < 2}
@@ -220,11 +220,11 @@ export const PerformanceChart = ({
                 yAxisId="left"
                 orientation="left"
                 stroke="#8e9299"
-                fontSize={9}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
                 domain={['auto', 'auto']}
-                width={32}
+                width={38}
               />
 
               {/* Right Y-axis: Power, Speed, etc. */}
@@ -232,11 +232,11 @@ export const PerformanceChart = ({
                 yAxisId="right"
                 orientation="right"
                 stroke="#8e9299"
-                fontSize={9}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
                 domain={['auto', 'auto']}
-                width={36}
+                width={44}
               />
 
               {/* FTP Power Zone Bands (right axis) */}
@@ -251,7 +251,7 @@ export const PerformanceChart = ({
                   label={{
                     value: zone.label,
                     position: 'insideRight',
-                    fontSize: 7,
+                    fontSize: 9,
                     fill: '#ffffff30',
                     fontFamily: 'monospace',
                   }}
@@ -274,7 +274,7 @@ export const PerformanceChart = ({
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
                     return (
-                      <div className="rounded-lg border border-vp-border bg-vp-bg/95 p-3 font-mono text-[10px] shadow-2xl backdrop-blur-xl">
+                      <div className="rounded-lg border border-vp-border bg-vp-bg/95 p-3 font-mono text-xs shadow-2xl backdrop-blur-xl">
                         <div className="mb-2 border-b border-vp-border pb-1 uppercase tracking-widest text-vp-muted">{label}</div>
                         <div className="space-y-1.5">
                           {payload.map((item: TooltipPayloadEntry) => {
@@ -287,7 +287,7 @@ export const PerformanceChart = ({
                                 </span>
                                 <span className="font-bold tabular-nums" style={{ color: item.color }}>
                                   {item.value}
-                                  <span className="text-[8px] opacity-60 ml-1">{metricDef?.unit}</span>
+                                  <span className="text-[10px] opacity-60 ml-1">{metricDef?.unit}</span>
                                 </span>
                               </div>
                             );
