@@ -22,102 +22,68 @@ export interface ShareCardRenderOptions {
   maxHr?: number;
 }
 
+/**
+ * Minimal editorial palettes. Flat background, one ink color, one muted
+ * color, one accent, and hairlines. No gradients, no glow, no texture.
+ */
 interface ThemePalette {
-  bgGradientStart: string;
-  bgGradientEnd: string;
-  cardBg: string;
-  cardBorder: string;
-  accentPrimary: string;
-  accentSecondary: string;
-  accentGlow: string;
-  textPrimary: string;
-  textMuted: string;
-  textAccent: string;
-  badgeBg: string;
-  badgeBorder: string;
-  chartLine: string;
-  chartFillStart: string;
-  chartFillEnd: string;
+  bg: string;
+  ink: string;
+  muted: string;
+  accent: string;
+  hairline: string;
+  deltaUp: string;
+  deltaDown: string;
 }
 
 const THEMES: Record<ShareCardTheme, ThemePalette> = {
   neon: {
-    bgGradientStart: '#060813',
-    bgGradientEnd: '#0d1326',
-    cardBg: 'rgba(255, 255, 255, 0.04)',
-    cardBorder: 'rgba(0, 240, 255, 0.22)',
-    accentPrimary: '#00f0ff',
-    accentSecondary: '#f43f5e',
-    accentGlow: 'rgba(0, 240, 255, 0.35)',
-    textPrimary: '#ffffff',
-    textMuted: '#94a3b8',
-    textAccent: '#00f0ff',
-    badgeBg: 'rgba(0, 240, 255, 0.1)',
-    badgeBorder: 'rgba(0, 240, 255, 0.4)',
-    chartLine: '#00f0ff',
-    chartFillStart: 'rgba(0, 240, 255, 0.35)',
-    chartFillEnd: 'rgba(0, 240, 255, 0.0)',
+    bg: '#0a0c0d',
+    ink: '#eef4f1',
+    muted: '#7c8a85',
+    accent: '#35f0bd',
+    hairline: 'rgba(255, 255, 255, 0.1)',
+    deltaUp: '#4ade80',
+    deltaDown: '#f87171',
   },
   gold: {
-    bgGradientStart: '#0c0a07',
-    bgGradientEnd: '#1c150c',
-    cardBg: 'rgba(255, 255, 255, 0.04)',
-    cardBorder: 'rgba(245, 158, 11, 0.3)',
-    accentPrimary: '#fbbf24',
-    accentSecondary: '#f97316',
-    accentGlow: 'rgba(245, 158, 11, 0.4)',
-    textPrimary: '#ffffff',
-    textMuted: '#d6d3d1',
-    textAccent: '#fbbf24',
-    badgeBg: 'rgba(245, 158, 11, 0.12)',
-    badgeBorder: 'rgba(245, 158, 11, 0.45)',
-    chartLine: '#fbbf24',
-    chartFillStart: 'rgba(245, 158, 11, 0.35)',
-    chartFillEnd: 'rgba(245, 158, 11, 0.0)',
+    bg: '#12100b',
+    ink: '#f2ead9',
+    muted: '#9a8f77',
+    accent: '#d9ab55',
+    hairline: 'rgba(255, 255, 255, 0.1)',
+    deltaUp: '#4ade80',
+    deltaDown: '#f87171',
   },
   stealth: {
-    bgGradientStart: '#09090b',
-    bgGradientEnd: '#141417',
-    cardBg: 'rgba(255, 255, 255, 0.03)',
-    cardBorder: 'rgba(255, 255, 255, 0.15)',
-    accentPrimary: '#ffffff',
-    accentSecondary: '#a1a1aa',
-    accentGlow: 'rgba(255, 255, 255, 0.2)',
-    textPrimary: '#ffffff',
-    textMuted: '#a1a1aa',
-    textAccent: '#ffffff',
-    badgeBg: 'rgba(255, 255, 255, 0.08)',
-    badgeBorder: 'rgba(255, 255, 255, 0.25)',
-    chartLine: '#e4e4e7',
-    chartFillStart: 'rgba(255, 255, 255, 0.25)',
-    chartFillEnd: 'rgba(255, 255, 255, 0.0)',
+    bg: '#f4f2ed',
+    ink: '#181a1c',
+    muted: '#8d8f8a',
+    accent: '#181a1c',
+    hairline: 'rgba(24, 26, 28, 0.16)',
+    deltaUp: '#15803d',
+    deltaDown: '#b91c1c',
   },
 };
 
-/** Helper to draw rounded rectangle on Canvas */
-const drawRoundedRect = (
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-) => {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
+const MONO_STACK = '"JetBrains Mono", "SF Mono", Menlo, Consolas, monospace';
+const SANS_STACK = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+const mono = (size: number, weight = '600') => `${weight} ${size}px ${MONO_STACK}`;
+const sans = (size: number, weight = '700') => `${weight} ${size}px ${SANS_STACK}`;
+
+/** Formats a signed duration delta as +M:SS / −M:SS */
+const formatDurationDelta = (seconds: number): string => {
+  const sign = seconds > 0 ? '+' : seconds < 0 ? '−' : '±';
+  const abs = Math.abs(seconds);
+  const m = Math.floor(abs / 60);
+  const s = Math.round(abs % 60);
+  return `${sign}${m}:${String(s).padStart(2, '0')}`;
 };
 
 /**
- * Renders high-resolution share card to a canvas element.
+ * Renders a minimalist, typography-driven share card to a canvas element.
+ * Flat background, hairline table of metrics, one thin chart line.
  */
 export const renderShareCardToCanvas = (
   canvas: HTMLCanvasElement,
@@ -141,6 +107,7 @@ export const renderShareCardToCanvas = (
 
   const width = 1080;
   const height = aspect === 'story' ? 1920 : 1080;
+  const isStory = aspect === 'story';
 
   canvas.width = width;
   canvas.height = height;
@@ -156,7 +123,7 @@ export const renderShareCardToCanvas = (
     ? 'Recent Workout'
     : sessionDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-  // Resolve session number (Latihan ke-N)
+  // Session number (RIDE #N)
   let sessionNumber = 1;
   if (allSessions && allSessions.length > 0) {
     const sorted = [...allSessions].sort((a, b) => {
@@ -168,7 +135,7 @@ export const renderShareCardToCanvas = (
     if (idx !== -1) sessionNumber = idx + 1;
   }
 
-  // Resolve previous session for comparison (either directly provided or from allSessions)
+  // Previous session for comparison
   let resolvedPrevSession: WorkoutSession | undefined = previousSession;
   if (!resolvedPrevSession && allSessions && allSessions.length > 1) {
     const sorted = [...allSessions].sort((a, b) => {
@@ -186,7 +153,6 @@ export const renderShareCardToCanvas = (
   const prevSpeed = prevOutcome && prevOutcome.duration > 0 ? (prevOutcome.distanceKm / (prevOutcome.duration / 3600)) : 0;
   const currentSpeed = outcome.duration > 0 ? (outcome.distanceKm / (outcome.duration / 3600)) : 0;
 
-  // Comparison deltas
   const deltas = showComparison && prevOutcome ? {
     distance: outcome.distanceKm - prevOutcome.distanceKm,
     distancePct: prevOutcome.distanceKm > 0 ? ((outcome.distanceKm - prevOutcome.distanceKm) / prevOutcome.distanceKm) * 100 : null,
@@ -200,180 +166,16 @@ export const renderShareCardToCanvas = (
     avgSpeedPct: prevSpeed > 0 ? ((currentSpeed - prevSpeed) / prevSpeed) * 100 : null,
   } : null;
 
-  // 1. Background gradient
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-  bgGrad.addColorStop(0, pal.bgGradientStart);
-  bgGrad.addColorStop(1, pal.bgGradientEnd);
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, width, height);
-
-  // Background ambient glow circles
-  const glow1 = ctx.createRadialGradient(width * 0.8, height * 0.15, 10, width * 0.8, height * 0.15, 450);
-  glow1.addColorStop(0, pal.accentGlow);
-  glow1.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glow1;
-  ctx.fillRect(0, 0, width, height);
-
-  if (aspect === 'story') {
-    const glow2 = ctx.createRadialGradient(width * 0.2, height * 0.75, 10, width * 0.2, height * 0.75, 500);
-    glow2.addColorStop(0, pal.accentGlow);
-    glow2.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glow2;
-    ctx.fillRect(0, 0, width, height);
+  // Duration comparisons: average across all logged rides + delta vs previous
+  let avgDuration: number | null = null;
+  if (allSessions && allSessions.length > 0) {
+    const total = allSessions.reduce((sum, s) => sum + getSessionOutcome(s).duration, 0);
+    avgDuration = total / allSessions.length;
   }
-
-  // Grid lines (subtle cyberpunk pattern)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-  ctx.lineWidth = 1;
-  const gridSize = 60;
-  for (let x = gridSize; x < width; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-  }
-  for (let y = gridSize; y < height; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-
-  // Margin and layout constants
-  const padX = 72;
-  let cursorY = aspect === 'story' ? 115 : 75;
-
-  // 2. Top Header Brand Bar with Latihan ke-N
-  ctx.fillStyle = pal.accentPrimary;
-  ctx.font = 'bold 22px "JetBrains Mono", monospace, system-ui';
-  ctx.letterSpacing = '3px';
-  ctx.fillText('⚡ VELOPULSE CYCLING LOG', padX, cursorY);
-
-  // Top Right Pill (RIDE #N + Intensity)
-  const tagText = `RIDE #${sessionNumber} • ${quality.label.toUpperCase()}`;
-  ctx.font = 'bold 15px "JetBrains Mono", monospace, system-ui';
-  const tagTextWidth = ctx.measureText(tagText).width;
-  const tagWidth = tagTextWidth + 30;
-  const tagHeight = 36;
-  const tagX = width - padX - tagWidth;
-  const tagY = cursorY - 26;
-  drawRoundedRect(ctx, tagX, tagY, tagWidth, tagHeight, 8);
-  ctx.fillStyle = pal.badgeBg;
-  ctx.fill();
-  ctx.strokeStyle = pal.badgeBorder;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  ctx.fillStyle = pal.accentPrimary;
-  ctx.letterSpacing = '1.5px';
-  ctx.textAlign = 'center';
-  ctx.fillText(tagText, tagX + tagWidth / 2, tagY + 23);
-  ctx.textAlign = 'left';
-  ctx.letterSpacing = '0px';
-
-  cursorY += 56;
-
-  // 3. Main Headline / Celebration Title (No redundant session number repetition)
-  const displayHeadline =
-    headline ||
-    (milestones.length > 0 ? `${milestones[0].icon} ${milestones[0].title}` : null) ||
-    (personalRecords.length > 0 ? `${personalRecords[0].icon} ${personalRecords[0].title}` : null) ||
-    (showComparison && deltas && deltas.avgPower > 0 ? '📈 PROGRESSION & EFFORT' : null) ||
-    'WORKOUT PERFORMANCE';
-
-  ctx.fillStyle = pal.textPrimary;
-  ctx.font = '900 48px system-ui, -apple-system, sans-serif';
-  ctx.fillText(displayHeadline, padX, cursorY);
-
-  cursorY += 36;
-
-  // Subtitle / Date & Duration Info
-  ctx.fillStyle = pal.textMuted;
-  ctx.font = '500 22px "JetBrains Mono", monospace, system-ui';
-  const durationText = formatDuration(outcome.duration);
-  ctx.fillText(`📅 ${dateFormatted}   ⏱️ ${durationText}   📍 Indoor Trainer`, padX, cursorY);
-
-  cursorY += 46;
-
-  // 4. Milestone, PR, or Progression Badges Ribbon
-  let allBadges = [...milestones, ...personalRecords];
-
-  // If no milestones/PRs but comparison is active and has improvements, create comparison badges
-  if (allBadges.length === 0 && deltas) {
-    if (deltas.avgPower > 0) {
-      const pctStr = deltas.avgPowerPct ? ` (+${deltas.avgPowerPct.toFixed(1)}%)` : '';
-      allBadges.push({
-        id: 'comp_power',
-        type: 'pr',
-        title: `+${deltas.avgPower}W Avg Power${pctStr}`,
-        subtitle: 'power improvement',
-        icon: '⚡',
-        valueFormatted: `+${deltas.avgPower} W`,
-        tier: 'silver',
-      });
-    }
-    if (deltas.distance > 0.3) {
-      allBadges.push({
-        id: 'comp_dist',
-        type: 'distance',
-        title: `+${deltas.distance.toFixed(1)} km Distance`,
-        subtitle: 'endurance gain',
-        icon: '🚴',
-        valueFormatted: `+${deltas.distance.toFixed(1)} km`,
-        tier: 'silver',
-      });
-    }
-    if (deltas.avgSpeed > 0.3) {
-      allBadges.push({
-        id: 'comp_speed',
-        type: 'pr',
-        title: `+${deltas.avgSpeed.toFixed(1)} km/h Avg Speed`,
-        subtitle: 'faster pace',
-        icon: '🚀',
-        valueFormatted: `+${deltas.avgSpeed.toFixed(1)} km/h`,
-        tier: 'silver',
-      });
-    }
-  }
-
-  if (allBadges.length > 0) {
-    const ribbonY = cursorY;
-    let badgeX = padX;
-    const maxBadgesToShow = aspect === 'story' ? 4 : 3;
-
-    allBadges.slice(0, maxBadgesToShow).forEach(badge => {
-      const text = `${badge.icon} ${badge.title}`;
-      ctx.font = 'bold 18px "JetBrains Mono", monospace, system-ui';
-      const textWidth = ctx.measureText(text).width;
-      const bWidth = textWidth + 36;
-      const bHeight = 44;
-
-      if (badgeX + bWidth <= width - padX) {
-        drawRoundedRect(ctx, badgeX, ribbonY, bWidth, bHeight, 10);
-        ctx.fillStyle = pal.badgeBg;
-        ctx.fill();
-        ctx.strokeStyle = pal.badgeBorder;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.fillStyle = pal.textPrimary;
-        ctx.fillText(text, badgeX + 18, ribbonY + 28);
-
-        badgeX += bWidth + 14;
-      }
-    });
-
-    cursorY += 62;
-  }
-
-  // 5. Main Metric Grid (Big Clear Numbers + Clean Delta Comparison Bars)
-  interface MetricItem {
-    label: string;
-    value: string;
-    unit: string;
-    color: string;
-    delta?: { text: string; subText?: string; positive: boolean } | null;
-  }
+  const durationDelta = prevOutcome && prevOutcome.duration > 0
+    ? outcome.duration - prevOutcome.duration
+    : null;
+  const hasDurationCompare = avgDuration !== null || (durationDelta !== null && Math.abs(durationDelta) >= 1);
 
   const formatDeltaText = (
     deltaVal: number,
@@ -381,7 +183,7 @@ export const renderShareCardToCanvas = (
     decimals = 0,
     pctVal: number | null = null,
     invertGood = false
-  ): { text: string; subText?: string; positive: boolean } | null => {
+  ): { text: string; positive: boolean } | null => {
     if (Math.abs(deltaVal) < 0.01) return null;
     const sign = deltaVal > 0 ? '+' : '';
     const pctSign = pctVal && pctVal > 0 ? '+' : '';
@@ -391,143 +193,230 @@ export const renderShareCardToCanvas = (
     return { text: formatted, positive };
   };
 
+  // ---- Flat background -------------------------------------------------
+  ctx.fillStyle = pal.bg;
+  ctx.fillRect(0, 0, width, height);
+
+  const padX = 84;
+  const contentW = width - padX * 2;
+
+  const hairline = (y: number) => {
+    ctx.strokeStyle = pal.hairline;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padX, y);
+    ctx.lineTo(width - padX, y);
+    ctx.stroke();
+  };
+
+  const setSpacing = (value: string) => {
+    (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = value;
+  };
+
+  let y = isStory ? 150 : 100;
+
+  // ---- Overline: accent tick + brand / session line --------------------
+  ctx.fillStyle = pal.accent;
+  ctx.fillRect(padX, y - 13, 15, 15);
+
+  ctx.font = mono(isStory ? 20 : 18);
+  setSpacing('3.5px');
+  ctx.fillStyle = pal.muted;
+  ctx.fillText(`VELOPULSE  /  RIDE #${sessionNumber}  /  ${quality.label.toUpperCase()}`, padX + 32, y);
+  setSpacing('0px');
+
+  y += isStory ? 100 : 72;
+
+  // ---- Headline: one line, auto-fit ------------------------------------
+  const displayHeadline = (
+    headline ||
+    (milestones.length > 0 ? milestones[0].title : null) ||
+    (personalRecords.length > 0 ? personalRecords[0].title : null) ||
+    'INDOOR RIDE'
+  ).toUpperCase();
+
+  let headSize = isStory ? 96 : 70;
+  ctx.font = sans(headSize, '800');
+  while (ctx.measureText(displayHeadline).width > contentW && headSize > 28) {
+    headSize -= 4;
+    ctx.font = sans(headSize, '800');
+  }
+  ctx.fillStyle = pal.ink;
+  ctx.fillText(displayHeadline, padX, y);
+
+  y += isStory ? 58 : 44;
+
+  // ---- Date line --------------------------------------------------------
+  ctx.font = mono(isStory ? 21 : 19);
+  setSpacing('1.5px');
+  ctx.fillStyle = pal.muted;
+  ctx.fillText(`${dateFormatted.toUpperCase()}   ·   INDOOR TRAINER`, padX, y);
+  setSpacing('0px');
+
+  // ---- Achievements as a single quiet line (no pills, no icons) --------
+  const badgeLine = [...milestones, ...personalRecords]
+    .slice(0, 3)
+    .map(b => b.title)
+    .join('   ·   ');
+  if (badgeLine) {
+    y += isStory ? 48 : 40;
+    ctx.font = mono(isStory ? 20 : 17);
+    setSpacing('2px');
+    ctx.fillStyle = pal.accent;
+    ctx.fillText(badgeLine.toUpperCase(), padX, y);
+    setSpacing('0px');
+  }
+
+  y += isStory ? 56 : 44;
+  hairline(y);
+
+  // Chart availability decides the layout: without the chart the metrics
+  // grid takes the full canvas.
+  const history = session.history || [];
+  const hasChart = showChart && history.length > 5;
+
+  // ---- Hero metric: duration (kept modest — metrics are the focus) -----
+  y += isStory ? 76 : 52;
+  ctx.font = mono(isStory ? 19 : 16);
+  setSpacing('3px');
+  ctx.fillStyle = pal.muted;
+  ctx.fillText('DURATION', padX, y);
+  setSpacing('0px');
+
+  y += isStory ? 150 : 108;
+  ctx.font = sans(isStory ? 168 : 118, '700');
+  ctx.fillStyle = pal.ink;
+  ctx.fillText(formatDuration(outcome.duration), padX, y);
+
+  // Comparison line under the hero: average of all rides + delta vs last ride
+  if (hasDurationCompare) {
+    y += isStory ? 54 : 42;
+    ctx.font = mono(isStory ? 20 : 17);
+    setSpacing('1.5px');
+    let cx = padX;
+    if (avgDuration !== null) {
+      ctx.fillStyle = pal.muted;
+      const avgText = `AVG ${formatDuration(Math.round(avgDuration))}`;
+      ctx.fillText(avgText, cx, y);
+      cx += ctx.measureText(avgText).width + 26;
+    }
+    if (durationDelta !== null && Math.abs(durationDelta) >= 1) {
+      ctx.fillStyle = durationDelta > 0 ? pal.deltaUp : pal.deltaDown;
+      ctx.fillText(`${formatDurationDelta(durationDelta)} VS LAST RIDE`, cx, y);
+    }
+    setSpacing('0px');
+    y += isStory ? 46 : 34;
+  } else {
+    y += isStory ? 76 : 52;
+  }
+  hairline(y);
+
+  // ---- Metric table: 2 columns, hairline grid --------------------------
+  interface MetricItem {
+    label: string;
+    value: string;
+    unit: string;
+    delta?: { text: string; positive: boolean } | null;
+  }
+
   const metrics: MetricItem[] = [
     {
       label: 'DISTANCE',
       value: outcome.distanceKm.toFixed(2),
       unit: 'KM',
-      color: pal.accentPrimary,
       delta: deltas ? formatDeltaText(deltas.distance, 'km', 1, deltas.distancePct) : null,
     },
     {
       label: 'CALORIES',
       value: String(outcome.calories),
       unit: 'KCAL',
-      color: pal.accentSecondary,
       delta: deltas ? formatDeltaText(deltas.calories, 'kcal', 0, deltas.caloriesPct) : null,
     },
     {
       label: 'AVG POWER',
       value: String(session.stats?.avgPower || 0),
       unit: 'W',
-      color: '#facc15',
       delta: deltas ? formatDeltaText(deltas.avgPower, 'W', 0, deltas.avgPowerPct) : null,
     },
     {
       label: 'MAX POWER',
       value: String(session.stats?.maxPower || 0),
       unit: 'W',
-      color: '#fb923c',
       delta: deltas ? formatDeltaText(deltas.maxPower, 'W', 0) : null,
     },
     ...(showHr ? [{
       label: 'AVG HR',
       value: String(session.stats?.avgHr || 0),
       unit: 'BPM',
-      color: '#f43f5e',
       delta: deltas ? formatDeltaText(deltas.avgHr, 'bpm', 0, null, true) : null,
     }] : []),
     {
       label: 'AVG SPEED',
       value: currentSpeed.toFixed(1),
       unit: 'KM/H',
-      color: '#38bdf8',
       delta: deltas ? formatDeltaText(deltas.avgSpeed, 'km/h', 1, deltas.avgSpeedPct) : null,
     },
   ];
 
-  const cols = 3;
-  const cardGap = 20;
-  const gridWidth = width - (padX * 2);
-  const cardW = (gridWidth - (cardGap * (cols - 1))) / cols;
+  const cols = 2;
+  const rows = Math.ceil(metrics.length / cols);
   const hasDeltas = deltas !== null;
-  const cardH = aspect === 'story' ? (hasDeltas ? 165 : 140) : (hasDeltas ? 142 : 115);
+  const cellH = hasChart
+    ? (isStory ? (hasDeltas ? 136 : 108) : (hasDeltas ? 96 : 78))
+    : (isStory ? (hasDeltas ? 300 : 240) : (hasDeltas ? 172 : 138));
+  const gridTop = y;
+  const colW = contentW / 2;
+  const colX = [padX, padX + colW + 44];
 
-  metrics.slice(0, 6).forEach((m, idx) => {
-    const row = Math.floor(idx / cols);
-    const col = idx % cols;
-    const mx = padX + (col * (cardW + cardGap));
-    const my = cursorY + (row * (cardH + cardGap));
+  metrics.forEach((m, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const x = colX[col];
+    const cellY = gridTop + row * cellH;
 
-    // Card background
-    drawRoundedRect(ctx, mx, my, cardW, cardH, 14);
-    ctx.fillStyle = pal.cardBg;
-    ctx.fill();
-    ctx.strokeStyle = pal.cardBorder;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+    ctx.font = mono(hasChart ? (isStory ? 16 : 14) : (isStory ? 18 : 15));
+    setSpacing('2.5px');
+    ctx.fillStyle = pal.muted;
+    ctx.fillText(m.label, x, cellY + (hasChart ? 18 : 20));
+    setSpacing('0px');
 
-    // Metric Label
-    ctx.fillStyle = pal.textMuted;
-    ctx.font = 'bold 15px "JetBrains Mono", monospace, system-ui';
-    ctx.letterSpacing = '1.2px';
-    ctx.fillText(m.label, mx + 18, my + 30);
+    ctx.font = sans(hasChart ? (isStory ? 52 : 40) : (isStory ? 100 : 72), '700');
+    ctx.fillStyle = pal.ink;
+    const valueBaseline = cellY + (hasChart ? (isStory ? 86 : 62) : (isStory ? 130 : 96));
+    ctx.fillText(m.value, x, valueBaseline);
 
-    // Metric Value (Big and clear)
-    ctx.fillStyle = pal.textPrimary;
-    ctx.font = '900 38px "JetBrains Mono", monospace, system-ui';
-    ctx.letterSpacing = '0px';
-    ctx.fillText(m.value, mx + 18, my + (hasDeltas ? 75 : cardH - 24));
+    const valueW = ctx.measureText(m.value).width;
+    ctx.font = mono(hasChart ? (isStory ? 18 : 15) : (isStory ? 22 : 18));
+    ctx.fillStyle = pal.muted;
+    ctx.fillText(m.unit, x + valueW + (hasChart ? 10 : 12), valueBaseline);
 
-    // Metric Unit
-    const valWidth = ctx.measureText(m.value).width;
-    ctx.fillStyle = m.color;
-    ctx.font = 'bold 17px "JetBrains Mono", monospace, system-ui';
-    ctx.fillText(m.unit, mx + 18 + valWidth + 8, my + (hasDeltas ? 75 : cardH - 25));
-
-    // Clean, Prominent Comparison Delta Row (without repeated "vs prev" suffix)
     if (m.delta) {
-      const deltaStr = `${m.delta.positive ? '▲' : '▼'} ${m.delta.text}`;
-      const pillX = mx + 14;
-      const pillY = my + cardH - 36;
-      const pillW = cardW - 28;
-      const pillH = 26;
-
-      drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 6);
-      ctx.fillStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.18)' : 'rgba(239, 68, 68, 0.18)';
-      ctx.fill();
-      ctx.strokeStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.45)' : 'rgba(239, 68, 68, 0.45)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.fillStyle = m.delta.positive ? '#4ade80' : '#f87171';
-      ctx.font = 'bold 13px "JetBrains Mono", monospace, system-ui';
-      ctx.fillText(deltaStr, pillX + 12, pillY + 18);
+      ctx.font = mono(hasChart ? (isStory ? 17 : 15) : (isStory ? 28 : 22), '600');
+      setSpacing('0.5px');
+      ctx.fillStyle = m.delta.positive ? pal.deltaUp : pal.deltaDown;
+      ctx.fillText(m.delta.text, x, cellY + (hasChart ? (isStory ? 122 : 90) : (isStory ? 190 : 144)));
+      setSpacing('0px');
     }
   });
 
-  const numRows = Math.ceil(Math.min(metrics.length, 6) / cols);
-  cursorY += (numRows * (cardH + cardGap)) + 16;
+  const gridBottom = gridTop + rows * cellH;
 
-  // 6. Mini Telemetry Sparkline Chart
-  const history = session.history || [];
-  if (showChart && history.length > 5) {
-    const chartBoxW = width - (padX * 2);
-    const chartBoxH = aspect === 'story' ? 360 : 200;
+  // Row separators + single vertical divider
+  for (let r = 1; r < rows; r++) {
+    hairline(gridTop + r * cellH);
+  }
+  ctx.strokeStyle = pal.hairline;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padX + colW, gridTop + 8);
+  ctx.lineTo(padX + colW, gridBottom - 8);
+  ctx.stroke();
 
-    // Card Box for chart
-    drawRoundedRect(ctx, padX, cursorY, chartBoxW, chartBoxH, 16);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.fill();
-    ctx.strokeStyle = pal.cardBorder;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  y = gridBottom;
 
-    // Chart Title inside Box
-    ctx.fillStyle = pal.textMuted;
-    ctx.font = 'bold 14px "JetBrains Mono", monospace, system-ui';
-    ctx.letterSpacing = '2px';
-    ctx.fillText('TELEMETRY WAVEFORM (POWER & EFFORT)', padX + 24, cursorY + 32);
-
-    const chartPadX = 24;
-    const chartPadY = 50;
-    const plotW = chartBoxW - (chartPadX * 2);
-    const plotH = chartBoxH - chartPadY - 24;
-    const plotX = padX + chartPadX;
-    const plotY = cursorY + chartPadY;
-
-    // Sample data points for smooth line
-    const maxPoints = 80;
+  // ---- Power chart: single thin line, no box, no fill ------------------
+  if (hasChart) {
+    const maxPoints = 90;
     const step = Math.max(1, Math.floor(history.length / maxPoints));
     const sampled: HistoryData[] = [];
     for (let i = 0; i < history.length; i += step) {
@@ -539,27 +428,33 @@ export const renderShareCardToCanvas = (
 
     const maxPowerVal = Math.max(...sampled.map(p => p.power || 0), 100);
 
-    // Build path
+    y += isStory ? 72 : 46;
+
+    ctx.font = mono(isStory ? 17 : 14);
+    setSpacing('2.5px');
+    ctx.fillStyle = pal.muted;
+    ctx.fillText('POWER', padX, y);
+    setSpacing('0px');
+
+    ctx.font = mono(isStory ? 17 : 14);
+    setSpacing('1px');
+    ctx.textAlign = 'right';
+    ctx.fillText(`PEAK ${Math.round(maxPowerVal)} W`, width - padX, y);
+    ctx.textAlign = 'left';
+    setSpacing('0px');
+
+    const plotTop = y + (isStory ? 44 : 28);
+    const plotH = isStory ? 300 : 92;
+    const plotBottom = plotTop + plotH;
+
+    hairline(plotBottom);
+
     const points = sampled.map((p, idx) => ({
-      x: plotX + (idx / (sampled.length - 1)) * plotW,
-      y: plotY + plotH - (((p.power || 0) / maxPowerVal) * plotH),
+      x: padX + (idx / (sampled.length - 1)) * contentW,
+      y: plotBottom - ((p.power || 0) / maxPowerVal) * plotH,
     }));
 
     if (points.length > 1) {
-      // Fill under curve
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, plotY + plotH);
-      points.forEach(pt => ctx.lineTo(pt.x, pt.y));
-      ctx.lineTo(points[points.length - 1].x, plotY + plotH);
-      ctx.closePath();
-
-      const fillGrad = ctx.createLinearGradient(0, plotY, 0, plotY + plotH);
-      fillGrad.addColorStop(0, pal.chartFillStart);
-      fillGrad.addColorStop(1, pal.chartFillEnd);
-      ctx.fillStyle = fillGrad;
-      ctx.fill();
-
-      // Stroke curve line
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) {
@@ -568,64 +463,44 @@ export const renderShareCardToCanvas = (
         ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
       }
       ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-      ctx.strokeStyle = pal.chartLine;
+      ctx.strokeStyle = pal.accent;
       ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       ctx.stroke();
     }
 
-    cursorY += chartBoxH + 24;
+    y = plotBottom;
   }
 
-  // 7. HR Recovery & Extra Callout (for Story format or if space allows)
+  // ---- Heart-rate recovery (story only, one quiet line) ----------------
   const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
-  if (aspect === 'story' && hrrScore !== null) {
-    const hrrW = width - (padX * 2);
-    const hrrH = 100;
-    drawRoundedRect(ctx, padX, cursorY, hrrW, hrrH, 14);
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  if (isStory && hrrScore !== null) {
+    y += isStory ? 56 : 44;
+    ctx.font = mono(isStory ? 19 : 17);
+    setSpacing('2px');
+    ctx.fillStyle = pal.muted;
+    ctx.fillText('HEART-RATE RECOVERY', padX, y);
+    setSpacing('0px');
+    ctx.font = mono(isStory ? 19 : 17, '700');
+    ctx.fillStyle = pal.ink;
+    const labelW = ctx.measureText('HEART-RATE RECOVERY').width;
+    ctx.fillText(`   ${hrrScore} BPM  ·  ${(session.stats?.hrrClassification || 'Normal').toUpperCase()}`, padX + labelW, y);
 
-    ctx.fillStyle = '#34d399';
-    ctx.font = 'bold 16px "JetBrains Mono", monospace, system-ui';
-    ctx.fillText(`🫀 HEART RATE RECOVERY (HRR): ${hrrScore} BPM (${session.stats?.hrrClassification || 'Normal'})`, padX + 24, cursorY + 36);
-
-    ctx.fillStyle = pal.textMuted;
-    ctx.font = '15px system-ui, sans-serif';
-    ctx.fillText('Strong autonomic recovery recorded in the 2-minute post-ride cooldown.', padX + 24, cursorY + 70);
-
-    cursorY += hrrH + 24;
+    y += isStory ? 30 : 24;
   }
 
-  // Custom Note if provided
+  // ---- Rider note -------------------------------------------------------
   if (customNote && customNote.trim().length > 0) {
-    ctx.fillStyle = pal.textMuted;
-    ctx.font = 'italic 18px system-ui, sans-serif';
-    ctx.fillText(`"${customNote.trim()}"`, padX, cursorY + 10);
-    cursorY += 36;
+    y += isStory ? 64 : 48;
+    ctx.font = `italic ${isStory ? 26 : 22}px ${SANS_STACK}`;
+    ctx.fillStyle = pal.muted;
+    let note = `"${customNote.trim()}"`;
+    while (ctx.measureText(note).width > contentW && note.length > 12) {
+      note = `${note.slice(0, -5)}…"`;
+    }
+    ctx.fillText(note, padX, y);
   }
-
-  // 8. Footer Branding
-  const footerY = height - (aspect === 'story' ? 80 : 50);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(padX, footerY - 24);
-  ctx.lineTo(width - padX, footerY - 24);
-  ctx.stroke();
-
-  ctx.fillStyle = pal.textMuted;
-  ctx.font = 'bold 16px "JetBrains Mono", monospace, system-ui';
-  ctx.letterSpacing = '1.5px';
-  ctx.fillText('🚲 VELOPULSE • INDOOR PERFORMANCE TRACKER', padX, footerY);
-
-  ctx.textAlign = 'right';
-  ctx.fillStyle = pal.accentPrimary;
-  ctx.fillText('velopulse.app', width - padX, footerY);
-  ctx.textAlign = 'left';
-  ctx.letterSpacing = '0px';
 };
 
 /** Generates PNG Blob from Share Card options */
@@ -658,8 +533,8 @@ export const downloadShareCardPNG = async (
 /** Shares image directly using Web Share API (mobile/desktop browsers) */
 export const shareViaWebShareApi = async (
   options: ShareCardRenderOptions,
-  title = 'VeloPulse Workout Achievement',
-  text = 'Check out my indoor cycling workout on VeloPulse!'
+  title = 'VeloPulse Workout',
+  text = 'My indoor cycling session, tracked with VeloPulse.'
 ): Promise<boolean> => {
   const blob = await generateShareCardBlob(options);
   if (!blob) return false;
