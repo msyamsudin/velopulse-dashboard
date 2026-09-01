@@ -440,6 +440,7 @@ export const HistoryDetail = ({
       <ShareWorkoutCardModal
         session={session}
         allSessions={allSessions}
+        previousSession={previousSession}
         maxHr={maxHr}
         onClose={() => setIsShareModalOpen(false)}
       />

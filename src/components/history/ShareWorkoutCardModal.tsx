@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Download, Share2, Copy, Check, Sparkles, X, Heart, Activity } from 'lucide-react';
+import { Download, Share2, Copy, Check, Sparkles, X, Heart, Activity, TrendingUp } from 'lucide-react';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import {
   type ShareCardAspect,
@@ -16,6 +16,7 @@ import { useI18n } from '@/i18n';
 interface ShareWorkoutCardModalProps {
   session: WorkoutSession;
   allSessions?: WorkoutSession[];
+  previousSession?: WorkoutSession;
   maxHr?: number;
   onClose: () => void;
 }
@@ -23,6 +24,7 @@ interface ShareWorkoutCardModalProps {
 export const ShareWorkoutCardModal = ({
   session,
   allSessions = [],
+  previousSession,
   maxHr = 190,
   onClose,
 }: ShareWorkoutCardModalProps) => {
@@ -33,6 +35,7 @@ export const ShareWorkoutCardModal = ({
   const [theme, setTheme] = useState<ShareCardTheme>('neon');
   const [showHr, setShowHr] = useState(true);
   const [showChart, setShowChart] = useState(true);
+  const [showComparison, setShowComparison] = useState(true);
   const [customNote, setCustomNote] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -57,16 +60,18 @@ export const ShareWorkoutCardModal = ({
     renderShareCardToCanvas(canvasRef.current, {
       session,
       allSessions,
+      previousSession,
       aspect,
       theme,
       milestones: achievements.milestones,
       personalRecords: achievements.personalRecords,
       showHr,
       showChart,
+      showComparison,
       customNote,
       maxHr,
     });
-  }, [session, allSessions, aspect, theme, showHr, showChart, customNote, maxHr, achievements]);
+  }, [session, allSessions, previousSession, aspect, theme, showHr, showChart, showComparison, customNote, maxHr, achievements]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -75,12 +80,14 @@ export const ShareWorkoutCardModal = ({
       await downloadShareCardPNG({
         session,
         allSessions,
+        previousSession,
         aspect,
         theme,
         milestones: achievements.milestones,
         personalRecords: achievements.personalRecords,
         showHr,
         showChart,
+        showComparison,
         customNote,
         maxHr,
       }, filename);
@@ -97,12 +104,14 @@ export const ShareWorkoutCardModal = ({
       const shared = await shareViaWebShareApi({
         session,
         allSessions,
+        previousSession,
         aspect,
         theme,
         milestones: achievements.milestones,
         personalRecords: achievements.personalRecords,
         showHr,
         showChart,
+        showComparison,
         customNote,
         maxHr,
       });
@@ -112,12 +121,14 @@ export const ShareWorkoutCardModal = ({
         const copied = await copyShareCardToClipboard({
           session,
           allSessions,
+          previousSession,
           aspect,
           theme,
           milestones: achievements.milestones,
           personalRecords: achievements.personalRecords,
           showHr,
           showChart,
+          showComparison,
           customNote,
           maxHr,
         });
@@ -143,12 +154,14 @@ export const ShareWorkoutCardModal = ({
     const success = await copyShareCardToClipboard({
       session,
       allSessions,
+      previousSession,
       aspect,
       theme,
       milestones: achievements.milestones,
       personalRecords: achievements.personalRecords,
       showHr,
       showChart,
+      showComparison,
       customNote,
       maxHr,
     });
@@ -282,6 +295,18 @@ export const ShareWorkoutCardModal = ({
                 {t('Card Elements')}
               </label>
               <div className="space-y-2">
+                <label className="flex items-center justify-between text-xs font-mono text-white/80 cursor-pointer p-2 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/10">
+                  <span className="flex items-center gap-2">
+                    <TrendingUp size={14} className="text-emerald-400" /> {t('Compare vs Last Workout')}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={showComparison}
+                    onChange={e => setShowComparison(e.target.checked)}
+                    className="accent-hw-accent"
+                  />
+                </label>
+
                 <label className="flex items-center justify-between text-xs font-mono text-white/80 cursor-pointer p-2 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/10">
                   <span className="flex items-center gap-2">
                     <Activity size={14} className="text-hw-accent" /> {t('Power & Effort Waveform')}

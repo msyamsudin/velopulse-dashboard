@@ -9,6 +9,7 @@ export type ShareCardTheme = 'neon' | 'gold' | 'stealth';
 export interface ShareCardRenderOptions {
   session: WorkoutSession;
   allSessions?: WorkoutSession[];
+  previousSession?: WorkoutSession;
   aspect: ShareCardAspect;
   theme: ShareCardTheme;
   headline?: string;
@@ -16,6 +17,7 @@ export interface ShareCardRenderOptions {
   personalRecords?: MilestoneBadge[];
   showHr?: boolean;
   showChart?: boolean;
+  showComparison?: boolean;
   customNote?: string;
   maxHr?: number;
 }
@@ -123,6 +125,8 @@ export const renderShareCardToCanvas = (
 ): void => {
   const {
     session,
+    allSessions,
+    previousSession,
     aspect = 'square',
     theme = 'neon',
     headline,
@@ -130,6 +134,7 @@ export const renderShareCardToCanvas = (
     personalRecords = [],
     showHr = true,
     showChart = true,
+    showComparison = true,
     customNote,
     maxHr = 190,
   } = options;
@@ -150,6 +155,34 @@ export const renderShareCardToCanvas = (
   const dateFormatted = Number.isNaN(sessionDate.getTime())
     ? 'Recent Workout'
     : sessionDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+  // Resolve previous session for comparison (either directly provided or from allSessions)
+  let resolvedPrevSession: WorkoutSession | undefined = previousSession;
+  if (!resolvedPrevSession && allSessions && allSessions.length > 1) {
+    const sorted = [...allSessions].sort((a, b) => {
+      const tA = a.sessionStartTime || new Date(a.date).getTime() || 0;
+      const tB = b.sessionStartTime || new Date(b.date).getTime() || 0;
+      return tA - tB;
+    });
+    const currIdx = sorted.findIndex(s => s.id === session.id);
+    if (currIdx > 0) {
+      resolvedPrevSession = sorted[currIdx - 1];
+    }
+  }
+
+  const prevOutcome = resolvedPrevSession ? getSessionOutcome(resolvedPrevSession) : null;
+  const prevSpeed = prevOutcome && prevOutcome.duration > 0 ? (prevOutcome.distanceKm / (prevOutcome.duration / 3600)) : 0;
+  const currentSpeed = outcome.duration > 0 ? (outcome.distanceKm / (outcome.duration / 3600)) : 0;
+
+  // Comparison deltas
+  const deltas = showComparison && prevOutcome ? {
+    distance: outcome.distanceKm - prevOutcome.distanceKm,
+    calories: outcome.calories - prevOutcome.calories,
+    avgPower: (session.stats?.avgPower || 0) - (resolvedPrevSession?.stats?.avgPower || 0),
+    maxPower: (session.stats?.maxPower || 0) - (resolvedPrevSession?.stats?.maxPower || 0),
+    avgHr: (session.stats?.avgHr || 0) - (resolvedPrevSession?.stats?.avgHr || 0),
+    avgSpeed: currentSpeed - prevSpeed,
+  } : null;
 
   // 1. Background gradient
   const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
@@ -200,7 +233,7 @@ export const renderShareCardToCanvas = (
   ctx.letterSpacing = '4px';
   ctx.fillText('⚡ VELOPULSE CYCLING LOG', padX, cursorY);
 
-  // Top Right Pill (Intensity or App link)
+  // Top Right Pill (Intensity or Comparison tag)
   const tagText = quality.label.toUpperCase();
   const tagWidth = 140;
   const tagHeight = 36;
@@ -228,6 +261,7 @@ export const renderShareCardToCanvas = (
     headline ||
     (milestones.length > 0 ? `${milestones[0].icon} ${milestones[0].title}` : null) ||
     (personalRecords.length > 0 ? `${personalRecords[0].icon} ${personalRecords[0].title}` : null) ||
+    (showComparison && deltas && deltas.avgPower > 0 ? '📈 PROGRESSION & EFFORT' : null) ||
     'WORKOUT PERFORMANCE';
 
   ctx.fillStyle = pal.textPrimary;
@@ -240,12 +274,51 @@ export const renderShareCardToCanvas = (
   ctx.fillStyle = pal.textMuted;
   ctx.font = '500 22px "JetBrains Mono", monospace, system-ui';
   const durationText = formatDuration(outcome.duration);
-  ctx.fillText(`📅 ${dateFormatted}   ⏱️ ${durationText}   📍 Indoor Trainer`, padX, cursorY);
+  const comparisonSubtitle = showComparison && resolvedPrevSession ? '  •  vs Prev Workout' : '';
+  ctx.fillText(`📅 ${dateFormatted}   ⏱️ ${durationText}   📍 Indoor Trainer${comparisonSubtitle}`, padX, cursorY);
 
   cursorY += 48;
 
-  // 4. Milestone & PR Badges Ribbon (if any)
-  const allBadges = [...milestones, ...personalRecords];
+  // 4. Milestone, PR, or Progression Badges Ribbon
+  let allBadges = [...milestones, ...personalRecords];
+
+  // If no milestones/PRs but comparison is active and has improvements, create comparison badges
+  if (allBadges.length === 0 && deltas) {
+    if (deltas.avgPower > 0) {
+      allBadges.push({
+        id: 'comp_power',
+        type: 'pr',
+        title: `+${deltas.avgPower}W Power`,
+        subtitle: 'vs previous ride',
+        icon: '⚡',
+        valueFormatted: `+${deltas.avgPower} W`,
+        tier: 'silver',
+      });
+    }
+    if (deltas.distance > 0.5) {
+      allBadges.push({
+        id: 'comp_dist',
+        type: 'distance',
+        title: `+${deltas.distance.toFixed(1)} km Distance`,
+        subtitle: 'longer session',
+        icon: '🚴',
+        valueFormatted: `+${deltas.distance.toFixed(1)} km`,
+        tier: 'silver',
+      });
+    }
+    if (deltas.avgSpeed > 0.5) {
+      allBadges.push({
+        id: 'comp_speed',
+        type: 'pr',
+        title: `+${deltas.avgSpeed.toFixed(1)} km/h Speed`,
+        subtitle: 'faster pace',
+        icon: '🚀',
+        valueFormatted: `+${deltas.avgSpeed.toFixed(1)} km/h`,
+        tier: 'silver',
+      });
+    }
+  }
+
   if (allBadges.length > 0) {
     const ribbonY = cursorY;
     let badgeX = padX;
@@ -276,14 +349,66 @@ export const renderShareCardToCanvas = (
     cursorY += 64;
   }
 
-  // 5. Main Metric Grid (Big Numbers)
-  const metrics = [
-    { label: 'DISTANCE', value: outcome.distanceKm.toFixed(2), unit: 'KM', color: pal.accentPrimary },
-    { label: 'CALORIES', value: String(outcome.calories), unit: 'KCAL', color: pal.accentSecondary },
-    { label: 'AVG POWER', value: String(session.stats?.avgPower || 0), unit: 'W', color: '#facc15' },
-    { label: 'MAX POWER', value: String(session.stats?.maxPower || 0), unit: 'W', color: '#fb923c' },
-    ...(showHr ? [{ label: 'AVG HR', value: String(session.stats?.avgHr || 0), unit: 'BPM', color: '#f43f5e' }] : []),
-    { label: 'AVG SPEED', value: (outcome.duration > 0 ? (outcome.distanceKm / (outcome.duration / 3600)).toFixed(1) : '0'), unit: 'KM/H', color: '#38bdf8' },
+  // 5. Main Metric Grid (Big Numbers + Delta comparison pills)
+  interface MetricItem {
+    label: string;
+    value: string;
+    unit: string;
+    color: string;
+    delta?: { text: string; positive: boolean } | null;
+  }
+
+  const formatDeltaText = (deltaVal: number, unit: string, decimals = 0, invertGood = false): { text: string; positive: boolean } | null => {
+    if (Math.abs(deltaVal) < 0.01) return null;
+    const sign = deltaVal > 0 ? '+' : '';
+    const formatted = `${sign}${deltaVal.toFixed(decimals)}${unit ? ' ' + unit : ''}`;
+    const positive = invertGood ? deltaVal < 0 : deltaVal > 0;
+    return { text: formatted, positive };
+  };
+
+  const metrics: MetricItem[] = [
+    {
+      label: 'DISTANCE',
+      value: outcome.distanceKm.toFixed(2),
+      unit: 'KM',
+      color: pal.accentPrimary,
+      delta: deltas ? formatDeltaText(deltas.distance, 'km', 1) : null,
+    },
+    {
+      label: 'CALORIES',
+      value: String(outcome.calories),
+      unit: 'KCAL',
+      color: pal.accentSecondary,
+      delta: deltas ? formatDeltaText(deltas.calories, 'kcal', 0) : null,
+    },
+    {
+      label: 'AVG POWER',
+      value: String(session.stats?.avgPower || 0),
+      unit: 'W',
+      color: '#facc15',
+      delta: deltas ? formatDeltaText(deltas.avgPower, 'W', 0) : null,
+    },
+    {
+      label: 'MAX POWER',
+      value: String(session.stats?.maxPower || 0),
+      unit: 'W',
+      color: '#fb923c',
+      delta: deltas ? formatDeltaText(deltas.maxPower, 'W', 0) : null,
+    },
+    ...(showHr ? [{
+      label: 'AVG HR',
+      value: String(session.stats?.avgHr || 0),
+      unit: 'BPM',
+      color: '#f43f5e',
+      delta: deltas ? formatDeltaText(deltas.avgHr, 'bpm', 0, true) : null,
+    }] : []),
+    {
+      label: 'AVG SPEED',
+      value: currentSpeed.toFixed(1),
+      unit: 'KM/H',
+      color: '#38bdf8',
+      delta: deltas ? formatDeltaText(deltas.avgSpeed, 'km/h', 1) : null,
+    },
   ];
 
   const cols = 3;
@@ -311,6 +436,26 @@ export const renderShareCardToCanvas = (
     ctx.font = 'bold 15px "JetBrains Mono", monospace, system-ui';
     ctx.letterSpacing = '1px';
     ctx.fillText(m.label, mx + 20, my + 32);
+
+    // Delta pill on top right of metric box (if available)
+    if (m.delta) {
+      const deltaStr = m.delta.text;
+      ctx.font = 'bold 12px "JetBrains Mono", monospace, system-ui';
+      const dWidth = ctx.measureText(deltaStr).width + 16;
+      const dHeight = 22;
+      const dx = mx + cardW - dWidth - 14;
+      const dy = my + 16;
+
+      drawRoundedRect(ctx, dx, dy, dWidth, dHeight, 6);
+      ctx.fillStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+      ctx.fill();
+      ctx.strokeStyle = m.delta.positive ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = m.delta.positive ? '#4ade80' : '#f87171';
+      ctx.fillText(deltaStr, dx + 8, dy + 15);
+    }
 
     // Metric Value
     ctx.fillStyle = pal.textPrimary;
