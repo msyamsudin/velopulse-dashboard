@@ -97,6 +97,12 @@ export const detectSessionAchievements = (
   const priorSessions = sorted.slice(0, sessionIndex);
   const currentOutcome = getSessionOutcome(session);
   const currentSpeed = currentOutcome.duration > 0 ? currentOutcome.distanceKm / (currentOutcome.duration / 3600) : 0;
+  // Average speed can never exceed the fastest speed the session recorded;
+  // guards against distance-counter offsets crowning impossible pace records.
+  const currentMaxPointSpeed = (session.history || []).reduce(
+    (max, point) => Math.max(max, point.speed || 0),
+    session.stats?.maxSpeed || 0
+  );
   const currentAvgPower = session.stats?.avgPower || 0;
   const currentMaxPower = session.stats?.maxPower || 0;
   const currentHrr = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
@@ -239,7 +245,7 @@ export const detectSessionAchievements = (
       });
     }
 
-    if (currentSpeed > priorFastestSpeed && currentSpeed >= 20 && currentOutcome.distanceKm >= 5) {
+    if (currentSpeed > priorFastestSpeed && currentSpeed >= 20 && currentOutcome.distanceKm >= 5 && currentSpeed <= currentMaxPointSpeed * 1.05 + 0.5) {
       personalRecords.push({
         id: 'pr_speed',
         type: 'pr',

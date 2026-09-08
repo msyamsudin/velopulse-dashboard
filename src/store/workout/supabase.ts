@@ -1,6 +1,7 @@
 import { getSupabaseClient, getSupabaseUserId } from '@/lib/supabase';
 import { classifySupabaseError } from '@/lib/supabase-errors';
 import type { HistoryData, WorkoutSession } from './types';
+import { sanitizeLegacySessionDuration } from './session-utils';
 
 interface SupabaseWorkoutRow {
   id: string;
@@ -15,7 +16,7 @@ interface SupabaseWorkoutRow {
 export const mapSupabaseWorkout = (item: SupabaseWorkoutRow): WorkoutSession => {
   const sessionStartTime = Number(item.session_start_time) || Date.parse(item.created_at) || 0;
 
-  return {
+  return sanitizeLegacySessionDuration({
     id: item.id,
     sessionStartTime,
     date: sessionStartTime > 0 ? new Date(sessionStartTime).toISOString() : item.created_at,
@@ -27,7 +28,7 @@ export const mapSupabaseWorkout = (item: SupabaseWorkoutRow): WorkoutSession => 
     supabase_id: item.id,
     supabase_synced_at: item.created_at,
     supabase_sync_error: undefined
-  };
+  });
 };
 
 export const findSupabaseDuplicate = async (session: WorkoutSession) => {

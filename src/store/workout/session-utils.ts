@@ -58,3 +58,48 @@ export const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSes
 
   return sortSessions(Array.from(merged.values()));
 };
+
+/**
+ * Repairs legacy sessions whose stored `duration` froze far below the ride's
+ * real length. Very old builds ticked `elapsed` from a JS timer that could
+ * sleep while the BLE point stream kept recording (1 point/second), leaving a
+ * session like a real ~23-minute ride stored with `duration: 262`.
+ *
+ * The physical signature of that corruption: the distance-derived average
+ * speed (distance ÷ duration) exceeds the fastest speed the session ever
+ * recorded — an average can never be higher than the maximum. When detected,
+ * the duration is re-derived from the recorded point series (real wall-clock
+ * timestamps when present, otherwise the legacy 1-point-per-second count).
+ * Only ever lengthens the duration and only when the evidence is unambiguous.
+ */
+export const sanitizeLegacySessionDuration = (session: WorkoutSession): WorkoutSession => {
+  const history = session?.history || [];
+  if (history.length < 2 || !(session.duration > 0)) return session;
+
+  let distanceMeters = 0;
+  let maxPointSpeed = 0;
+  for (const point of history) {
+    if (point.distance > distanceMeters) distanceMeters = point.distance;
+    if ((point.speed || 0) > maxPointSpeed) maxPointSpeed = point.speed || 0;
+  }
+
+  const recordedMaxSpeed = Math.max(session.stats?.maxSpeed || 0, maxPointSpeed);
+  if (distanceMeters <= 0 || recordedMaxSpeed <= 0) return session;
+
+  const distanceKm = distanceMeters / 1000;
+  const avgSpeedKmh = distanceKm / (session.duration / 3600);
+  // Small tolerance for rounding/unit noise: physical average ≤ recorded max.
+  if (avgSpeedKmh <= recordedMaxSpeed * 1.05 + 0.5) return session;
+
+  let derivedSeconds = history.length - 1;
+  const firstTs = history[0]?.ts;
+  const lastTs = history[history.length - 1]?.ts;
+  if (typeof firstTs === 'number' && typeof lastTs === 'number' && lastTs > firstTs) {
+    derivedSeconds = Math.max(derivedSeconds, Math.round((lastTs - firstTs) / 1000));
+  }
+
+  // Only act on clear-cut corruption (derived time at least twice the stored).
+  if (derivedSeconds <= session.duration * 2) return session;
+
+  return { ...session, duration: derivedSeconds };
+};

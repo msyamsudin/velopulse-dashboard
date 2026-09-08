@@ -298,9 +298,28 @@ export const getPersonalRecords = (sessions: WorkoutSession[], locale = 'en-US')
   const calories = bestBy(item => item.outcome.calories);
   const avgPower = bestBy(item => item.session?.stats?.avgPower || 0);
   const maxPower = bestBy(item => item.session?.stats?.maxPower || 0);
-  const speed = bestBy(item => item.speed);
 
-  return [
+  // Average-speed record sanity checks. A session's average speed can never
+  // exceed the fastest speed it actually recorded, and a window shorter than
+  // five minutes is not a meaningful "ride average". Some trainers inject a
+  // device-counter offset into the distance stream (see
+  // parseFtmsIndoorBikeData), which would otherwise crown a broken few-minute
+  // session as the all-time fastest average (e.g. 138 km/h) and poison the PR
+  // pacer target shown during rides.
+  const MIN_AVG_SPEED_RECORD_SECONDS = 300;
+  const speedEligibleSessions = enriched.filter(item => {
+    if (item.outcome.duration < MIN_AVG_SPEED_RECORD_SECONDS) return false;
+    if (item.outcome.distanceKm < 1) return false;
+    const maxPointSpeed = (item.session?.history || []).reduce(
+      (max, point) => Math.max(max, point.speed || 0),
+      0
+    );
+    const recordedMaxSpeed = item.session?.stats?.maxSpeed || 0;
+    const plausibilityCap = Math.max(maxPointSpeed, recordedMaxSpeed) * 1.05 + 0.5;
+    return item.speed <= plausibilityCap;
+  });
+
+  const records: PersonalRecord[] = [
     {
       title: 'Longest Ride',
       value: `${Math.floor(longest.outcome.duration / 60)}`,
@@ -336,12 +355,21 @@ export const getPersonalRecords = (sessions: WorkoutSession[], locale = 'en-US')
       dateLabel: maxPower.dateLabel,
       sessionId: maxPower.session.id,
     },
-    {
-      title: 'Fastest Avg Speed',
-      value: speed.speed.toFixed(1),
-      unit: 'km/h',
-      dateLabel: speed.dateLabel,
-      sessionId: speed.session.id,
-    },
   ];
+
+  if (speedEligibleSessions.length > 0) {
+    const fastestAvgSpeed = speedEligibleSessions.reduce(
+      (best, current) => (current.speed > best.speed ? current : best),
+      speedEligibleSessions[0]
+    );
+    records.push({
+      title: 'Fastest Avg Speed',
+      value: fastestAvgSpeed.speed.toFixed(1),
+      unit: 'km/h',
+      dateLabel: fastestAvgSpeed.dateLabel,
+      sessionId: fastestAvgSpeed.session.id,
+    });
+  }
+
+  return records;
 };

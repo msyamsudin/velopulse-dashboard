@@ -31,6 +31,7 @@ import {
   getWorkoutDateISOString,
   isPotentialDuplicateSession,
   mergeSessionHistories,
+  sanitizeLegacySessionDuration,
 } from './session-utils';
 import {
   addPointToTotals,
@@ -329,7 +330,11 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
     },
 
     importTCX: async (tcxContent, filename = 'TCX file') => {
-      const importedSessions = parseTCXWorkoutSessions(tcxContent);
+      // Sanitize imported durations too: a TCX written from a legacy session
+      // (or split across laps) can carry a Lap TotalTimeSeconds far shorter
+      // than the trackpoints it contains, which would otherwise recreate the
+      // impossible 138 km/h average on re-import.
+      const importedSessions = parseTCXWorkoutSessions(tcxContent).map(sanitizeLegacySessionDuration);
       const result: ImportTcxResult = {
         imported: 0,
         skipped: 0,
@@ -480,11 +485,14 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
 
     loadHistory: () => {
       const applySessions = (sessions: WorkoutSession[]) => {
-        const normalizedSessions = sessions.map((session: WorkoutSession) => ({
-          ...session,
-          date: getWorkoutDateISOString(session),
-          synced_to_supabase: Boolean(session.synced_to_supabase || session.supabase_id)
-        }));
+        const normalizedSessions = sessions.map((session: WorkoutSession) => {
+          const sanitized = sanitizeLegacySessionDuration(session);
+          return {
+            ...sanitized,
+            date: getWorkoutDateISOString(sanitized),
+            synced_to_supabase: Boolean(sanitized.synced_to_supabase || sanitized.supabase_id)
+          };
+        });
 
         set({ sessionHistory: normalizedSessions });
         return normalizedSessions;

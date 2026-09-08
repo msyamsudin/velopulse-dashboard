@@ -142,13 +142,18 @@ export const parseFtmsIndoorBikeData = (
     const rawDistance = d1 + (d2 << 8) + (d3 << 16);
 
     if (!state.distanceFromDevice) {
-      // First real Total Distance: the device's own counter is authoritative.
-      // Rebase so any speed-derived estimate accumulated before this packet is
-      // dropped instead of double-counted.
+      // First real Total Distance seen. Do NOT adopt the device counter as an
+      // absolute value: indoor consoles often keep counting from power-on or
+      // from an earlier workout, so that counter can include distance ridden
+      // before this app session started (warm-up, a previous ride, a quick
+      // spin test). Rebasing onto it mid-session injects that whole offset
+      // into the first history point and inflates the recorded session
+      // distance/speed (e.g. an impossible 138 km/h average from a 4-minute
+      // session). Instead, treat this value only as the baseline for the
+      // device deltas that follow; the speed-derived estimate accumulated so
+      // far is preserved.
       trackerUpdates.distanceFromDevice = true;
-      trackerUpdates.cumulativeDistance = rawDistance;
       trackerUpdates.lastRawDistance = rawDistance;
-      updates.distance = rawDistance;
     } else {
       const delta = (state.lastRawDistance > 0 && rawDistance < state.lastRawDistance)
         ? rawDistance

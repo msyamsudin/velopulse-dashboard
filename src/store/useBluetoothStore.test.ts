@@ -65,8 +65,14 @@ describe('parseFtmsIndoorBikeData', () => {
       0x2c, 0x01, // elapsed time = 300 s (skip)
     ]);
 
-    const { updates, trackerUpdates } = parseFtmsIndoorBikeData(packet, makeState(), 1000);
+    const { updates, trackerUpdates } = parseFtmsIndoorBikeData(packet, makeState({
+      cumulativeDistance: 1000,
+      lastRawDistance: 1000,
+      distanceFromDevice: true,
+    }), 1000);
 
+    // Device Total Distance stays flat (raw 1000 → delta 0) so the session
+    // distance is preserved at 1000 while the other fields are parsed.
     expect(updates.distance).toBe(1000);
     expect(updates.power).toBe(200);
     expect(updates.calories).toBe(50);
@@ -76,21 +82,17 @@ describe('parseFtmsIndoorBikeData', () => {
   });
 
   it('handles distance counter rollover without losing cumulative distance', () => {
-    // flags 0x0011: more data set (no speed field) + total distance
-    const first = makeView([0x11, 0x00, 0xe8, 0x03, 0x00]); // 1000 m
-    const second = makeView([0x11, 0x00, 0x0a, 0x00, 0x00]); // device reset to 10 m
+    // flags 0x0011: more data set (no speed field) + total distance.
+    // The session has already tracked 1000 m of device distance (last raw 1000).
+    const state = makeState({
+      cumulativeDistance: 1000,
+      lastRawDistance: 1000,
+      distanceFromDevice: true,
+    });
+    const reset = makeView([0x11, 0x00, 0x0a, 0x00, 0x00]); // device reset to 10 m
+    const result = parseFtmsIndoorBikeData(reset, state, 2000);
 
-    const state = makeState();
-    const firstResult = parseFtmsIndoorBikeData(first, state, 1000);
-    const stateAfterFirst: BluetoothParseState = {
-      ...state,
-      cumulativeDistance: firstResult.trackerUpdates.cumulativeDistance ?? 0,
-      lastRawDistance: firstResult.trackerUpdates.lastRawDistance ?? 0,
-      distanceFromDevice: firstResult.trackerUpdates.distanceFromDevice ?? false,
-    };
-    const secondResult = parseFtmsIndoorBikeData(second, stateAfterFirst, 2000);
-
-    expect(secondResult.updates.distance).toBe(1010);
+    expect(result.updates.distance).toBe(1010);
   });
 
   it('handles total energy counter rollover', () => {
@@ -131,17 +133,34 @@ describe('parseFtmsIndoorBikeData', () => {
     expect(result.updates.distance).toBeUndefined();
   });
 
-  it('rebases cumulative distance onto the device total when the first Total Distance arrives', () => {
-    // flags 0x0010: speed (bit0 clear => present) + total distance.
-    // speed = 500 / 100 = 5 km/h; distance = 1000 m.
-    const packet = makeView([0x10, 0x00, 0xf4, 0x01, 0xe8, 0x03, 0x00]);
-    const state = makeState({ cumulativeDistance: 42.5, lastUpdate: { speed: 1000 } }); // speed-fallback period
+  it('does not jump distance when the first Total Distance arrives mid-session (regression: impossible 138 km/h average)', () => {
+    // The app recorded from the speed fallback (cumulative 42.5 m) before the
+    // console's Total Distance field first appeared. The console counter may
+    // include distance ridden before the app session (warm-up / earlier ride),
+    // so adopting it wholesale would inject that whole offset and inflate the
+    // session distance — the fix keeps the estimate and only starts counting
+    // device deltas from the counter baseline.
+    // flags 0x0011: more data (no speed field) + total distance.
+    const first = makeView([0x11, 0x00, 0xe8, 0x03, 0x00]); // raw total distance = 1000 m
+    const state = makeState({ cumulativeDistance: 42.5 });
 
-    const result = parseFtmsIndoorBikeData(packet, state, 3000);
+    const firstResult = parseFtmsIndoorBikeData(first, state, 3000);
 
-    expect(result.updates.distance).toBe(1000); // device total wins over the 42.5 m estimate
-    expect(result.trackerUpdates.cumulativeDistance).toBe(1000);
-    expect(result.trackerUpdates.distanceFromDevice).toBe(true);
+    // No jump is emitted and the fallback distance is preserved.
+    expect(firstResult.updates.distance).toBeUndefined();
+    expect(firstResult.trackerUpdates.cumulativeDistance).toBeUndefined();
+    expect(firstResult.trackerUpdates.distanceFromDevice).toBe(true);
+    expect(firstResult.trackerUpdates.lastRawDistance).toBe(1000);
+
+    // The next Total Distance packet adds only the device delta (1010 - 1000).
+    const second = makeView([0x11, 0x00, 0xf2, 0x03, 0x00]); // raw total distance = 1010 m (0x03F2)
+    const secondResult = parseFtmsIndoorBikeData(second, {
+      ...state,
+      lastRawDistance: firstResult.trackerUpdates.lastRawDistance ?? 0,
+      distanceFromDevice: true,
+    }, 4000);
+
+    expect(secondResult.updates.distance).toBeCloseTo(52.5, 1);
   });
 });
 
