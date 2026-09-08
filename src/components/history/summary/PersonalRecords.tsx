@@ -1,6 +1,7 @@
 import { Trophy } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { PersonalRecord } from '@/lib/workout-analysis';
+import { formatDuration } from '@/utils/formatters';
 
 interface PersonalRecordsProps {
   personalRecords: PersonalRecord[];
@@ -26,19 +27,25 @@ export const PersonalRecords = ({ personalRecords, onSelectSession, rangeLabel, 
       </div>
       {personalRecords.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          {personalRecords.map(record => (
-            <button
-              key={record.title}
-              onClick={() => onSelectSession?.(record.sessionId)}
-              className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:border-hw-accent/40 hover:bg-hw-accent/5"
-            >
-              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{t(record.title)}</div>
-              <div className="mt-1 text-lg font-bold font-mono text-white tabular-nums">
-                {record.value} <span className="text-[10px] font-normal text-white/35">{record.unit}</span>
-              </div>
-              <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{t(record.dateLabel)}</div>
-            </button>
-          ))}
+          {personalRecords.map(record => {
+            // Longest Ride carries exact seconds; show them instead of the
+            // rounded minutes so every surface agrees with the PR pacer target.
+            const showDuration = record.title === 'Longest Ride' && typeof record.seconds === 'number';
+            return (
+              <button
+                key={record.title}
+                onClick={() => onSelectSession?.(record.sessionId)}
+                className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:border-hw-accent/40 hover:bg-hw-accent/5"
+              >
+                <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-hw-muted">{t(record.title)}</div>
+                <div className="mt-1 text-lg font-bold font-mono text-white tabular-nums">
+                  {showDuration ? formatDuration(record.seconds ?? 0) : record.value}{' '}
+                  {!showDuration && <span className="text-[10px] font-normal text-white/35">{record.unit}</span>}
+                </div>
+                <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-hw-accent/70">{t(record.dateLabel)}</div>
+              </button>
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">

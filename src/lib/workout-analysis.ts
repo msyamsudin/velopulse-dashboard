@@ -98,6 +98,9 @@ export type PersonalRecord = {
   unit: string;
   dateLabel: string;
   sessionId: string;
+  /** Exact session duration in seconds (Longest Ride), so callers can avoid
+   *  the rounding that the displayed minute value introduces. */
+  seconds?: number;
 };
 
 const formatDelta = (value: number, unit: string, decimals = 0) => {
@@ -290,78 +293,95 @@ export const getPersonalRecords = (sessions: WorkoutSession[], locale = 'en-US')
     };
   });
 
-  const bestBy = (selector: (item: typeof enriched[number]) => number) =>
-    enriched.reduce((best, current) => selector(current) > selector(best) ? current : best, enriched[0]);
+  const pickBest = <T>(items: T[], selector: (item: T) => number): T | undefined =>
+    items.length > 0
+      ? items.reduce((best, current) => (selector(current) > selector(best) ? current : best), items[0])
+      : undefined;
 
-  const longest = bestBy(item => item.outcome.duration);
-  const distance = bestBy(item => item.outcome.distanceKm);
-  const calories = bestBy(item => item.outcome.calories);
-  const avgPower = bestBy(item => item.session?.stats?.avgPower || 0);
-  const maxPower = bestBy(item => item.session?.stats?.maxPower || 0);
-
-  // Average-speed record sanity checks. A session's average speed can never
-  // exceed the fastest speed it actually recorded, and a window shorter than
-  // five minutes is not a meaningful "ride average". Some trainers inject a
-  // device-counter offset into the distance stream (see
-  // parseFtmsIndoorBikeData), which would otherwise crown a broken few-minute
-  // session as the all-time fastest average (e.g. 138 km/h) and poison the PR
-  // pacer target shown during rides.
-  const MIN_AVG_SPEED_RECORD_SECONDS = 300;
-  const speedEligibleSessions = enriched.filter(item => {
-    if (item.outcome.duration < MIN_AVG_SPEED_RECORD_SECONDS) return false;
-    if (item.outcome.distanceKm < 1) return false;
+  // Distance-derived records (Longest Ride, Best Distance, Top Calories,
+  // Fastest Avg Speed) only accept physically consistent rides: at least five
+  // minutes and one kilometre, and an average speed (distance ÷ duration) that
+  // can never exceed the fastest speed the session recorded. A trainer counter
+  // offset (see parseFtmsIndoorBikeData) or a frozen legacy duration would
+  // otherwise crown a broken session as the record — e.g. an impossible
+  // 138 km/h "average" from a real ~23-minute ride stored with duration 262 s.
+  const MIN_RECORD_SECONDS = 300;
+  const MIN_RECORD_KM = 1;
+  const plausibleRides = enriched.filter(item => {
+    if (item.outcome.duration < MIN_RECORD_SECONDS) return false;
+    if (item.outcome.distanceKm < MIN_RECORD_KM) return false;
     const maxPointSpeed = (item.session?.history || []).reduce(
       (max, point) => Math.max(max, point.speed || 0),
       0
     );
-    const recordedMaxSpeed = item.session?.stats?.maxSpeed || 0;
-    const plausibilityCap = Math.max(maxPointSpeed, recordedMaxSpeed) * 1.05 + 0.5;
-    return item.speed <= plausibilityCap;
+    const recordedMaxSpeed = Math.max(item.session?.stats?.maxSpeed || 0, maxPointSpeed);
+    if (recordedMaxSpeed <= 0) return false;
+    return item.speed <= recordedMaxSpeed * 1.05 + 0.5;
   });
 
-  const records: PersonalRecord[] = [
-    {
+  const longest = pickBest(plausibleRides, item => item.outcome.duration);
+  const distance = pickBest(plausibleRides, item => item.outcome.distanceKm);
+  const calories = pickBest(plausibleRides, item => item.outcome.calories);
+  const fastestAvgSpeed = pickBest(plausibleRides, item => item.speed);
+  // Power metrics are immune to distance-stream corruption, so every session
+  // is a candidate regardless of the ride-distance plausibility above.
+  const avgPower = pickBest(enriched, item => item.session?.stats?.avgPower || 0);
+  const maxPower = pickBest(enriched, item => item.session?.stats?.maxPower || 0);
+
+  const records: PersonalRecord[] = [];
+
+  if (longest) {
+    records.push({
       title: 'Longest Ride',
       value: `${Math.floor(longest.outcome.duration / 60)}`,
+      seconds: longest.outcome.duration,
       unit: 'min',
       dateLabel: longest.dateLabel,
       sessionId: longest.session.id,
-    },
-    {
+    });
+  }
+
+  if (distance) {
+    records.push({
       title: 'Best Distance',
       value: distance.outcome.distanceKm.toFixed(2),
       unit: 'km',
       dateLabel: distance.dateLabel,
       sessionId: distance.session.id,
-    },
-    {
+    });
+  }
+
+  if (calories) {
+    records.push({
       title: 'Top Calories',
       value: `${calories.outcome.calories}`,
       unit: 'kcal',
       dateLabel: calories.dateLabel,
       sessionId: calories.session.id,
-    },
-    {
+    });
+  }
+
+  if (avgPower) {
+    records.push({
       title: 'Best Avg Power',
       value: `${avgPower.session?.stats?.avgPower || 0}`,
       unit: 'w',
       dateLabel: avgPower.dateLabel,
       sessionId: avgPower.session.id,
-    },
-    {
+    });
+  }
+
+  if (maxPower) {
+    records.push({
       title: 'Peak Power',
       value: `${maxPower.session?.stats?.maxPower || 0}`,
       unit: 'w',
       dateLabel: maxPower.dateLabel,
       sessionId: maxPower.session.id,
-    },
-  ];
+    });
+  }
 
-  if (speedEligibleSessions.length > 0) {
-    const fastestAvgSpeed = speedEligibleSessions.reduce(
-      (best, current) => (current.speed > best.speed ? current : best),
-      speedEligibleSessions[0]
-    );
+  if (fastestAvgSpeed) {
     records.push({
       title: 'Fastest Avg Speed',
       value: fastestAvgSpeed.speed.toFixed(1),

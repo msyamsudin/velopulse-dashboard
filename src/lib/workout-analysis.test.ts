@@ -78,15 +78,44 @@ describe('getPersonalRecords — Fastest Avg Speed', () => {
     expect(fastest?.sessionId).toBe('normal_29_5');
   });
 
-  it('omits the average-speed record when every session is implausible or too short', () => {
+  it('omits distance-derived records when every session is implausible or too short', () => {
     const shortBlip = makeSession('blip', '2026-05-01T08:00:00.000Z', 120, 3000, 90, 92);
 
     const records = getPersonalRecords([shortBlip], 'en-US');
-    const fastest = records.find(record => record.title === 'Fastest Avg Speed');
 
-    expect(fastest).toBeUndefined();
-    // Other record cards are unaffected.
-    expect(records.some(record => record.title === 'Best Distance')).toBe(true);
+    // A 2-minute blip cannot set any distance-derived record: no Fastest Avg
+    // Speed, and no Best Distance either.
+    expect(records.find(record => record.title === 'Fastest Avg Speed')).toBeUndefined();
+    expect(records.find(record => record.title === 'Best Distance')).toBeUndefined();
+    // Power metrics are not distance-dependent, so they still surface.
+    expect(records.find(record => record.title === 'Peak Power')).toBeDefined();
+    expect(records.find(record => record.title === 'Best Avg Power')).toBeDefined();
+  });
+
+  it('keeps distance-derived records honest when a session carries an inflated distance', () => {
+    // Distance-counter offset: a real ~6 km in 15 minutes was recorded as
+    // 18 km (average would be an impossible 72 km/h vs a 42 km/h max).
+    const inflated = makeSession('inflated', '2026-05-03T08:00:00.000Z', 900, 18000, 40, 42);
+    const normalBest = makeSession('normal', '2026-05-04T08:00:00.000Z', 3600, 25000, 45, 50);
+
+    const records = getPersonalRecords([inflated, normalBest], 'en-US');
+
+    for (const title of ['Longest Ride', 'Best Distance', 'Top Calories', 'Fastest Avg Speed']) {
+      expect(records.find(record => record.title === title)?.sessionId).not.toBe('inflated');
+    }
+    const best = records.find(record => record.title === 'Best Distance');
+    expect(best?.sessionId).toBe('normal');
+  });
+
+  it('carries the exact duration seconds on the Longest Ride record', () => {
+    const session = makeSession('long', '2026-05-05T08:00:00.000Z', 3725, 26000, 45, 50);
+
+    const records = getPersonalRecords([session], 'en-US');
+    const longest = records.find(record => record.title === 'Longest Ride');
+
+    // Display value stays in rounded minutes; the exact seconds ride along.
+    expect(longest?.value).toBe('62');
+    expect(longest?.seconds).toBe(3725);
   });
 
   it('keeps the true best average from plausible sessions', () => {

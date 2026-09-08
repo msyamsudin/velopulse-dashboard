@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Trophy, Target, TrendingUp, Zap, Route, Timer, Activity, X, ChevronDown, ChevronUp, Sparkles, CheckCircle2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Trophy, Zap, Route, Timer, Activity, Flame, Gauge, X, ChevronDown, ChevronUp, Sparkles, CheckCircle2 } from 'lucide-react';
 import type { TelemetrySnapshot, WorkoutView } from '@/lib/cockpit-types';
 import type { LiveWorkoutStats, WorkoutSession } from '@/store/useWorkoutStore';
-import { getPersonalRecords, getSessionOutcome } from '@/lib/workout-analysis';
+import { getPersonalRecords, type PersonalRecord } from '@/lib/workout-analysis';
 import { formatDuration } from '@/utils/formatters';
 import { useI18n } from '@/i18n';
 
-export type TargetCategory = 'avg_power' | 'distance' | 'speed' | 'duration' | 'prev_workout';
+export type TargetCategory = 'avg_power' | 'distance' | 'speed' | 'duration' | 'calories' | 'peak_power';
 
 interface RecordPacerPanelProps {
   currentData: TelemetrySnapshot;
@@ -16,6 +17,13 @@ interface RecordPacerPanelProps {
   onClose: () => void;
 }
 
+interface PacerTab {
+  category: TargetCategory;
+  labelKey: string;
+  activeClass: string;
+  icon: ReactNode;
+}
+
 export const RecordPacerPanel = ({
   currentData,
   liveStats,
@@ -23,58 +31,46 @@ export const RecordPacerPanel = ({
   sessions,
   onClose,
 }: RecordPacerPanelProps) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [selectedTarget, setSelectedTarget] = useState<TargetCategory>('avg_power');
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // Compute all-time personal records
-  const personalRecords = useMemo(() => getPersonalRecords(sessions), [sessions]);
+  // Compute all-time personal records (same source as the History > Records page).
+  const personalRecords = useMemo(() => getPersonalRecords(sessions, locale), [sessions, locale]);
 
-  // Compute last session outcome
-  const lastSession = useMemo(() => {
-    if (!sessions || sessions.length === 0) return null;
-    const sorted = [...sessions].sort((a, b) => {
-      const tA = a.sessionStartTime || new Date(a.date).getTime() || 0;
-      const tB = b.sessionStartTime || new Date(b.date).getTime() || 0;
-      return tA - tB;
-    });
-    return sorted[sorted.length - 1];
-  }, [sessions]);
-
-  const lastOutcome = useMemo(() => (lastSession ? getSessionOutcome(lastSession) : null), [lastSession]);
-
-  // Extract PR targets
-  const prAvgPower = useMemo(() => {
-    const pr = personalRecords.find(r => r.title === 'Best Avg Power');
-    return pr ? Number(pr.value) : 0;
-  }, [personalRecords]);
-
-  const prDistance = useMemo(() => {
-    const pr = personalRecords.find(r => r.title === 'Best Distance');
-    return pr ? Number(pr.value) : 0;
-  }, [personalRecords]);
-
-  const prSpeed = useMemo(() => {
-    const pr = personalRecords.find(r => r.title === 'Fastest Avg Speed');
-    return pr ? Number(pr.value) : 0;
-  }, [personalRecords]);
-
-  const prDurationSec = useMemo(() => {
-    const pr = personalRecords.find(r => r.title === 'Longest Ride');
-    return pr ? Number(pr.value) * 60 : 0;
+  const recordByTitle = useMemo(() => {
+    const map = new Map<string, PersonalRecord>();
+    for (const record of personalRecords) {
+      map.set(record.title, record);
+    }
+    return map;
   }, [personalRecords]);
 
   // Current session metrics
   const currentDistanceKm = Number((currentData.distance / 1000).toFixed(2));
   const currentAvgPower = Math.round(liveStats.avgPower || 0);
   const currentAvgSpeed = Number((liveStats.avgSpeed || 0).toFixed(1));
+  const currentCalories = Math.round(currentData.calories || 0);
+  const currentPeakPower = Math.round(liveStats.maxPower || 0);
   const currentDurationSec = workout.elapsed;
+
+  const tabs: PacerTab[] = [
+    { category: 'avg_power', labelKey: 'Avg Power', activeClass: 'border-yellow-400 bg-yellow-400/20 text-yellow-300', icon: <Zap size={12} /> },
+    { category: 'distance', labelKey: 'Distance', activeClass: 'border-cyan-400 bg-cyan-400/20 text-cyan-300', icon: <Route size={12} /> },
+    { category: 'speed', labelKey: 'Avg Speed', activeClass: 'border-blue-400 bg-blue-400/20 text-blue-300', icon: <Activity size={12} /> },
+    { category: 'duration', labelKey: 'Duration', activeClass: 'border-amber-400 bg-amber-400/20 text-amber-300', icon: <Timer size={12} /> },
+    { category: 'calories', labelKey: 'Calories', activeClass: 'border-pink-400 bg-pink-400/20 text-pink-300', icon: <Flame size={12} /> },
+    { category: 'peak_power', labelKey: 'Peak Power', activeClass: 'border-purple-400 bg-purple-400/20 text-purple-300', icon: <Gauge size={12} /> },
+  ];
 
   // Active target calculations
   const targetInfo = useMemo(() => {
+    const recordFor = (title: string) => recordByTitle.get(title);
+
     switch (selectedTarget) {
       case 'avg_power': {
-        const target = prAvgPower > 0 ? prAvgPower : 150;
+        const record = recordFor('Best Avg Power');
+        const target = record ? Number(record.value) : 150;
         const current = currentAvgPower;
         const delta = current - target;
         const isOnTrack = delta >= 0;
@@ -88,6 +84,7 @@ export const RecordPacerPanel = ({
           isBeaten: delta > 0 && currentDurationSec >= 600,
           progressPercent,
           unit: 'W',
+          recordDateLabel: record?.dateLabel,
           guidance: isOnTrack
             ? t('You are currently averaging above your PR pace! Keep holding this power.')
             : t('Average power is {gap} W below PR. Increase steady effort to close the gap.', { gap: Math.abs(delta) }),
@@ -95,7 +92,8 @@ export const RecordPacerPanel = ({
         };
       }
       case 'distance': {
-        const target = prDistance > 0 ? prDistance : 20.0;
+        const record = recordFor('Best Distance');
+        const target = record ? Number(record.value) : 20.0;
         const current = currentDistanceKm;
         const remaining = Math.max(0, Number((target - current).toFixed(2)));
         const isBeaten = current > target;
@@ -109,6 +107,7 @@ export const RecordPacerPanel = ({
           isBeaten,
           progressPercent,
           unit: 'km',
+          recordDateLabel: record?.dateLabel,
           guidance: isBeaten
             ? t('New Distance Record achieved in this workout! Every extra km extends your PR.')
             : t('{remaining} km remaining to break your all-time distance record.', { remaining: remaining.toFixed(2) }),
@@ -116,7 +115,8 @@ export const RecordPacerPanel = ({
         };
       }
       case 'speed': {
-        const target = prSpeed > 0 ? prSpeed : 25.0;
+        const record = recordFor('Fastest Avg Speed');
+        const target = record ? Number(record.value) : 25.0;
         const current = currentAvgSpeed;
         const delta = Number((current - target).toFixed(1));
         const isOnTrack = delta >= 0;
@@ -130,6 +130,7 @@ export const RecordPacerPanel = ({
           isBeaten: delta > 0 && currentDistanceKm >= 5,
           progressPercent,
           unit: 'km/h',
+          recordDateLabel: record?.dateLabel,
           guidance: isOnTrack
             ? t('Cruising above your record pace! Maintain smooth cadence and gear.')
             : t('Current average pace is {gap} km/h behind record speed.', { gap: Math.abs(delta).toFixed(1) }),
@@ -137,7 +138,12 @@ export const RecordPacerPanel = ({
         };
       }
       case 'duration': {
-        const target = prDurationSec > 0 ? prDurationSec : 3600;
+        const record = recordFor('Longest Ride');
+        // Use the exact record duration in seconds (not the rounded display
+        // minutes) so the pacer target matches the record to the second.
+        const target = record
+          ? (record.seconds ?? Number(record.value) * 60)
+          : 3600;
         const current = currentDurationSec;
         const remaining = Math.max(0, target - current);
         const isBeaten = current > target;
@@ -151,44 +157,68 @@ export const RecordPacerPanel = ({
           isBeaten,
           progressPercent,
           unit: 'min',
+          recordDateLabel: record?.dateLabel,
           guidance: isBeaten
             ? t('Endurance record surpassed! You are now setting a new duration high.')
             : t('{time} more in the saddle to break your longest endurance record.', { time: formatDuration(remaining) }),
           icon: <Timer size={14} className="text-amber-400" />,
         };
       }
-      case 'prev_workout': {
-        const targetPower = lastSession?.stats?.avgPower || 150;
-        const current = currentAvgPower;
-        const delta = current - targetPower;
-        const isOnTrack = delta >= 0;
-        const progressPercent = Math.min(Math.round((current / targetPower) * 100), 150);
+      case 'calories': {
+        const record = recordFor('Top Calories');
+        const target = record ? Number(record.value) : 200;
+        const current = currentCalories;
+        const remaining = Math.max(0, target - current);
+        const isBeaten = current > target;
+        const progressPercent = Math.min(Math.round((current / target) * 100), 100);
         return {
-          title: t('Target: Beat Last Workout Avg Power'),
-          targetLabel: `${targetPower} W`,
+          title: t('Target: Top Calories PR'),
+          targetLabel: `${target} kcal`,
+          currentLabel: `${current} kcal`,
+          deltaLabel: isBeaten ? `+${current - target} kcal` : `${remaining} kcal left`,
+          isOnTrack: isBeaten || progressPercent >= 50,
+          isBeaten,
+          progressPercent,
+          unit: 'kcal',
+          recordDateLabel: record?.dateLabel,
+          guidance: isBeaten
+            ? t('New calorie record! Every extra kcal pushes it further.')
+            : t('{gap} kcal to go to break your all-time calorie record. Keep pushing.', { gap: remaining }),
+          icon: <Flame size={14} className="text-pink-400" />,
+        };
+      }
+      case 'peak_power': {
+        const record = recordFor('Peak Power');
+        const target = record ? Number(record.value) : 250;
+        const current = currentPeakPower;
+        const delta = current - target;
+        const isBeaten = delta > 0;
+        const progressPercent = Math.min(Math.round((current / target) * 100), 150);
+        return {
+          title: t('Target: Peak Power PR'),
+          targetLabel: `${target} W`,
           currentLabel: `${current} W`,
           deltaLabel: `${delta > 0 ? '+' : ''}${delta} W`,
-          isOnTrack,
-          isBeaten: delta > 0 && currentDurationSec >= 300,
+          isOnTrack: isBeaten,
+          isBeaten,
           progressPercent,
           unit: 'W',
-          guidance: isOnTrack
-            ? t('Holding higher power (+{delta}W) than your previous workout! Great progression.', { delta })
-            : t('Power is {gap}W below last session. Push a gear up to exceed previous ride.', { gap: Math.abs(delta) }),
-          icon: <TrendingUp size={14} className="text-emerald-400" />,
+          recordDateLabel: record?.dateLabel,
+          guidance: isBeaten
+            ? t('Peak power record smashed! Sprint again to push it even higher.')
+            : t('Peak power is {gap} W below record. Try a short all-out sprint to top it.', { gap: Math.abs(delta) }),
+          icon: <Gauge size={14} className="text-purple-400" />,
         };
       }
     }
   }, [
     selectedTarget,
-    prAvgPower,
-    prDistance,
-    prSpeed,
-    prDurationSec,
-    lastSession,
+    recordByTitle,
     currentAvgPower,
     currentDistanceKm,
     currentAvgSpeed,
+    currentCalories,
+    currentPeakPower,
     currentDurationSec,
     t,
   ]);
@@ -277,71 +307,22 @@ export const RecordPacerPanel = ({
       </div>
 
       {/* Target Selector Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mb-3.5">
-        <button
-          type="button"
-          onClick={() => setSelectedTarget('avg_power')}
-          className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono uppercase tracking-wider font-bold transition-all ${
-            selectedTarget === 'avg_power'
-              ? 'border-yellow-400 bg-yellow-400/20 text-yellow-300 shadow-sm'
-              : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20'
-          }`}
-        >
-          <Zap size={12} />
-          <span>{t('Avg Power')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedTarget('distance')}
-          className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono uppercase tracking-wider font-bold transition-all ${
-            selectedTarget === 'distance'
-              ? 'border-cyan-400 bg-cyan-400/20 text-cyan-300 shadow-sm'
-              : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20'
-          }`}
-        >
-          <Route size={12} />
-          <span>{t('Distance')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedTarget('speed')}
-          className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono uppercase tracking-wider font-bold transition-all ${
-            selectedTarget === 'speed'
-              ? 'border-blue-400 bg-blue-400/20 text-blue-300 shadow-sm'
-              : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20'
-          }`}
-        >
-          <Activity size={12} />
-          <span>{t('Avg Speed')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedTarget('duration')}
-          className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono uppercase tracking-wider font-bold transition-all ${
-            selectedTarget === 'duration'
-              ? 'border-amber-400 bg-amber-400/20 text-amber-300 shadow-sm'
-              : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20'
-          }`}
-        >
-          <Timer size={12} />
-          <span>{t('Duration')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedTarget('prev_workout')}
-          className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono uppercase tracking-wider font-bold transition-all ${
-            selectedTarget === 'prev_workout'
-              ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-sm'
-              : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20'
-          }`}
-        >
-          <TrendingUp size={12} />
-          <span>{t('Vs Last Ride')}</span>
-        </button>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 mb-3.5">
+        {tabs.map(tab => (
+          <button
+            key={tab.category}
+            type="button"
+            onClick={() => setSelectedTarget(tab.category)}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono uppercase tracking-wider font-bold transition-all ${
+              selectedTarget === tab.category
+                ? tab.activeClass + ' shadow-sm'
+                : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20'
+            }`}
+          >
+            {tab.icon}
+            <span>{t(tab.labelKey)}</span>
+          </button>
+        ))}
       </div>
 
       {/* Main Target Pacer Card */}
@@ -362,6 +343,11 @@ export const RecordPacerPanel = ({
             <div className="text-2xl font-black font-mono text-amber-300 tabular-nums flex items-baseline gap-1 mt-0.5">
               {targetInfo.targetLabel}
             </div>
+            {targetInfo.recordDateLabel && (
+              <div className="mt-0.5 text-[8px] font-mono uppercase tracking-widest text-white/30">
+                {t('Record: {date}', { date: targetInfo.recordDateLabel })}
+              </div>
+            )}
           </div>
         </div>
 

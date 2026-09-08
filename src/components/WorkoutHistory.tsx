@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useWorkoutHistoryData } from '../hooks/useWorkoutHistoryData';
 import { HistoryList } from './history/HistoryList';
 import { HistorySummary } from './history/HistorySummary';
+import { RecordsOverview } from './history/RecordsOverview';
 import { HistoryDetail } from './history/HistoryDetail';
 import { SessionCharts } from './history/SessionCharts';
 import { Download, RefreshCw, Search, Upload, X, AlertTriangle, Trash2 } from 'lucide-react';
@@ -45,7 +46,7 @@ export const WorkoutHistory = ({
 }: WorkoutHistoryProps) => {
   const { t } = useI18n();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'sessions' | 'charts' | 'summary'>('sessions');
+  const [viewMode, setViewMode] = useState<'sessions' | 'charts' | 'summary' | 'records'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
   const [summaryRange, setSummaryRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
   const [weeklyMetric, setWeeklyMetric] = useState<'distance' | 'calories' | 'duration' | 'cadence' | 'trimp'>('distance');
@@ -325,6 +326,7 @@ export const WorkoutHistory = ({
                     { label: t('Sessions'), value: 'sessions' },
                     { label: t('Charts'), value: 'charts' },
                     { label: t('Summary'), value: 'summary' },
+                    { label: t('Records'), value: 'records' },
                   ]}
                   onChange={(value) => setViewMode(value as typeof viewMode)}
                 />
@@ -571,6 +573,13 @@ export const WorkoutHistory = ({
                 <SessionCharts
                   sessions={filteredSessions}
                   maxHr={maxHr}
+                  onSelectSession={setSelectedSessionId}
+                />
+              </div>
+            ) : viewMode === 'records' ? (
+              <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
+                <RecordsOverview
+                  sessions={sessions}
                   onSelectSession={setSelectedSessionId}
                 />
               </div>
