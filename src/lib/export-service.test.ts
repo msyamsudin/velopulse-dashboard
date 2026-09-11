@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { generateCombinedTCX, generateTCX } from './export-service';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  buildSummaryCSV,
+  buildSummaryReport,
+  generateCombinedTCX,
+  generateTCX,
+  printSummaryPDF,
+} from './export-service';
 import type { WorkoutSession } from './export-service';
+import { buildProvenance, formatBuildId } from './version';
 
 const baseSession: WorkoutSession = {
   id: 's1',
@@ -147,5 +154,67 @@ describe('generateCombinedTCX', () => {
 
     expect(tcx.match(/<MaximumHeartRateBpm>/g)).toHaveLength(2);
     expect(tcx.match(/<AverageHeartRateBpm>/g)).toHaveLength(2);
+  });
+});
+
+describe('exported artifacts carry the build identity', () => {
+  const session: WorkoutSession = {
+    ...baseSession,
+    history: [
+      { time: '00:00:01', ts: 1700000001000, hr: 130, cadence: 80, power: 190, speed: 25, distance: 1000, resistance: 45, calories: 0.5 },
+      { time: '00:00:02', ts: 1700000002000, hr: 150, cadence: 82, power: 210, speed: 26, distance: 2000, resistance: 50, calories: 1 },
+    ],
+  };
+
+  it('writes the provenance note into a single-activity TCX', () => {
+    const tcx = generateTCX(session);
+
+    expect(tcx).toContain(`<Notes>Exported by ${buildProvenance()}</Notes>`);
+    // Activity_t expects Notes after the laps.
+    expect(tcx.indexOf('</Lap>')).toBeLessThan(tcx.indexOf('<Notes>'));
+  });
+
+  it('writes one provenance note per activity in a combined TCX', () => {
+    const tcx = generateCombinedTCX([session, session]);
+
+    expect(tcx.match(/<Notes>Exported by /g)).toHaveLength(2);
+  });
+
+  it('adds a trailing build column to the summary CSV', () => {
+    const lines = buildSummaryCSV([session]).split('\n');
+    const header = lines[0].split(',');
+
+    expect(header[header.length - 1]).toBe('exported_by_build');
+    expect(lines[1].endsWith(formatBuildId())).toBe(true);
+  });
+
+  it('records the build in the summary JSON report', () => {
+    const report = buildSummaryReport([session]);
+
+    expect(report.exportedBy).toBe('VeloPulse');
+    expect(report.build).toBe(formatBuildId());
+    expect(report.sessions).toHaveLength(1);
+  });
+
+  it('prints the build identity into the PDF report', () => {
+    const written: string[] = [];
+    const fakeWindow = {
+      document: {
+        open: () => {},
+        write: (html: string) => written.push(html),
+        close: () => {},
+      },
+      focus: () => {},
+      print: () => {},
+    };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWindow as unknown as Window);
+
+    try {
+      printSummaryPDF([session]);
+    } finally {
+      openSpy.mockRestore();
+    }
+
+    expect(written.join('')).toContain(buildProvenance());
   });
 });

@@ -51,3 +51,35 @@ export function versionLabel(
   if (date) parts.push(date);
   return parts.join(' · ');
 }
+
+/**
+ * `VeloPulse 0.1.0+a1b2c3d (2026-09-11)` — the provenance sentence stamped on
+ * everything that leaves the app (TCX notes, JSON/CSV metadata, report footer).
+ *
+ * An exported file outlives the tab that produced it: without this, a report
+ * that someone emails around cannot be traced back to a commit, and a bug in
+ * the exporter becomes impossible to confirm against a specific build.
+ */
+export function buildProvenance(
+  version: string = APP_VERSION,
+  sha: string = COMMIT_SHA,
+  buildDate: string = BUILD_DATE
+): string {
+  const id = formatBuildId(version, sha);
+  const date = formatBuildDate(buildDate);
+  return date ? `VeloPulse ${id} (${date})` : `VeloPulse ${id}`;
+}
+
+/**
+ * `[build 0.1.0+a1b2c3d]` — appended to cloud-failure logs.
+ *
+ * Deliberately not shown in the UI: a commit SHA in a toast is noise to the
+ * rider. It belongs in the console, where it is the first thing needed when
+ * someone reports that sync broke.
+ */
+export function buildLogTag(
+  version: string = APP_VERSION,
+  sha: string = COMMIT_SHA
+): string {
+  return `[build ${formatBuildId(version, sha)}]`;
+}

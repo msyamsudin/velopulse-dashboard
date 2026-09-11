@@ -3,6 +3,7 @@ import { DELTA_MAX_SECONDS } from '@/lib/physics';
 import { getSupabaseClient } from '@/lib/supabase';
 import { parseTCXWorkoutSessions } from '@/lib/tcx-import-service';
 import { classifySupabaseError } from '@/lib/supabase-errors';
+import { buildLogTag } from '@/lib/version';
 import type { BluetoothData } from '../useBluetoothStore';
 import { useBluetoothStore } from '../useBluetoothStore';
 import {
@@ -279,7 +280,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         reportProgress(40, 'sync');
         const syncedSession = await syncSessionToSupabase(newSession);
         if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
-          console.warn('[Supabase] Workout sync pending:', syncedSession.supabase_sync_error);
+          console.warn('[Supabase] Workout sync pending:', syncedSession.supabase_sync_error, buildLogTag());
         }
 
         reportProgress(80, 'finalizing');
@@ -324,7 +325,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         persistSessionHistory(nextHistory);
 
         if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
-          console.warn('[Supabase] Pending workout sync failed:', syncedSession.supabase_sync_error);
+          console.warn('[Supabase] Pending workout sync failed:', syncedSession.supabase_sync_error, buildLogTag());
         }
       }
 
@@ -660,7 +661,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         }
       } catch (err) {
         const info = classifySupabaseError(err);
-        console.error('Failed to fetch from Supabase:', err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err) ?? String(err));
+        console.error('Failed to fetch from Supabase:', err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err) ?? String(err), buildLogTag());
         set({ supabaseSyncError: info });
       }
     },
@@ -694,7 +695,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         persistSessionHistory(mergedSessions);
       } catch (err) {
         const info = classifySupabaseError(err);
-        console.error('Failed to fetch older sessions from Supabase:', err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err) ?? String(err));
+        console.error('Failed to fetch older sessions from Supabase:', err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err) ?? String(err), buildLogTag());
         set({ supabaseSyncError: info });
       }
     },

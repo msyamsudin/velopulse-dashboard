@@ -22,6 +22,7 @@ import { AuthScreen } from './components/AuthScreen';
 
 // Layout & Dashboard Components
 import { DashboardHeader } from './components/layout/DashboardHeader';
+import { buildLogTag } from './lib/version';
 import { DashboardFooter } from './components/layout/DashboardFooter';
 import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
 import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
@@ -171,7 +172,7 @@ export default function App() {
     loadHistoryFromSupabase()
       .then(() => syncPendingSupabaseSessions())
       .catch(err => {
-        console.error('Failed to load remote workout history:', err);
+        console.error('Failed to load remote workout history:', err, buildLogTag());
       });
   }, [showHistory, hasRequestedRemoteHistory, loadHistoryFromSupabase, syncPendingSupabaseSessions]);
 

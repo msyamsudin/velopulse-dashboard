@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAppConfig } from '@/lib/config-helper';
 import { classifySupabaseError } from '@/lib/supabase-errors';
+import { buildLogTag } from '@/lib/version';
 
 const SUPABASE_FETCH_TIMEOUT_MS = 10_000;
 
@@ -24,7 +25,7 @@ function getServerSupabase() {
 
 function errorResponse(err: unknown) {
   const info = classifySupabaseError(err);
-  console.error('Profile fetch error:', err);
+  console.error('Profile fetch error:', err, buildLogTag());
   return NextResponse.json(
     {
       error: info.message,

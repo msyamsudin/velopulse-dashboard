@@ -793,6 +793,7 @@ const id: Record<string, string> = {
   'Built': 'Dibangun',
   'Build info': 'Info build',
   'Build identity of the running deployment — include it in bug reports.': 'Identitas build dari deployment yang sedang berjalan — sertakan saat melaporkan bug.',
+  'Exported by {build}': 'Diekspor oleh {build}',
 };
 
 type I18nValue = {

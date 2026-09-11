@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { buildLogTag } from './version';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -57,7 +58,7 @@ export const getSupabaseClient = async (): Promise<SupabaseClient | null> => {
 
       // Validate that we have a real-looking URL before creating the client.
       if (!url || !key || !url.startsWith('https://')) {
-        console.warn('[Supabase] URL or anon key is empty/invalid. Please configure via Settings.');
+        console.warn('[Supabase] URL or anon key is empty/invalid. Please configure via Settings.', buildLogTag());
         lastFailedAt = Date.now();
         // Cache a null-resolving promise so callers don't re-fetch immediately.
         cachedRuntimeClientPromise = Promise.resolve(null);
@@ -67,7 +68,7 @@ export const getSupabaseClient = async (): Promise<SupabaseClient | null> => {
       return createClient(url, key);
     } catch (err) {
       // Cache failure as null so we don't retry immediately on every call.
-      console.warn('[Supabase] Could not initialize client (will retry after 30 s):', (err as Error)?.message ?? err);
+      console.warn('[Supabase] Could not initialize client (will retry after 30 s):', (err as Error)?.message ?? err, buildLogTag());
       lastFailedAt = Date.now();
       cachedRuntimeClientPromise = Promise.resolve(null);
       return null;
@@ -110,7 +111,8 @@ export const claimOrphanWorkouts = async (): Promise<void> => {
   } catch (err) {
     console.warn(
       '[Auth] Could not claim orphan workouts (run supabase/schema.sql first):',
-      err instanceof Error ? err.message : err
+      err instanceof Error ? err.message : err,
+      buildLogTag()
     );
   }
 };

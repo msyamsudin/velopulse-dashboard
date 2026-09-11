@@ -2,6 +2,7 @@
 import JSZip from 'jszip';
 import { calcCaloriesFromPower, DELTA_MAX_SECONDS } from './physics';
 import { getFinalMetrics } from './workout-analysis';
+import { buildProvenance, formatBuildDate, formatBuildId } from './version';
 
 export interface HistoryData {
   time: string;
@@ -187,6 +188,7 @@ export const generateTCX = (session: WorkoutSession): string => {
         <Track>${trackpoints}
         </Track>${buildLapExtensions(session)}
       </Lap>
+      <Notes>Exported by ${buildProvenance()}</Notes>
     </Activity>
   </Activities>
 </TrainingCenterDatabase>`;
@@ -230,6 +232,7 @@ export const generateCombinedTCX = (sessions: WorkoutSession[]): string => {
         <Track>${trackpoints}
         </Track>${buildLapExtensions(session)}
       </Lap>
+      <Notes>Exported by ${buildProvenance()}</Notes>
     </Activity>`;
   });
 
@@ -337,7 +340,15 @@ const getSessionReportRows = (sessions: WorkoutSession[]) => {
   });
 };
 
-export const downloadSummaryCSV = (sessions: WorkoutSession[]) => {
+/**
+ * Column that keeps an exported summary traceable back to a build. A trailing
+ * column rather than a comment line, so the file stays rectangular and every
+ * CSV reader can still open it.
+ */
+const BUILD_COLUMN = 'exported_by_build';
+
+/** Pure builder, so the exported shape is assertable without a download. */
+export const buildSummaryCSV = (sessions: WorkoutSession[]): string => {
   const headers = [
     'date',
     'duration_seconds',
@@ -351,9 +362,12 @@ export const downloadSummaryCSV = (sessions: WorkoutSession[]) => {
     'avg_cadence_rpm',
     'max_cadence_rpm',
     'synced_to_google',
+    BUILD_COLUMN,
   ];
   const rows = getSessionReportRows(sessions);
-  const csv = [
+  const build = formatBuildId();
+
+  return [
     headers.join(','),
     ...rows.map(row => [
       row.date,
@@ -368,14 +382,22 @@ export const downloadSummaryCSV = (sessions: WorkoutSession[]) => {
       row.avgCadence,
       row.maxCadence,
       row.syncedToGoogle,
+      build,
     ].map(csvEscape).join(',')),
   ].join('\n');
-
-  const dateStr = new Date().toISOString().split('T')[0];
-  downloadTextFile(csv, `velopulse_summary_${dateStr}.csv`, 'text/csv;charset=utf-8');
 };
 
-export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
+export const downloadSummaryCSV = (sessions: WorkoutSession[]) => {
+  const dateStr = new Date().toISOString().split('T')[0];
+  downloadTextFile(
+    buildSummaryCSV(sessions),
+    `velopulse_summary_${dateStr}.csv`,
+    'text/csv;charset=utf-8'
+  );
+};
+
+/** Pure builder, so the report metadata is assertable without a download. */
+export const buildSummaryReport = (sessions: WorkoutSession[]) => {
   const rows = getSessionReportRows(sessions);
   const totals = rows.reduce((acc, row) => {
     acc.sessions += 1;
@@ -384,7 +406,11 @@ export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
     acc.calories += row.calories;
     return acc;
   }, { sessions: 0, durationSeconds: 0, distanceKm: 0, calories: 0 });
-  const report = {
+
+  return {
+    exportedBy: 'VeloPulse',
+    build: formatBuildId(),
+    builtOn: formatBuildDate() || null,
     generatedAt: new Date().toISOString(),
     totals: {
       ...totals,
@@ -392,8 +418,15 @@ export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
     },
     sessions: rows,
   };
+};
+
+export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
   const dateStr = new Date().toISOString().split('T')[0];
-  downloadTextFile(JSON.stringify(report, null, 2), `velopulse_summary_${dateStr}.json`, 'application/json;charset=utf-8');
+  downloadTextFile(
+    JSON.stringify(buildSummaryReport(sessions), null, 2),
+    `velopulse_summary_${dateStr}.json`,
+    'application/json;charset=utf-8'
+  );
 };
 
 export const printSummaryPDF = (
@@ -441,6 +474,7 @@ export const printSummaryPDF = (
 <body>
   <h1>${t('VeloPulse Summary Report')}</h1>
   <div class="muted">${t('Generated {date}', { date: generatedAt })}</div>
+  <div class="muted">${t('Exported by {build}', { build: buildProvenance() })}</div>
   <div class="grid">
     <div class="card"><div class="label">${t('Sessions')}</div><div class="value">${totals.sessions}</div></div>
     <div class="card"><div class="label">${t('Distance')}</div><div class="value">${totals.distanceKm.toFixed(2)} km</div></div>
