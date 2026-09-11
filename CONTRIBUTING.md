@@ -205,17 +205,40 @@ sumber kebenaran, tetapi ada tiga hal yang berubah.
 
 ### 5.1 Catat atribusinya
 
-Tambahkan trailer pada commit yang dibantu AI:
+Trailer yang jadi konsensus lintas proyek adalah **`Assisted-by:`** — dipakai
+Fedora, Rocky Linux, LLVM, OpenInfra, OpenTelemetry, dan Linux kernel. Artinya
+penting: **manusia tetap penulisnya**, AI adalah alat yang membantu. Itu juga yang
+menjaga rantai hak cipta tetap utuh, karena CLA dan DCO hanya bisa ditandatangani
+manusia.
 
 ```
 feat(history): add the interval breakdown
 
 Kenapa perubahan ini ada, dan apa yang diverifikasi manual.
 
-Assisted-by: <nama alat dan model>
+Assisted-by: DeepSeek Harness (deepseek-v4-flash)
 ```
 
-Cara praktisnya, biarkan hook yang menuliskannya:
+Nilainya adalah **nama agent + versi model**, karena itulah yang membuat trailer
+ini berguna. Contoh resmi dari
+[OpenTelemetry](https://github.com/open-telemetry/community/blob/main/policies/genai.md)
+adalah `Assisted-by: Claude Opus 4.5`, sedangkan
+[dokumen Linux kernel](https://docs.kernel.org/process/coding-assistants.html)
+memakai bentuk `Assisted-by: LLM [TOOL1] [TOOL2]` — dengan catatan bahwa daftar
+tool itu hanya untuk alat analisis khusus (coccinelle, sparse), **bukan** tool
+dasar seperti git, gcc, atau editor.
+
+Dua hal yang jangan dilakukan:
+
+- **Jangan pakai `Co-authored-by:` untuk AI.** Itu default GitHub Copilot, Cursor,
+  dan Claude, tetapi menyatakan model sebagai rekan penulis, sedangkan model tidak
+  bisa menandatangani CLA/DCO atau memegang hak cipta. Lihat diskusi
+  [CALCITE-7752](https://issues.apache.org/jira/browse/CALCITE-7752).
+- **Jangan menambahkan `Signed-off-by` atas nama AI.** Hanya manusia yang boleh
+  mensertifikasi Developer Certificate of Origin, dan hook di repo ini tidak
+  pernah menulisnya.
+
+Cara praktisnya, biarkan hook yang menuliskan trailernya:
 
 ```bash
 VELOPULSE_AI_ASSISTED="DeepSeek Harness (deepseek-v4-flash)" git commit -m "feat(ui): ..."
@@ -226,11 +249,15 @@ variabel ini tidak ada yang ditambahkan, sehingga commit yang murni ditulis
 manusia tidak tersentuh.
 
 Berguna untuk apa: saat insiden produksi terjadi, Anda bisa menjawab "perubahan
-mana yang perlu ditinjau ulang" — dan itu pertanyaan yang berbeda dari "siapa
-yang menekan tombol commit". Tooling seperti
-[AI attribution hooks](https://github.com/mgoodric/ai-attribution-hooks) dan
-praktik [provenance untuk build yang dihasilkan AI](https://crashoverride.com/resources/knowledge-base/container-management/container-provenance-ai-builds)
-bergerak ke arah yang sama.
+mana yang perlu ditinjau ulang" — dan itu pertanyaan yang berbeda dari "siapa yang
+menekan tombol commit". Survei kebijakan lintas foundation dirangkum di
+[All Things Open](https://allthingsopen.org/articles/open-source-ai-contributions-assisted-by-git-trailer-standard),
+dan tooling seperti
+[AI attribution hooks](https://github.com/mgoodric/ai-attribution-hooks) bergerak
+ke arah yang sama.
+
+Kebijakan untuk agen ditulis terpisah di [`AGENTS.md`](AGENTS.md), supaya agen
+membacanya otomatis alih-alih menebak.
 
 ### 5.2 Yang tetap harus dilakukan manusia
 
