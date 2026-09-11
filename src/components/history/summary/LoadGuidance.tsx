@@ -162,22 +162,7 @@ export const LoadGuidance = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/50">{t('Repetition risk')}</div>
-                <div className="font-mono text-xl font-bold text-white tabular-nums">{trainingLoadMetrics.monotony.toFixed(2)}</div>
-              </div>
-              <p className="mt-2 text-xs leading-5 text-white/50">{t('Higher means your daily training load is very similar, with less easy/hard variation.')}</p>
-            </div>
-            <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/50">{t('Overall strain')}</div>
-                <div className="font-mono text-xl font-bold text-white tabular-nums">{trainingLoadMetrics.strain}</div>
-              </div>
-              <p className="mt-2 text-xs leading-5 text-white/50">{t('Combines weekly load and repetition risk; useful when deciding whether to back off.')}</p>
-            </div>
-          </div>
+          {/* Repetition risk and strain moved to the Advanced analysis panel. */}
         </div>
       </details>
     </section>

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { HistorySummary } from './HistorySummary';
-import type { ComparisonSummary, GlobalSummary, IntensitySummary, SummaryInsights } from '@/lib/history-types';
+import type { AdvancedSummary, ComparisonSummary, GlobalSummary, IntensitySummary, SummaryInsights } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
 
 // Pin the locale so number formatting (e.g. 3,980 kcal) is deterministic
@@ -80,8 +80,23 @@ const trainingLoadMetrics: TrainingLoadMetrics = {
   recommendationDetail: 'Recent load is close to your 3-week baseline. Keep the next session controlled.',
 };
 
+const advanced: AdvancedSummary = {
+  coverage: { sessions: 12, withHeartRate: 12, withPower: 9, withHrr: 3 },
+  loadTrend: {
+    ctl: 52.4,
+    atl: 61.2,
+    tsb: -8.8,
+    ctlSeries: [40, 45, 52.4],
+    atlSeries: [50, 58, 61.2],
+    days: 90,
+    trainingDays: 30,
+    established: true,
+  },
+};
+
 const baseProps = {
   intensity,
+  advanced,
   summaryPeriod: 'daily' as const,
   setSummaryPeriod: () => {},
   summaryRange: '30d' as const,
@@ -224,5 +239,30 @@ describe('HistorySummary', () => {
     );
 
     expect(screen.getByText('No heart-rate data in this range')).toBeInTheDocument();
+  });
+
+  it('keeps duration, coverage and the fitness model in the collapsed panel', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    // Active time (3000 s counted, nothing below Z1).
+    expect(screen.getByText('50:00')).toBeInTheDocument();
+    expect(screen.getByText('100% of 50:00 recorded')).toBeInTheDocument();
+    // Coverage chips.
+    expect(screen.getByText('Data coverage')).toBeInTheDocument();
+    expect(screen.getByText('12 sessions')).toBeInTheDocument();
+    expect(screen.getByText('Power 9')).toBeInTheDocument();
+    // Fitness / fatigue / form (CTL 52.4, ATL 61.2 → TSB -8.8 = neutral).
+    expect(screen.getByText(/Fitness \(CTL\)/)).toBeInTheDocument();
+    expect(screen.getByText('52.4')).toBeInTheDocument();
+    expect(screen.getByText('61.2')).toBeInTheDocument();
+    expect(screen.getByText('-8.8')).toBeInTheDocument();
+    expect(screen.getByText(/Neutral/)).toBeInTheDocument();
+    // Repetition risk and strain moved here from the load card.
+    expect(screen.getByText('1.20')).toBeInTheDocument();
+    expect(screen.getByText('144')).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import type { TrainingLoadMetrics, TrainingLoadResult } from '@/lib/training-load';
+import type { LoadTrend, TrainingLoadMetrics, TrainingLoadResult } from '@/lib/training-load';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 export type { WorkoutSession };
@@ -120,6 +120,20 @@ export interface IntensitySummary {
   sessionTypes: { easy: number; moderate: number; hard: number };
 }
 
+/** How many sessions in the range actually carry each data source. */
+export interface CoverageSummary {
+  sessions: number;
+  withHeartRate: number;
+  withPower: number;
+  withHrr: number;
+}
+
+/** L2 "advanced analysis" payload: data trust plus the fitness/fatigue model. */
+export interface AdvancedSummary {
+  coverage: CoverageSummary;
+  loadTrend: LoadTrend;
+}
+
 export interface GlobalSummary {
   totalDistance: string;
   totalCalories: number;
@@ -172,6 +186,7 @@ export interface WorkoutHistoryData {
   calculateFullStats: (session: WorkoutSession) => FullWorkoutStats;
   globalSummary: GlobalSummary | null;
   intensity: IntensitySummary;
+  advanced: AdvancedSummary;
   normalizedChartData: HistoryChartPoint[];
   summaryInsights: SummaryInsights | null;
   comparisonSummary: ComparisonSummary | null;

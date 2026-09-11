@@ -1,51 +1,10 @@
 import { useI18n } from '@/i18n';
 import type { GlobalSummary } from '@/lib/history-types';
+import { Sparkline } from './Sparkline';
 
 interface HeartRateRecoveryProps {
   globalSummary: GlobalSummary;
 }
-
-const SPARK_WIDTH = 96;
-const SPARK_HEIGHT = 26;
-
-/**
- * Inline HRR sparkline. Deliberately a hand-rolled SVG rather than a chart
- * library: it is a single 96×26 row inside the load card, not a plot.
- */
-const Sparkline = ({ values, label }: { values: number[]; label: string }) => {
-  if (values.length < 2) return null;
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const points = values.map((value, index) => {
-    const x = (index / (values.length - 1)) * (SPARK_WIDTH - 4) + 2;
-    const y = SPARK_HEIGHT - 3 - ((value - min) / span) * (SPARK_HEIGHT - 8);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const [lastX, lastY] = points[points.length - 1].split(',');
-
-  return (
-    <svg
-      width={SPARK_WIDTH}
-      height={SPARK_HEIGHT}
-      viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
-      role="img"
-      aria-label={`${label}: ${values.join(', ')}`}
-      className="shrink-0 overflow-visible"
-    >
-      <polyline
-        points={points.join(' ')}
-        fill="none"
-        stroke="#35f0bd"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <circle cx={lastX} cy={lastY} r="2.5" fill="#35f0bd" />
-    </svg>
-  );
-};
 
 /**
  * One compact row: how heart-rate recovery is trending across the range.
@@ -75,7 +34,7 @@ export const HeartRateRecovery = ({ globalSummary }: HeartRateRecoveryProps) => 
             {globalSummary.hrrSessions}/{globalSummary.totalSessions} {t('sessions')}
           </div>
         </div>
-        <Sparkline values={series} label={t('Heart Rate Recovery')} />
+        <Sparkline series={[{ values: series, color: '#35f0bd' }]} label={t('Heart Rate Recovery')} />
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/45">

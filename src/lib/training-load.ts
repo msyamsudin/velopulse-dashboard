@@ -76,6 +76,77 @@ export const calculateEdwardsTrimp = (
 
 const roundOne = (value: number) => Math.round(value * 10) / 10;
 
+/** Window length for the fitness/fatigue model: 90 days of daily TRIMP. */
+export const LOAD_TREND_DAYS = 90;
+
+/** Training days needed before the fitness/fatigue model is worth trusting. */
+export const MIN_TREND_TRAINING_DAYS = 12;
+
+export interface LoadTrend {
+  /** Fitness: 42-day exponentially weighted average of daily load. */
+  ctl: number;
+  /** Fatigue: 7-day exponentially weighted average of daily load. */
+  atl: number;
+  /** Form: fitness minus fatigue. */
+  tsb: number;
+  ctlSeries: number[];
+  atlSeries: number[];
+  /** Days covered by the series (including rest days). */
+  days: number;
+  /** Days with load > 0. */
+  trainingDays: number;
+  /** False while the history is too short for the model to mean anything. */
+  established: boolean;
+}
+
+/**
+ * Impulse-response model over chronological daily TRIMP totals.
+ *
+ * CTL (fitness) and ATL (fatigue) are exponentially weighted averages with
+ * 42-day and 7-day time constants; TSB (form) is their difference. Both averages
+ * are seeded with the mean of the first week instead of zero: seeding at zero
+ * makes a rider with a perfectly steady load look 10% less fit than they are and
+ * permanently "fatigued" for the first month.
+ */
+export const calculateLoadTrend = (
+  dailyLoads: number[] = [],
+  ctlDays = 42,
+  atlDays = 7
+): LoadTrend => {
+  const loads = dailyLoads.map(load => (Number.isFinite(load) && load > 0 ? load : 0));
+  const seedWindow = Math.min(atlDays, loads.length);
+  const seed = seedWindow > 0
+    ? loads.slice(0, seedWindow).reduce((total, load) => total + load, 0) / seedWindow
+    : 0;
+
+  const ctlSeries: number[] = [];
+  const atlSeries: number[] = [];
+  let ctl = seed;
+  let atl = seed;
+
+  for (const load of loads) {
+    ctl += (load - ctl) / ctlDays;
+    atl += (load - atl) / atlDays;
+    ctlSeries.push(roundOne(ctl));
+    atlSeries.push(roundOne(atl));
+  }
+
+  const trainingDays = loads.filter(load => load > 0).length;
+  const lastCtl = ctlSeries[ctlSeries.length - 1] ?? 0;
+  const lastAtl = atlSeries[atlSeries.length - 1] ?? 0;
+
+  return {
+    ctl: lastCtl,
+    atl: lastAtl,
+    tsb: roundOne(lastCtl - lastAtl),
+    ctlSeries,
+    atlSeries,
+    days: loads.length,
+    trainingDays,
+    established: trainingDays >= MIN_TREND_TRAINING_DAYS,
+  };
+};
+
 /**
  * Calculates workload guidance from up to 28 chronological daily TRIMP totals.
  * Chronic load is the average weekly load of the 3 weeks BEFORE the current

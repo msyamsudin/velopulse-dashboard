@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateEdwardsTrimp, calculateTrainingLoadMetrics, getTrainingLoadLabel } from './training-load';
+import { calculateEdwardsTrimp, calculateLoadTrend, calculateTrainingLoadMetrics, getTrainingLoadLabel, MIN_TREND_TRAINING_DAYS } from './training-load';
 
 describe('calculateEdwardsTrimp', () => {
   it('weights time in each heart-rate zone', () => {
@@ -74,5 +74,40 @@ describe('calculateTrainingLoadMetrics', () => {
 
     expect(result.trainingDays).toBe(1);
     expect(result.recommendation).toBe('Build');
+  });
+});
+
+describe('calculateLoadTrend', () => {
+  it('stays level for a perfectly steady load instead of drifting to fatigued', () => {
+    const trend = calculateLoadTrend(Array(90).fill(100));
+
+    expect(trend.ctl).toBe(100);
+    expect(trend.atl).toBe(100);
+    expect(trend.tsb).toBe(0);
+    expect(trend.days).toBe(90);
+    expect(trend.established).toBe(true);
+  });
+
+  it('pushes fatigue above fitness after a load spike', () => {
+    const trend = calculateLoadTrend([...Array(60).fill(50), ...Array(7).fill(300)]);
+
+    expect(trend.atl).toBeGreaterThan(trend.ctl);
+    expect(trend.tsb).toBeLessThan(0);
+  });
+
+  it('marks the model unestablished until enough training days exist', () => {
+    const trend = calculateLoadTrend([100, 100, 0, 0, 0, 0, 0]);
+
+    expect(trend.trainingDays).toBe(2);
+    expect(trend.established).toBe(false);
+    expect(trend.trainingDays).toBeLessThan(MIN_TREND_TRAINING_DAYS);
+  });
+
+  it('returns an empty series for no history', () => {
+    const trend = calculateLoadTrend([]);
+
+    expect(trend).toMatchObject({ ctl: 0, atl: 0, tsb: 0, days: 0, established: false });
+    expect(trend.ctlSeries).toEqual([]);
+    expect(trend.atlSeries).toEqual([]);
   });
 });

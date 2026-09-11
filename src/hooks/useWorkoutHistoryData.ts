@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { formatDuration } from '../utils/formatters';
 import { HR_ZONES, getSafeMaxHr } from '@/lib/constants';
-import { calculateEdwardsTrimp, calculateTrainingLoadMetrics } from '@/lib/training-load';
+import { calculateEdwardsTrimp, calculateLoadTrend, calculateTrainingLoadMetrics, LOAD_TREND_DAYS } from '@/lib/training-load';
 import { getFinalMetrics, getWorkoutQuality } from '@/lib/workout-analysis';
 import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
@@ -13,6 +13,7 @@ import type {
   GlobalSummary,
   HistoryChartPoint,
   IntensitySummary,
+  AdvancedSummary,
   MetricKey,
   PeriodSummaryEntry,
   SummaryInsights,
@@ -547,6 +548,58 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     };
   }, [filteredSessions, calculateFullStats, maxHr]);
 
+  // 90 days of daily TRIMP ending today, for the fitness/fatigue model. Load
+  // guidance keeps its own 28-day window; this one is deliberately longer and,
+  // like the guidance, is independent of the selected summary range.
+  const loadTrend = useMemo(() => {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - offsetDays);
+    endDate.setHours(23, 59, 59, 999);
+
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - (LOAD_TREND_DAYS - 1));
+    startDate.setHours(0, 0, 0, 0);
+
+    const dailyLoads = new Map<string, number>();
+    const cursor = new Date(startDate);
+    while (cursor <= endDate) {
+      dailyLoads.set(getLocalDateKey(cursor), 0);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    sessions.forEach(session => {
+      const sessionDate = new Date(session.date);
+      if (Number.isNaN(sessionDate.getTime()) || sessionDate < startDate || sessionDate > endDate) return;
+
+      const key = getLocalDateKey(sessionDate);
+      dailyLoads.set(key, (dailyLoads.get(key) || 0) + (calculateFullStats(session).trainingLoad.score || 0));
+    });
+
+    return calculateLoadTrend(Array.from(dailyLoads.values()));
+  }, [sessions, offsetDays, calculateFullStats]);
+
+  // L2 payload: how much of the range is actually backed by data, plus the
+  // fitness/fatigue model. Coverage is range-scoped; the model is not.
+  const advanced = useMemo<AdvancedSummary>(() => {
+    let withHeartRate = 0;
+    let withPower = 0;
+
+    filteredSessions.forEach(session => {
+      if ((session.stats?.avgHr || 0) > 0) withHeartRate += 1;
+      if ((session.stats?.avgPower || 0) > 0) withPower += 1;
+    });
+
+    return {
+      coverage: {
+        sessions: filteredSessions.length,
+        withHeartRate,
+        withPower,
+        withHrr: globalSummary?.hrrSessions ?? 0,
+      },
+      loadTrend,
+    };
+  }, [filteredSessions, globalSummary, loadTrend]);
+
   const summaryInsights = useMemo<SummaryInsights | null>(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;
 
@@ -750,6 +803,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     calculateFullStats,
     globalSummary,
     intensity,
+    advanced,
     normalizedChartData,
     summaryInsights,
     comparisonSummary,

@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
-import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, IntensitySummary, MetricKey, SummaryInsights, WeeklyLoadPoint } from '@/lib/history-types';
+import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, IntensitySummary, AdvancedSummary, MetricKey, SummaryInsights, WeeklyLoadPoint } from '@/lib/history-types';
 import type { SummaryPeriod, SummaryRange } from './summary/constants';
 import { useHistorySummary } from './summary/useHistorySummary';
 import { SummaryHeader } from './summary/SummaryHeader';
@@ -9,11 +9,13 @@ import { RangeTotals } from './summary/RangeTotals';
 import { TrendChart } from './summary/TrendChart';
 import { IntensityDistribution } from './summary/IntensityDistribution';
 import { LoadGuidance } from './summary/LoadGuidance';
+import { AdvancedAnalysis } from './summary/AdvancedAnalysis';
 import { ConsistencyMap } from './summary/ConsistencyMap';
 
 export interface HistorySummaryProps {
   globalSummary: GlobalSummary | null;
   intensity: IntensitySummary;
+  advanced: AdvancedSummary;
   summaryPeriod: SummaryPeriod;
   setSummaryPeriod: (period: SummaryPeriod) => void;
   summaryRange: SummaryRange;
@@ -45,6 +47,7 @@ const capitalize = (value: string) => (value ? value[0].toUpperCase() + value.sl
 export const HistorySummary = ({
   globalSummary,
   intensity,
+  advanced,
   summaryPeriod,
   setSummaryPeriod,
   summaryRange,
@@ -195,6 +198,13 @@ export const HistorySummary = ({
         loadAnalysisText={loadAnalysisText}
         loadAnalysisSummary={loadAnalysisSummary}
         loadAnalysisDetail={loadAnalysisDetail}
+      />
+
+      <AdvancedAnalysis
+        intensity={intensity}
+        advanced={advanced}
+        trainingLoadMetrics={trainingLoadMetrics}
+        rangeLabel={rangeLabel}
       />
     </div>
   );
