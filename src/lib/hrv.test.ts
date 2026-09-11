@@ -3,6 +3,7 @@ import {
   classifyReadiness,
   computeRmssd,
   finalizeDailyHrv,
+  hrvReadinessLabelKey,
   median,
   parseHeartRateMeasurement,
   todayKey,
@@ -125,5 +126,20 @@ describe('todayKey', () => {
   it('formats a local date as YYYY-MM-DD', () => {
     expect(todayKey(new Date(2026, 7, 16))).toBe('2026-08-16');
     expect(todayKey(new Date(2026, 0, 5))).toBe('2026-01-05');
+  });
+});
+
+describe('hrvReadinessLabelKey', () => {
+  it('maps every stored level to its translation key', () => {
+    expect(hrvReadinessLabelKey('strained')).toBe('Strained');
+    expect(hrvReadinessLabelKey('balanced')).toBe('Balanced');
+    expect(hrvReadinessLabelKey('recovered')).toBe('Recovered');
+  });
+
+  it('returns null for a missing or unknown level instead of an untranslatable key', () => {
+    expect(hrvReadinessLabelKey(null)).toBeNull();
+    expect(hrvReadinessLabelKey(undefined)).toBeNull();
+    expect(hrvReadinessLabelKey('')).toBeNull();
+    expect(hrvReadinessLabelKey('toString')).toBeNull();
   });
 });

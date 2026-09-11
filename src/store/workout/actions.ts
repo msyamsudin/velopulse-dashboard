@@ -61,6 +61,9 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         const startTime = Date.now();
         const sDist = useBluetoothStore.getState().data.distance || 0;
         const sCal = useBluetoothStore.getState().data.calories || 0;
+        // Readiness is a pre-ride reading: capture it now, because HRV measured
+        // after the ride reflects the effort, not the state it started from.
+        const sHrv = useBluetoothStore.getState();
         set({
           history: [],
           elapsed: 0,
@@ -74,6 +77,8 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           liveStatsTotals: EMPTY_LIVE_TOTALS,
           hrrScore: null,
           hrrClassification: null,
+          sessionHrvRmssd: sHrv.hrvRmssd,
+          sessionHrvReadiness: sHrv.hrvReadiness,
           isRecording: true,
         });
         persistActiveSession({
@@ -230,6 +235,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         await new Promise(resolve => setTimeout(resolve, 0));
 
         const computed = calculateLiveStats(history, get().hrrScore, get().hrrClassification);
+        const { sessionHrvRmssd, sessionHrvReadiness } = get();
         const stats = {
           avgHr: computed.stats.avgHr,
           maxHr: computed.stats.maxHr,
@@ -241,6 +247,10 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           maxSpeed: computed.stats.maxSpeed,
           hrrScore: get().hrrScore !== null ? get().hrrScore! : undefined,
           hrrClassification: get().hrrClassification !== null ? get().hrrClassification! : undefined,
+          // Undefined (not null) so a session without a reading stays clean and
+          // the stats blob keeps syncing to the same JSON column as before.
+          hrvRmssd: sessionHrvRmssd ?? undefined,
+          hrvReadiness: sessionHrvReadiness ?? undefined,
         };
 
         const newSession: WorkoutSession = {
@@ -483,6 +493,8 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         isRecording: false,
         hrrScore: null,
         hrrClassification: null,
+        sessionHrvRmssd: null,
+        sessionHrvReadiness: null,
         liveStats: EMPTY_LIVE_STATS,
         liveStatsTotals: EMPTY_LIVE_TOTALS
       });

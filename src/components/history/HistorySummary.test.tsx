@@ -134,7 +134,7 @@ const trainingLoadMetrics: TrainingLoadMetrics = {
 };
 
 const advanced: AdvancedSummary = {
-  coverage: { sessions: 12, withHeartRate: 12, withPower: 9, withHrr: 3 },
+  coverage: { sessions: 12, withHeartRate: 12, withPower: 9, withHrr: 3, withHrv: 2 },
   loadTrend: {
     ctl: 52.4,
     atl: 61.2,
@@ -425,6 +425,7 @@ describe('HistorySummary', () => {
     expect(screen.getByText('Data coverage')).toBeInTheDocument();
     expect(screen.getByText('12 sessions')).toBeInTheDocument();
     expect(screen.getByText('Power 9')).toBeInTheDocument();
+    expect(screen.getByText('HRV 2')).toBeInTheDocument();
     // Fitness / fatigue / form (CTL 52.4, ATL 61.2 → TSB -8.8 = neutral).
     expect(screen.getByText(/Fitness \(CTL\)/)).toBeInTheDocument();
     expect(screen.getByText('52.4')).toBeInTheDocument();

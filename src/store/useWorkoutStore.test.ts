@@ -168,6 +168,67 @@ describe('incrementElapsed wall clock', () => {
   });
 });
 
+describe('HRV captured with the saved session', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useWorkoutStore.setState({
+      isRecording: false,
+      sessionStartTime: null,
+      elapsed: 0,
+      history: [],
+      sessionHistory: [],
+      sessionHrvRmssd: null,
+      sessionHrvReadiness: null,
+    });
+  });
+
+  const rideOneMinute = async () => {
+    useBluetoothStore.setState({
+      lastUpdate: { heartRate: Date.now(), power: Date.now() },
+      data: { heartRate: 120, power: 200 },
+    });
+    useWorkoutStore.getState().addHistoryPoint({ heartRate: 120, power: 200 });
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    useWorkoutStore.getState().addHistoryPoint({ heartRate: 130, power: 210 });
+  };
+
+  it('keeps the pre-ride reading even though HRV changes during the ride', async () => {
+    useBluetoothStore.setState({ hrvRmssd: 48, hrvReadiness: 'recovered' });
+    useWorkoutStore.getState().toggleRecording();
+
+    // Post-exercise RMSSD drops: the saved session must not pick this up.
+    useBluetoothStore.setState({ hrvRmssd: 21, hrvReadiness: 'strained' });
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession();
+
+    const saved = useWorkoutStore.getState().sessionHistory[0];
+    expect(saved.stats.hrvRmssd).toBe(48);
+    expect(saved.stats.hrvReadiness).toBe('recovered');
+  });
+
+  it('leaves HRV undefined for a session that started without a reading', async () => {
+    useBluetoothStore.setState({ hrvRmssd: null, hrvReadiness: null });
+    useWorkoutStore.getState().toggleRecording();
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession();
+
+    const saved = useWorkoutStore.getState().sessionHistory[0];
+    expect(saved.stats.hrvRmssd).toBeUndefined();
+    expect(saved.stats.hrvReadiness).toBeUndefined();
+    expect('hrvRmssd' in saved.stats).toBe(true);
+  });
+
+  it('clears the captured reading when the session is discarded', () => {
+    useBluetoothStore.setState({ hrvRmssd: 55, hrvReadiness: 'balanced' });
+    useWorkoutStore.getState().toggleRecording();
+    expect(useWorkoutStore.getState().sessionHrvRmssd).toBe(55);
+
+    useWorkoutStore.getState().discardSession();
+    expect(useWorkoutStore.getState().sessionHrvRmssd).toBeNull();
+    expect(useWorkoutStore.getState().sessionHrvReadiness).toBeNull();
+  });
+});
+
 describe('active session recovery', () => {
   beforeEach(() => {
     localStorage.clear();

@@ -8,6 +8,7 @@ import { downloadTCX } from '../../lib/export-service';
 import { generateSessionInsights, getInsightToneClasses, getMetricDelta, getSessionOutcome, getWorkoutQuality, getZoneInsight } from '../../lib/workout-analysis';
 import { detectSessionAchievements } from '../../lib/milestone-records';
 import { hrrLevelKey } from '../../lib/hrr';
+import { hrvReadinessLabelKey } from '../../lib/hrv';
 import { ShareWorkoutCardModal } from './ShareWorkoutCardModal';
 import { useI18n } from '@/i18n';
 import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
@@ -161,6 +162,7 @@ export const HistoryDetail = ({
   const autoInsights = generateSessionInsights({ session, fullStats, previousSession, previousFullStats, maxHr, translate: t });
   const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
   const hrrClassification = t(hrrLevelKey(session.stats?.hrrClassification));
+  const hrvReadiness = hrvReadinessLabelKey(session.stats?.hrvReadiness);
 
   return (
     <>
@@ -379,6 +381,38 @@ export const HistoryDetail = ({
                 <div className="md:col-span-2 rounded-lg border border-emerald-400/15 bg-black/20 p-3">
                   <div className="mb-2 text-[9px] font-mono uppercase tracking-widest text-hw-muted">{t('Classification')}</div>
                   <div className="text-lg font-bold uppercase tracking-wide text-emerald-300">{hrrClassification}</div>
+                  <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.12em] text-white/40">
+                    {t('Saved with this workout session')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(session.stats?.hrvRmssd !== undefined || session.stats?.hrvReadiness !== undefined) && (
+            <div className="hardware-card border-cyan-400/20 bg-cyan-400/5 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-cyan-400/10 pb-3">
+                <div>
+                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-300">{t('HRV at ride start')}</div>
+                  <div className="mt-1 text-[11px] font-mono uppercase tracking-[0.12em] text-white/45">
+                    {t('Readiness recorded before the session')}
+                  </div>
+                </div>
+                <Activity size={16} className="text-cyan-300" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <MiniMetric
+                  label={t('HRV')}
+                  value={session.stats?.hrvRmssd ?? '--'}
+                  unit="ms"
+                  icon={<Activity size={11} />}
+                  colorClass="text-cyan-300"
+                />
+                <div className="md:col-span-2 rounded-lg border border-cyan-400/15 bg-black/20 p-3">
+                  <div className="mb-2 text-[9px] font-mono uppercase tracking-widest text-hw-muted">{t('Readiness')}</div>
+                  <div className="text-lg font-bold uppercase tracking-wide text-cyan-300">
+                    {hrvReadiness ? t(hrvReadiness) : t('Not classified')}
+                  </div>
                   <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.12em] text-white/40">
                     {t('Saved with this workout session')}
                   </div>

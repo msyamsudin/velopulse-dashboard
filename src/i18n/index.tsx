@@ -759,6 +759,11 @@ const id: Record<string, string> = {
 
   // Fitness/fatigue chart (Fase 6.4)
   'Fitness and fatigue over the last {count} days': 'Kebugaran dan kelelahan selama {count} hari terakhir',
+
+  // HRV saved with the session (Fase 6.5)
+  'HRV at ride start': 'HRV saat mulai',
+  'Readiness recorded before the session': 'Kesiapan yang tercatat sebelum sesi',
+  'Readiness': 'Kesiapan',
 };
 
 type I18nValue = {

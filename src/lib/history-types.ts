@@ -164,6 +164,8 @@ export interface CoverageSummary {
   withHeartRate: number;
   withPower: number;
   withHrr: number;
+  /** Sessions that saved a pre-ride HRV reading. */
+  withHrv: number;
 }
 
 /** L2 "advanced analysis" payload: data trust plus the fitness/fatigue model. */

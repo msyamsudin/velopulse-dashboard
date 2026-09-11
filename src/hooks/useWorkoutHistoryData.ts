@@ -661,10 +661,12 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, su
   const advanced = useMemo<AdvancedSummary>(() => {
     let withHeartRate = 0;
     let withPower = 0;
+    let withHrv = 0;
 
     filteredSessions.forEach(session => {
       if ((session.stats?.avgHr || 0) > 0) withHeartRate += 1;
       if ((session.stats?.avgPower || 0) > 0) withPower += 1;
+      if (typeof session.stats?.hrvRmssd === 'number') withHrv += 1;
     });
 
     return {
@@ -673,6 +675,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, su
         withHeartRate,
         withPower,
         withHrr: globalSummary?.hrrSessions ?? 0,
+        withHrv,
       },
       loadTrend,
       bodyMetrics,

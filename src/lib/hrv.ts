@@ -73,6 +73,27 @@ export const computeRmssd = (intervalsMs: number[], minCount = 5): number | null
 export type ReadinessLevel = 'strained' | 'balanced' | 'recovered';
 
 /**
+ * i18n keys for the readiness levels. Single definition shared by the live
+ * cockpit badge and the saved-session report, so the two cannot drift apart
+ * (the same mistake the HRR classification made before lib/hrr.ts stored codes).
+ */
+export const HRV_READINESS_LABEL_KEYS: Record<ReadinessLevel, string> = {
+  strained: 'Strained',
+  balanced: 'Balanced',
+  recovered: 'Recovered',
+};
+
+/** Safe translation key for a stored readiness value (null when unknown). */
+export const hrvReadinessLabelKey = (level: string | null | undefined): string | null => {
+  if (!level) return null;
+  // Own property only: a stored value like "toString" must not resolve to an
+  // inherited Object.prototype member and end up rendered as a function.
+  return Object.hasOwn(HRV_READINESS_LABEL_KEYS, level)
+    ? HRV_READINESS_LABEL_KEYS[level as ReadinessLevel]
+    : null;
+};
+
+/**
  * Classify live RMSSD against a personal baseline. The exact thresholds are
  * arbitrary; the important thing is they are relative to the rider's own
  * baseline, not absolute numbers.

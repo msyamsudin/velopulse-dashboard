@@ -94,6 +94,9 @@ export const AdvancedAnalysis = ({ intensity, advanced, trainingLoadMetrics, ran
             <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5">
               HRR {coverage.withHrr}
             </span>
+            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5">
+              {t('HRV')} {coverage.withHrv}
+            </span>
           </div>
           <p className="mt-2 text-[10px] leading-4 text-white/40">
             {t('Sessions without heart rate are excluded from the zone, load and recovery metrics.')}

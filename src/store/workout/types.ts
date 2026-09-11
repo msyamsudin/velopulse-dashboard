@@ -1,4 +1,5 @@
 import type { SupabaseErrorInfo } from '@/lib/supabase-errors';
+import type { ReadinessLevel } from '@/lib/hrv';
 import type { BluetoothData } from '../useBluetoothStore';
 
 export interface HistoryData {
@@ -35,6 +36,13 @@ export interface WorkoutSession {
     maxSpeed?: number;
     hrrScore?: number;
     hrrClassification?: string;
+    /**
+     * Pre-ride HRV reading, captured when the session started (not at save
+     * time — post-exercise RMSSD is depressed and would misreport readiness).
+     * Absent on sessions recorded before this existed or without a strap.
+     */
+    hrvRmssd?: number;
+    hrvReadiness?: ReadinessLevel;
   };
   history: HistoryData[];
   synced_to_google?: boolean;
@@ -118,6 +126,9 @@ export interface WorkoutStateFields {
   sessionHistory: WorkoutSession[];
   hrrScore: number | null;
   hrrClassification: string | null;
+  /** HRV captured when the current session started; saved into its stats. */
+  sessionHrvRmssd: number | null;
+  sessionHrvReadiness: ReadinessLevel | null;
   liveStats: LiveWorkoutStats;
   liveStatsTotals: LiveWorkoutTotals;
   supabaseHistoryLoadedCount: number;

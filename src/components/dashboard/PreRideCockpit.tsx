@@ -16,6 +16,7 @@ import { InlineNotice, MetricCard, Panel, StatusPill } from '../ui';
 import { ResistancePlanPanel } from './ResistancePlanPanel';
 import { useI18n } from '@/i18n';
 import type { RiderProfile, TelemetrySnapshot } from '@/lib/cockpit-types';
+import { HRV_READINESS_LABEL_KEYS } from '@/lib/hrv';
 import { getProfileGate } from '@/lib/profile-gate';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
 
@@ -23,12 +24,6 @@ const HRV_READINESS_TONES: Record<string, 'danger' | 'warning' | 'ready'> = {
   strained: 'danger',
   balanced: 'warning',
   recovered: 'ready',
-};
-
-const HRV_READINESS_LABELS: Record<string, string> = {
-  strained: 'Strained',
-  balanced: 'Balanced',
-  recovered: 'Recovered',
 };
 
 interface PreRideCockpitProps {
@@ -222,7 +217,7 @@ export const PreRideCockpit = ({
             <div className="flex flex-wrap gap-2">
               {hrvReadiness && (
                 <StatusPill
-                  label={`${t('HRV')} ${t(HRV_READINESS_LABELS[hrvReadiness])}`}
+                  label={`${t('HRV')} ${t(HRV_READINESS_LABEL_KEYS[hrvReadiness])}`}
                   tone={HRV_READINESS_TONES[hrvReadiness]}
                   icon={<Activity size={12} />}
                 />
