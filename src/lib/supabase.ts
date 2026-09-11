@@ -117,21 +117,36 @@ export const claimOrphanWorkouts = async (): Promise<void> => {
   }
 };
 
-// Database Types for reference
+/**
+ * Database row shapes, for reference.
+ *
+ * Nothing imports these; they exist so a reader (or an agent) does not have to
+ * reverse-engineer the schema from the queries. They previously described a
+ * schema that does not exist — `date` instead of `session_start_time`, a
+ * non-null `user_id`, and a `display_name` column that appears nowhere in this
+ * codebase — which is worse than having no reference at all.
+ *
+ * The authoritative shape for actually reading a workout row is
+ * `SupabaseWorkoutRow` in src/store/workout/supabase.ts.
+ */
 export type Workout = {
   id: string;
-  user_id: string;
-  date: string;
+  /** Nullable: rows recorded before auth existed are claimed after sign-in. */
+  user_id: string | null;
+  session_start_time: string | number;
   duration: number;
   stats: Record<string, unknown>;
   history: Record<string, unknown>[];
   synced_to_google: boolean;
+  created_at: string;
 };
 
+/** The single row in `profiles` addressed by `MASTER_PROFILE_ID`. */
 export type Profile = {
   id: string;
+  age: number;
   max_hr: number;
   ftp: number;
   weight: number;
-  display_name: string;
+  updated_at: string;
 };
