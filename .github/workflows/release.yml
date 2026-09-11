@@ -1,0 +1,36 @@
+name: Release
+
+# release-please keeps a "release PR" up to date from the Conventional Commits
+# that land on main. Merging that PR bumps package.json, rewrites CHANGELOG.md,
+# and creates the git tag and GitHub release — so a version is never bumped by
+# hand and never drifts from what actually shipped.
+#
+# One-time setup (see CONTRIBUTING.md):
+#   * Settings > Actions > General > enable "Allow GitHub Actions to create and
+#     approve pull requests", otherwise the release PR cannot be opened.
+#   * Optional: add a RELEASE_PLEASE_TOKEN secret (a PAT). With the default
+#     GITHUB_TOKEN, the release PR is created but workflows do not run on it, so
+#     CI results will not appear on that PR.
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Run release-please
+      uses: googleapis/release-please-action@v4
+      with:
+        # Falls back to the built-in token so the workflow works before a PAT is
+        # configured; upgrade by adding the secret, no file change needed.
+        token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        config-file: release-please-config.json
+        manifest-file: .release-please-manifest.json

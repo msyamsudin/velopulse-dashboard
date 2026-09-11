@@ -36,5 +36,35 @@ jobs:
     - name: Check i18n keys
       run: pnpm run i18n:check:strict
 
+    - name: Check the bundled Supabase schema
+      run: pnpm run schema:check
+
     - name: Run Tests
       run: pnpm test
+
+  commits:
+    # Conventional Commits are not a style preference here: release-please reads
+    # them to decide the version bump, and scripts/gen-changelog.mjs uses them to
+    # build release notes. A malformed subject silently drops a change from the
+    # release, so it is a build failure rather than a warning.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # The range below spans several commits, which a shallow clone cannot see.
+        fetch-depth: 0
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    - name: Validate commit messages
+      env:
+        # On a PR, everything the branch adds. On a push, everything since the
+        # previous tip. An all-zero base (first push, force push) makes the
+        # script fall back to checking the head commit only.
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      run: node scripts/check-commit-msg.mjs --range "${BASE_SHA}..${HEAD_SHA}"
