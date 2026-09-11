@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { formatDuration } from '../utils/formatters';
 import { HR_ZONES, getSafeMaxHr } from '@/lib/constants';
 import { calculateEdwardsTrimp, calculateTrainingLoadMetrics } from '@/lib/training-load';
-import { getFinalMetrics } from '@/lib/workout-analysis';
+import { getFinalMetrics, getWorkoutQuality } from '@/lib/workout-analysis';
 import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import type { HistoryData } from '@/store/useWorkoutStore';
@@ -12,11 +12,13 @@ import type {
   FullWorkoutStats,
   GlobalSummary,
   HistoryChartPoint,
+  IntensitySummary,
   MetricKey,
   PeriodSummaryEntry,
   SummaryInsights,
   WeeklyLoadPoint,
   WorkoutHistoryData,
+  ZoneShare,
 } from '@/lib/history-types';
 
 interface UseWorkoutHistoryDataProps {
@@ -157,6 +159,21 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       const { distanceMeters: maxDistanceMeters, calories: maxCalories } = getFinalMetrics(history);
       const totalDistanceKm = maxDistanceMeters / 1000;
 
+      // Per-zone time = share of samples in that zone × session duration.
+      // Samples below Z1 (<50% max HR: warm-up, coasting, watchdog-zeroed
+      // dropouts) belong to no zone and are therefore left out, instead of being
+      // dumped into the last zone as before — that inflated Z5 by every
+      // below-threshold minute of the session. Only the few seconds of rounding
+      // error are redistributed, and they go to the largest zone.
+      const rawZoneSeconds = zones.map(zone => (zone.seconds / history.length) * session.duration);
+      const roundedZoneSeconds = rawZoneSeconds.map(value => Math.round(value));
+      const roundingDelta = Math.round(rawZoneSeconds.reduce((total, value) => total + value, 0))
+        - roundedZoneSeconds.reduce((total, value) => total + value, 0);
+      if (roundingDelta !== 0) {
+        const largestZone = rawZoneSeconds.indexOf(Math.max(...rawZoneSeconds));
+        roundedZoneSeconds[largestZone] = Math.max(0, roundedZoneSeconds[largestZone] + roundingDelta);
+      }
+
       return {
         ...session.stats,
         avgSpeed: (history.reduce((total, point) => total + point.speed, 0) / history.length).toFixed(1),
@@ -168,22 +185,15 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         maxResistance: maxBy(history, point => point.resistance),
         moveMinutes,
         trainingLoad,
-        zones: zones.map((zone, index) => {
-          const ratio = zone.seconds / history.length;
-          // Seconds must sum exactly to the session duration: the last zone
-          // absorbs the rounding remainder.
-          const seconds = index === zones.length - 1
-            ? Math.max(0, session.duration - zones.slice(0, -1).reduce(
-                (total, z) => total + Math.round((z.seconds / history.length) * session.duration),
-                0
-              ))
-            : Math.round(ratio * session.duration);
-          return {
-            ...zone,
-            percent: Math.round(ratio * 100),
-            time: formatDuration(seconds)
-          };
-        })
+        zones: zones.map((zone, index) => ({
+          ...zone,
+          // `seconds` is public API that promises seconds; the counter in
+          // buildZoneStats holds a sample count, so overwrite it here (the
+          // percent share below is still sample-based, and unaffected).
+          seconds: roundedZoneSeconds[index],
+          percent: Math.round((zone.seconds / history.length) * 100),
+          time: formatDuration(roundedZoneSeconds[index]),
+        }))
       };
     };
 
@@ -490,6 +500,53 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     };
   }, [summaryData, filteredSessions, trainingLoadMetrics]);
 
+  // Intensity composition of the range: time in each HR zone plus the
+  // easy/tempo/hard session mix. Both come from data that is already computed
+  // (calculateFullStats is cached per session), so this is one cheap pass.
+  const intensity = useMemo<IntensitySummary>(() => {
+    const zoneSeconds = HR_ZONES.map(() => 0);
+    const sessionTypes = { easy: 0, moderate: 0, hard: 0 };
+    let recordedSeconds = 0;
+
+    filteredSessions.forEach(session => {
+      recordedSeconds += session.duration || 0;
+
+      calculateFullStats(session).zones.forEach((zone, index) => {
+        if (index < zoneSeconds.length) zoneSeconds[index] += zone.seconds;
+      });
+
+      const quality = getWorkoutQuality(session, maxHr).label;
+      if (quality === 'Easy' || quality === 'Endurance') sessionTypes.easy += 1;
+      else if (quality === 'Tempo') sessionTypes.moderate += 1;
+      else sessionTypes.hard += 1;
+    });
+
+    const countedSeconds = zoneSeconds.reduce((total, value) => total + value, 0);
+    // Zone boundaries are identical for every session of a render, so the first
+    // session supplies the absolute bpm ranges for the legend.
+    const zoneRanges = filteredSessions.length > 0 ? calculateFullStats(filteredSessions[0]).zones : [];
+    const zones: ZoneShare[] = zoneSeconds.map((seconds, index) => ({
+      label: `Z${index + 1}`,
+      range: zoneRanges[index]?.range ?? '',
+      seconds,
+      percent: countedSeconds > 0 ? Math.round((seconds / countedSeconds) * 100) : 0,
+      time: formatDuration(seconds),
+    }));
+
+    const lastZone = zoneSeconds.length - 1;
+    const easySeconds = (zoneSeconds[0] ?? 0) + (zoneSeconds[1] ?? 0);
+    const hardSeconds = (zoneSeconds[lastZone - 1] ?? 0) + (zoneSeconds[lastZone] ?? 0);
+
+    return {
+      zones,
+      countedSeconds,
+      belowZoneSeconds: Math.max(0, recordedSeconds - countedSeconds),
+      easyShare: countedSeconds > 0 ? easySeconds / countedSeconds : 0,
+      hardShare: countedSeconds > 0 ? hardSeconds / countedSeconds : 0,
+      sessionTypes,
+    };
+  }, [filteredSessions, calculateFullStats, maxHr]);
+
   const summaryInsights = useMemo<SummaryInsights | null>(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;
 
@@ -692,6 +749,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
   return {
     calculateFullStats,
     globalSummary,
+    intensity,
     normalizedChartData,
     summaryInsights,
     comparisonSummary,

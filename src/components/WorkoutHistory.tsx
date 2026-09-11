@@ -156,7 +156,7 @@ export const WorkoutHistory = ({
 
   const summaryInputSessions = viewMode === 'summary' ? sessions : [];
 
-  const { calculateFullStats, globalSummary, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData, loadRatioWeeklyData } = useWorkoutHistoryData({
+  const { calculateFullStats, globalSummary, intensity, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData, loadRatioWeeklyData } = useWorkoutHistoryData({
     sessions: summaryInputSessions,
     maxHr,
     summaryPeriod,
@@ -587,6 +587,7 @@ export const WorkoutHistory = ({
               <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
                 <HistorySummary 
                   globalSummary={globalSummary}
+                  intensity={intensity}
                   summaryPeriod={summaryPeriod}
                   setSummaryPeriod={setSummaryPeriod}
                   summaryRange={summaryRange}

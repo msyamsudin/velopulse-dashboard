@@ -483,6 +483,18 @@ const id: Record<string, string> = {
   // Summary — range totals block (Fase 5) & empty state
   'Range totals': 'Total rentang',
   'Try a wider range or record a workout': 'Coba rentang yang lebih luas atau rekam latihan',
+  'Time in heart-rate zones': 'Waktu di zona detak jantung',
+  'Easy volume': 'Volume mudah',
+  'Hard volume': 'Volume keras',
+  'Session types': 'Tipe sesi',
+  'Easy': 'Ringan',
+  'Tempo': 'Tempo',
+  'Hard': 'Berat',
+  'No heart-rate data in this range': 'Belum ada data detak jantung pada rentang ini',
+  'Mostly easy volume — a solid aerobic base.': 'Sebagian besar volume mudah — basis aerobik yang solid.',
+  'A large share of hard riding — watch recovery.': 'Porsi latihan berat cukup besar — perhatikan pemulihan.',
+  'Balanced mix of easy and hard riding.': 'Campuran latihan mudah dan berat yang seimbang.',
+  '{percent}% of the recorded time stayed below Z1 (warm-up or no heart-rate signal).': '{percent}% waktu terekam berada di bawah Z1 (pemanasan atau sinyal detak jantung hilang).',
 
   // Records — milestone progress banner
   'Upcoming Milestones': 'Milestone Mendatang',

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { HistorySummary } from './HistorySummary';
-import type { ComparisonSummary, GlobalSummary, SummaryInsights } from '@/lib/history-types';
+import type { ComparisonSummary, GlobalSummary, IntensitySummary, SummaryInsights } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
 
 // Pin the locale so number formatting (e.g. 3,980 kcal) is deterministic
@@ -54,6 +54,21 @@ const comparisonSummary: ComparisonSummary = {
   },
 };
 
+const intensity: IntensitySummary = {
+  zones: [
+    { label: 'Z1', range: '<95', seconds: 600, percent: 20, time: '10:00' },
+    { label: 'Z2', range: '95-114', seconds: 1500, percent: 50, time: '25:00' },
+    { label: 'Z3', range: '114-133', seconds: 570, percent: 19, time: '09:30' },
+    { label: 'Z4', range: '133-152', seconds: 270, percent: 9, time: '04:30' },
+    { label: 'Z5', range: '>152', seconds: 60, percent: 2, time: '01:00' },
+  ],
+  countedSeconds: 3000,
+  belowZoneSeconds: 0,
+  easyShare: 0.72,
+  hardShare: 0.1,
+  sessionTypes: { easy: 8, moderate: 3, hard: 1 },
+};
+
 const trainingLoadMetrics: TrainingLoadMetrics = {
   acuteLoad: 120,
   chronicLoad: 110,
@@ -66,6 +81,7 @@ const trainingLoadMetrics: TrainingLoadMetrics = {
 };
 
 const baseProps = {
+  intensity,
   summaryPeriod: 'daily' as const,
   setSummaryPeriod: () => {},
   summaryRange: '30d' as const,
@@ -169,5 +185,44 @@ describe('HistorySummary', () => {
     expect(screen.getByText('24')).toBeInTheDocument();
     expect(screen.getByText('31')).toBeInTheDocument();
     expect(screen.getByText('+4')).toBeInTheDocument();
+  });
+
+  it('shows the intensity split: zone legend, easy/hard volume and session types', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('Time in heart-rate zones')).toBeInTheDocument();
+    expect(screen.getByText('Z5')).toBeInTheDocument();
+    expect(screen.getByText(/Easy volume/)).toBeInTheDocument();
+    // 72% easy / 10% hard is neither "mostly easy" nor hard-heavy.
+    expect(screen.getByText('Balanced mix of easy and hard riding.')).toBeInTheDocument();
+    expect(screen.getByText('8 Easy')).toBeInTheDocument();
+    expect(screen.getByText('1 Hard')).toBeInTheDocument();
+  });
+
+  it('degrades gracefully when no session in the range has heart-rate data', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary
+          {...baseProps}
+          intensity={{
+            ...intensity,
+            zones: intensity.zones.map(zone => ({ ...zone, seconds: 0, percent: 0, time: '00:00' })),
+            countedSeconds: 0,
+            belowZoneSeconds: 0,
+            easyShare: 0,
+            hardShare: 0,
+            sessionTypes: { easy: 0, moderate: 0, hard: 0 },
+          }}
+          globalSummary={globalSummary}
+          summaryInsights={summaryInsights}
+        />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('No heart-rate data in this range')).toBeInTheDocument();
   });
 });

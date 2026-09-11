@@ -92,6 +92,34 @@ export interface HistoryChartPoint {
   isToday?: boolean;
 }
 
+/** One HR zone's share of the recorded range. */
+export interface ZoneShare {
+  /** Zone label, e.g. "Z3". */
+  label: string;
+  /** Absolute bpm range for the rider, e.g. "<95" or "114-133". */
+  range: string;
+  seconds: number;
+  /** Share of the counted zone time (Z1–Z5), rounded. */
+  percent: number;
+  /** Zone seconds formatted as mm:ss / h:mm:ss. */
+  time: string;
+}
+
+/** Intensity composition of the selected range (block 4 of the Summary). */
+export interface IntensitySummary {
+  zones: ZoneShare[];
+  /** Seconds inside Z1–Z5; excludes time below Z1 (warm-up, HR dropouts). */
+  countedSeconds: number;
+  /** Recorded session seconds that never reached Z1. */
+  belowZoneSeconds: number;
+  /** (Z1+Z2) / countedSeconds, 0..1. */
+  easyShare: number;
+  /** (Z4+Z5) / countedSeconds, 0..1. */
+  hardShare: number;
+  /** Sessions bucketed by their quality label. */
+  sessionTypes: { easy: number; moderate: number; hard: number };
+}
+
 export interface GlobalSummary {
   totalDistance: string;
   totalCalories: number;
@@ -143,6 +171,7 @@ export interface ComparisonSummary {
 export interface WorkoutHistoryData {
   calculateFullStats: (session: WorkoutSession) => FullWorkoutStats;
   globalSummary: GlobalSummary | null;
+  intensity: IntensitySummary;
   normalizedChartData: HistoryChartPoint[];
   summaryInsights: SummaryInsights | null;
   comparisonSummary: ComparisonSummary | null;

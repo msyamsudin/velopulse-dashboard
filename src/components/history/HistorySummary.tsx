@@ -1,17 +1,19 @@
 import { ChevronRight } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
-import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, MetricKey, SummaryInsights, WeeklyLoadPoint } from '@/lib/history-types';
+import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, IntensitySummary, MetricKey, SummaryInsights, WeeklyLoadPoint } from '@/lib/history-types';
 import type { SummaryPeriod, SummaryRange } from './summary/constants';
 import { useHistorySummary } from './summary/useHistorySummary';
 import { SummaryHeader } from './summary/SummaryHeader';
 import { RangeTotals } from './summary/RangeTotals';
 import { TrendChart } from './summary/TrendChart';
+import { IntensityDistribution } from './summary/IntensityDistribution';
 import { LoadGuidance } from './summary/LoadGuidance';
 import { ConsistencyMap } from './summary/ConsistencyMap';
 
 export interface HistorySummaryProps {
   globalSummary: GlobalSummary | null;
+  intensity: IntensitySummary;
   summaryPeriod: SummaryPeriod;
   setSummaryPeriod: (period: SummaryPeriod) => void;
   summaryRange: SummaryRange;
@@ -42,6 +44,7 @@ const capitalize = (value: string) => (value ? value[0].toUpperCase() + value.sl
  */
 export const HistorySummary = ({
   globalSummary,
+  intensity,
   summaryPeriod,
   setSummaryPeriod,
   summaryRange,
@@ -157,6 +160,8 @@ export const HistorySummary = ({
         selectedMetrics={selectedMetrics}
         effectiveChartType={effectiveChartType}
       />
+
+      <IntensityDistribution intensity={intensity} />
 
       {summaryPeriod === 'daily' && weeklyDailyData.length > 0 && (
         <details className="group rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
