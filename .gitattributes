@@ -1,0 +1,12 @@
+# Line endings are pinned only where they change behaviour; everything else
+# follows the contributor global git settings.
+
+# Shell hooks: a CR at the end of the shebang line makes git fail to execute
+# them, so a hook would silently stop running instead of reporting an error.
+.githooks/* text eol=lf
+*.sh text eol=lf
+
+# The generated supabase/schema.sql is verified against the migrations in CI
+# (pnpm run schema:check), so a CRLF checkout on Windows must not look like a
+# stale file.
+*.sql text eol=lf

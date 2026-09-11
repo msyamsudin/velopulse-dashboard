@@ -1,0 +1,15 @@
+#!/bin/sh
+# Conventional Commits gate, run by git on every commit message.
+#
+# Strips a stray UTF-8 BOM first: a BOM makes every ^-anchored pattern in the
+# changelog and version tooling miss the commit, so the change would silently
+# never reach the release notes.
+#
+# Install with: pnpm run hooks:install   (also runs on `pnpm install`)
+
+root=$(git rev-parse --show-toplevel) || exit 0
+
+msg=$1
+[ -f "$msg" ] || msg="$root/$msg"
+
+exec node "$root/scripts/check-commit-msg.mjs" --fix --source "$2" "$msg"

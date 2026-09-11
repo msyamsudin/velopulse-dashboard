@@ -1,0 +1,28 @@
+#!/bin/sh
+# Records AI involvement as a queryable git trailer.
+#
+# Off unless asked for, so human-only commits stay untouched:
+#
+#   VELOPULSE_AI_ASSISTED="DeepSeek Harness (deepseek-v4-flash)" git commit ...
+#
+# `VELOPULSE_AI_ASSISTED=1` falls back to a generic "AI assistant". The trailer
+# is only useful if it names the tool, so prefer the explicit form; see
+# CONTRIBUTING.md for why the repo tracks this at all.
+
+[ -n "$VELOPULSE_AI_ASSISTED" ] || exit 0
+
+case "$2" in
+  merge|squash) exit 0 ;;
+esac
+
+msg=$1
+[ -f "$msg" ] || exit 0
+
+# Already attributed (by a template or an earlier hook run): do nothing.
+grep -qi '^Assisted-by:' "$msg" && exit 0
+
+name=$VELOPULSE_AI_ASSISTED
+[ "$name" = "1" ] && name="AI assistant"
+
+printf '\nAssisted-by: %s\n' "$name" >> "$msg"
+exit 0
