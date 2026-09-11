@@ -134,6 +134,14 @@ berbeda.
 
 Anda tidak menulis changelog dan tidak menyentuh nomor versi dalam alur ini.
 
+**Tag harus berbentuk `v<versi>`** (`v0.2.0`). Karena itu
+`include-component-in-tag` sengaja dimatikan di `release-please-config.json`:
+dengan nilai default `true`, release-please mencari tag
+`velopulse-dashboard-v0.2.0`, tidak menemukannya, lalu menyimpulkan bahwa
+**tidak ada satu pun rilis** yang pernah ada — dan menawarkan changelog yang
+memuat ulang seluruh riwayat ke dalam satu versi. Ini sudah pernah terjadi dan
+tercatat di riwayat PR repo ini.
+
 ### 3.2 Setup sekali di GitHub
 
 - **Settings > Actions > General >** aktifkan *"Allow GitHub Actions to create and
