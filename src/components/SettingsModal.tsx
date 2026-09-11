@@ -4,6 +4,7 @@ import { Settings, User, X } from 'lucide-react';
 import { AppConfig } from '@/lib/config-helper';
 import { resetSupabaseClientCache } from '@/lib/supabase';
 import { DEFAULT_PROFILE } from '@/lib/constants';
+import { getLatestRestingHr } from '@/lib/body-history';
 import { validateSupabaseConfig } from '@/lib/config-validator';
 
 // Components
@@ -18,6 +19,7 @@ interface UserProfile {
   maxHr: number;
   ftp: number;
   weight: number;
+  restingHr: number;
 }
 
 interface SettingsModalProps {
@@ -57,6 +59,9 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
             maxHr: data.maxHr ?? data.max_hr ?? DEFAULT_PROFILE.maxHr,
             ftp: data.ftp ?? DEFAULT_PROFILE.ftp,
             weight: data.weight ?? DEFAULT_PROFILE.weight,
+            // No cloud column yet: the server value is used when it exists,
+            // otherwise the device-local history fills it in.
+            restingHr: data.restingHr ?? data.resting_hr ?? getLatestRestingHr() ?? DEFAULT_PROFILE.restingHr,
           });
         }
       })

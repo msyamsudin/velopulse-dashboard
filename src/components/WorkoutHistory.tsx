@@ -17,6 +17,7 @@ import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../lib/export-service';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
 import type { SupabaseErrorInfo } from '../lib/supabase-errors';
+import type { BodyHistoryEntry } from '../lib/body-history';
 import { useI18n } from '@/i18n';
 
 interface WorkoutHistoryProps {
@@ -32,6 +33,8 @@ interface WorkoutHistoryProps {
   ftp?: number;
   /** Rider weight for W/kg and kcal/kg/h; 0 keeps those metrics hidden. */
   weight?: number;
+  /** Dated weight / resting-HR entries, used for per-session W/kg and trends. */
+  bodyHistory?: BodyHistoryEntry[];
   supabaseSyncError?: SupabaseErrorInfo | null;
   onDismissSupabaseError?: () => void;
 }
@@ -47,6 +50,7 @@ export const WorkoutHistory = ({
   maxHr = 190,
   ftp = 0,
   weight = 0,
+  bodyHistory = [],
   supabaseSyncError,
   onDismissSupabaseError
 }: WorkoutHistoryProps) => {
@@ -167,6 +171,7 @@ export const WorkoutHistory = ({
     maxHr,
     ftp,
     weight,
+    bodyHistory,
     summaryPeriod,
     summaryRange,
     weeklyMetric
@@ -629,6 +634,8 @@ export const WorkoutHistory = ({
           previousSession={previousSession}
           previousFullStats={previousFullStats}
           maxHr={maxHr}
+          weight={weight}
+          bodyHistory={bodyHistory}
           onBack={() => setSelectedSessionId(null)}
           onClose={onClose}
           onDeleteSession={onDeleteSession ? handleDeleteSession : undefined}

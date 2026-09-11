@@ -12,11 +12,14 @@ beforeEach(() => {
   }
 });
 
-const renderTab = (profile: { age: number; maxHr: number; ftp: number; weight: number }, onSave = vi.fn()) => {
+const renderTab = (
+  profile: { age: number; maxHr: number; ftp: number; weight: number; restingHr?: number },
+  onSave = vi.fn()
+) => {
   render(
     <I18nProvider>
       <ProfileTab
-        profile={profile}
+        profile={{ restingHr: 0, ...profile }}
         setProfile={() => {}}
         onSave={onSave}
         saveStatus="idle"
@@ -57,5 +60,12 @@ describe('ProfileTab metric gate', () => {
     expect(screen.queryByText('Profile incomplete')).not.toBeInTheDocument();
     expect(screen.queryAllByText(/Add your FTP to unlock/)).toHaveLength(0);
     expect(screen.queryAllByText(/Add your weight to unlock/)).toHaveLength(0);
+  });
+
+  it('offers a resting-HR field and says where the body history lives', () => {
+    renderTab({ age: 40, maxHr: 178, ftp: 220, weight: 74, restingHr: 52 });
+
+    expect(screen.getByText('Resting HR')).toBeInTheDocument();
+    expect(screen.getByText(/stored as a dated history on this device/)).toBeInTheDocument();
   });
 });

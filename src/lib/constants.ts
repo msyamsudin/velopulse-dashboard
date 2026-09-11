@@ -2,7 +2,13 @@ export const DEFAULT_PROFILE = {
   age: 0,
   maxHr: 190,  // Safe fallback for division ops; age=0 still triggers onboarding
   ftp: 0,
-  weight: 0
+  weight: 0,
+  /**
+   * Optional resting heart rate. It has no column in the Supabase `profiles`
+   * table yet, so it is kept in the device-local body history instead (see
+   * lib/body-history.ts) — the server simply ignores the field.
+   */
+  restingHr: 0
 };
 
 export const APP_METADATA = {

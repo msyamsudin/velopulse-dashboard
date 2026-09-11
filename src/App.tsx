@@ -103,6 +103,7 @@ export default function App() {
   const {
     userProfile,
     setUserProfile,
+    bodyHistory,
     profileStatus,
     profileError,
     retryProfile,
@@ -333,6 +334,7 @@ export default function App() {
             maxHr={userProfile.maxHr}
             ftp={userProfile.ftp}
             weight={userProfile.weight}
+            bodyHistory={bodyHistory}
             onSyncSupabasePending={syncPendingSupabaseSessions}
             onLoadMoreSupabaseHistory={loadMoreHistoryFromSupabase}
             hasMoreSupabaseHistory={hasMoreSupabaseHistory}

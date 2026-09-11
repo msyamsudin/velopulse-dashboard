@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { AlertTriangle, Save, Target, User, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Save, Target, User, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { calculateMaxHr } from '@/lib/constants';
 import { getProfileGate } from '@/lib/profile-gate';
@@ -10,6 +10,7 @@ interface UserProfile {
   maxHr: number;
   ftp: number;
   weight: number;
+  restingHr: number;
 }
 
 interface ProfileTabProps {
@@ -101,10 +102,21 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError 
           suffix="KG"
           onChange={(weight) => setProfile({ ...profile, weight })}
         />
+        <NumberField
+          label={t('Resting HR')}
+          value={profile.restingHr}
+          icon={<Activity size={12} className="text-vp-hr" />}
+          suffix="BPM"
+          onChange={(restingHr) => setProfile({ ...profile, restingHr })}
+        />
       </div>
 
       <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
         {t('Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.')}
+      </div>
+
+      <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] leading-5 text-vp-muted">
+        {t('Weight and resting HR are stored as a dated history on this device, so past sessions keep the weight they were ridden at.')}
       </div>
 
       {!gate.complete && (

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
 import { useWorkoutHistoryData } from './useWorkoutHistoryData';
+import type { BodyHistoryEntry } from '@/lib/body-history';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 const makeSession = (id: string, dateISO: string): WorkoutSession => ({
@@ -22,7 +23,7 @@ const daysAgo = (days: number, hour = 12) => {
 
 const renderHistoryHook = (
   sessions: WorkoutSession[],
-  profile: { ftp?: number; weight?: number } = {}
+  profile: { ftp?: number; weight?: number; bodyHistory?: BodyHistoryEntry[] } = {}
 ) =>
   renderHook(() => useWorkoutHistoryData({
     sessions,
@@ -227,5 +228,28 @@ describe('profile metric gates', () => {
     expect(bodyMetrics?.avgWkg).toBe(2);
     expect(bodyMetrics?.peakWkg).toBe(5);
     expect(bodyMetrics?.kcalPerKgHour).toBe(9);
+  });
+
+  it('carries the dated body trend through to the L2 payload', () => {
+    const entries: BodyHistoryEntry[] = [
+      { date: '2026-05-01', weight: 80, restingHr: 55 },
+      { date: '2026-09-01', weight: 74, restingHr: 49 },
+    ];
+
+    const { result } = renderHistoryHook([powerSession], { weight: 74, bodyHistory: entries });
+    const { bodyTrend } = result.current.advanced;
+
+    expect(bodyTrend.weight).toEqual({
+      first: { date: '2026-05-01', value: 80 },
+      last: { date: '2026-09-01', value: 74 },
+      delta: -6,
+      count: 2,
+    });
+    expect(bodyTrend.restingHr?.delta).toBe(-6);
+  });
+
+  it('reports no body trend when nothing was ever recorded', () => {
+    const { result } = renderHistoryHook([powerSession], { weight: 80 });
+    expect(result.current.advanced.bodyTrend).toEqual({ weight: null, restingHr: null });
   });
 });

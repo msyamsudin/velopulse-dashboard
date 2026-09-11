@@ -26,7 +26,7 @@ interface AdvancedAnalysisProps {
  */
 export const AdvancedAnalysis = ({ intensity, advanced, trainingLoadMetrics, rangeLabel }: AdvancedAnalysisProps) => {
   const { t, locale } = useI18n();
-  const { coverage, loadTrend, bodyMetrics, hasWeight } = advanced;
+  const { coverage, loadTrend, bodyMetrics, hasWeight, bodyTrend } = advanced;
 
   const recordedSeconds = intensity.countedSeconds + intensity.belowZoneSeconds;
   const activePercent = recordedSeconds > 0
@@ -169,6 +169,40 @@ export const AdvancedAnalysis = ({ intensity, advanced, trainingLoadMetrics, ran
           </p>
         )}
       </div>
+
+      {/* Dated body trend: the per-kilogram numbers above only mean something
+          across months if the body they were divided by is visible. */}
+      {(bodyTrend.weight || bodyTrend.restingHr) && (
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg border border-white/8 bg-black/20 px-3 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/45">
+          <span className="text-[8px] tracking-[0.2em] text-hw-muted">{t('Body trend')}</span>
+          {bodyTrend.weight && (
+            <span>
+              {t('Weight')}{' '}
+              <b className="text-white/85 tabular-nums">
+                {formatMetric(bodyTrend.weight.first.value, 1)} → {formatMetric(bodyTrend.weight.last.value, 1)} kg
+              </b>
+              {bodyTrend.weight.count > 1 && (
+                <span className={bodyTrend.weight.delta <= 0 ? 'text-emerald-300' : 'text-amber-300'}>
+                  {' '}
+                  {bodyTrend.weight.delta > 0 ? '+' : ''}
+                  {formatMetric(bodyTrend.weight.delta, 1)}
+                </span>
+              )}
+            </span>
+          )}
+          {bodyTrend.restingHr && (
+            <span>
+              {t('Resting HR')}{' '}
+              <b className="text-white/85 tabular-nums">
+                {formatMetric(bodyTrend.restingHr.first.value, 0)} → {formatMetric(bodyTrend.restingHr.last.value, 0)} bpm
+              </b>
+            </span>
+          )}
+          <span className="text-[8px] tracking-[0.12em] text-white/25">
+            {t('From {count} entries on this device', { count: Math.max(bodyTrend.weight?.count ?? 0, bodyTrend.restingHr?.count ?? 0) })}
+          </span>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-white/8 bg-black/20 px-3 py-3">

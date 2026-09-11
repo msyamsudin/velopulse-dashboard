@@ -779,6 +779,13 @@ const id: Record<string, string> = {
   'Matched the recorded load': 'Sesuai dengan beban terekam',
   'Felt harder than the recorded load': 'Terasa lebih berat daripada beban terekam',
   'Felt easier than the recorded load': 'Terasa lebih ringan daripada beban terekam',
+
+  // Body history: weight & resting HR over time (Fase 6.5)
+  'Resting HR': 'Detak Jantung Istirahat',
+  'Weight and resting HR are stored as a dated history on this device, so past sessions keep the weight they were ridden at.': 'Berat badan dan detak jantung istirahat disimpan sebagai riwayat bertanggal di perangkat ini, sehingga sesi lama tetap memakai berat saat sesi itu dijalani.',
+  'Body trend': 'Tren tubuh',
+  'From {count} entries on this device': 'Dari {count} entri di perangkat ini',
+  'at {weight} kg': 'pada {weight} kg',
 };
 
 type I18nValue = {

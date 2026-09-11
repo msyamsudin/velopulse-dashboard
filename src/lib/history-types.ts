@@ -1,5 +1,6 @@
 import type { LoadTrend, TrainingLoadMetrics, TrainingLoadResult } from '@/lib/training-load';
 import type { BodyMetrics } from '@/lib/body-metrics';
+import type { BodyTrend } from '@/lib/body-history';
 import type { PowerZoneShare } from '@/lib/power-zones';
 import type { SessionTypeBucket } from '@/lib/workout-analysis';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
@@ -179,6 +180,8 @@ export interface AdvancedSummary {
   bodyMetrics: BodyMetrics | null;
   /** False when the weight gate is closed; the L2 panel shows a prompt instead. */
   hasWeight: boolean;
+  /** Dated body-weight / resting-HR trends (device-local history). */
+  bodyTrend: BodyTrend;
 }
 
 export interface GlobalSummary {

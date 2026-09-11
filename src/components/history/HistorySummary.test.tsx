@@ -153,6 +153,20 @@ const advanced: AdvancedSummary = {
     kcalPerKgHour: 8.4,
   },
   hasWeight: true,
+  bodyTrend: {
+    weight: {
+      first: { date: '2026-05-01', value: 80 },
+      last: { date: '2026-09-01', value: 74 },
+      delta: -6,
+      count: 3,
+    },
+    restingHr: {
+      first: { date: '2026-05-01', value: 55 },
+      last: { date: '2026-09-01', value: 49 },
+      delta: -6,
+      count: 3,
+    },
+  },
 };
 
 const baseProps = {
@@ -473,5 +487,20 @@ describe('HistorySummary', () => {
     expect(screen.getByText('Add your weight in Settings to see W/kg and kcal/kg per hour.')).toBeInTheDocument();
     expect(screen.queryByText(/Avg W\/kg/)).not.toBeInTheDocument();
     expect(screen.queryByText('2.15')).not.toBeInTheDocument();
+  });
+
+  it('shows the dated body trend next to the per-kilogram numbers', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('Body trend')).toBeInTheDocument();
+    // 80.0 → 74.0 kg over the recorded entries, with the delta and the source.
+    expect(screen.getByText('80.0 → 74.0 kg')).toBeInTheDocument();
+    expect(screen.getByText('-6.0')).toBeInTheDocument();
+    expect(screen.getByText('55 → 49 bpm')).toBeInTheDocument();
+    expect(screen.getByText('From 3 entries on this device')).toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ import { detectSessionAchievements } from '../../lib/milestone-records';
 import { hrrLevelKey } from '../../lib/hrr';
 import { hrvReadinessLabelKey } from '../../lib/hrv';
 import { compareSessionEffort, EFFORT_AGREEMENT_KEYS, getSessionRpeLoad } from '../../lib/rpe';
+import { resolveBodyMetric, type BodyHistoryEntry } from '../../lib/body-history';
 import { ShareWorkoutCardModal } from './ShareWorkoutCardModal';
 import { useI18n } from '@/i18n';
 import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
@@ -22,6 +23,10 @@ interface HistoryDetailProps {
   previousSession?: WorkoutSession;
   previousFullStats?: FullWorkoutStats;
   maxHr?: number;
+  /** Current profile weight, used when the body history has no dated entry. */
+  weight?: number;
+  /** Dated body entries, so W/kg uses the weight at this session's date. */
+  bodyHistory?: BodyHistoryEntry[];
   onBack: () => void;
   onClose: () => void;
   onDeleteSession?: (id: string) => void;
@@ -128,6 +133,8 @@ export const HistoryDetail = ({
   previousSession,
   previousFullStats,
   maxHr = 190,
+  weight = 0,
+  bodyHistory = [],
   onBack,
   onClose,
   onDeleteSession
@@ -173,6 +180,13 @@ export const HistoryDetail = ({
   const hrvReadiness = hrvReadinessLabelKey(session.stats?.hrvReadiness);
   const rpeScore = typeof session.stats?.rpe === 'number' ? session.stats.rpe : null;
   const rpeLoad = getSessionRpeLoad(session.stats?.rpe, session.duration);
+  // W/kg uses the weight recorded closest to this ride, not today's: the point
+  // of the dated history is that an old session keeps the body it was ridden
+  // with. Falls back to the current profile weight when nothing is recorded.
+  const sessionWeight = resolveBodyMetric(bodyHistory, session.date, 'weight') ?? (weight > 0 ? weight : null);
+  const sessionWkg = sessionWeight && session.stats.avgPower > 0
+    ? session.stats.avgPower / sessionWeight
+    : null;
 
   return (
     <>
@@ -375,6 +389,15 @@ export const HistoryDetail = ({
               <MiniMetric label={t('Speed')} value={fullStats.avgSpeed} unit="km/h" icon={<Activity size={11} />} colorClass="text-blue-400" />
               <MiniMetric label={t('TRIMP Load')} value={fullStats.trainingLoad.score} unit={t(fullStats.trainingLoad.label)} icon={<Activity size={11} />} colorClass="text-purple-300" />
             </div>
+
+            {sessionWkg !== null && sessionWeight !== null && (
+              <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/5 pt-3 text-[10px] font-mono uppercase tracking-[0.12em] text-white/45">
+                <span>
+                  {t('Avg W/kg')} <b className="text-white/85 tabular-nums">{sessionWkg.toFixed(2)}</b>
+                </span>
+                <span className="text-white/25">{t('at {weight} kg', { weight: sessionWeight })}</span>
+              </div>
+            )}
           </div>
 
           {hrrScore !== null && (

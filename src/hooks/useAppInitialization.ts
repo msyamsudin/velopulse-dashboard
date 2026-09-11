@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_PROFILE } from '@/lib/constants';
+import {
+  getLatestRestingHr,
+  readBodyHistory,
+  recordBodyEntry,
+  type BodyHistoryEntry,
+} from '@/lib/body-history';
 import { useBluetoothStore } from '../store/useBluetoothStore';
 import { useWorkoutStore } from '../store/useWorkoutStore';
 
@@ -16,8 +22,24 @@ export const useAppInitialization = () => {
   const loadHistory = useWorkoutStore(state => state.loadHistory);
 
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [userProfile, setUserProfile] = useState(DEFAULT_PROFILE);
+  const [userProfile, setUserProfileState] = useState(DEFAULT_PROFILE);
   const [profileError, setProfileError] = useState<ProfileLoadError | null>(null);
+  // Dated weight / resting-HR entries, kept on this device (lib/body-history).
+  const [bodyHistory, setBodyHistory] = useState<BodyHistoryEntry[]>([]);
+
+  useEffect(() => {
+    setBodyHistory(readBodyHistory());
+  }, []);
+
+  /**
+   * Every profile save also records a dated body entry, so past sessions can be
+   * read against the weight they were actually ridden at. Saving does not go
+   * through the cloud for this (no column exists), so it stays device-local.
+   */
+  const setUserProfile = useCallback((profile: typeof DEFAULT_PROFILE) => {
+    setUserProfileState(profile);
+    setBodyHistory(recordBodyEntry({ weight: profile.weight, restingHr: profile.restingHr }));
+  }, []);
 
   const loadProfile = useCallback(() => {
     setIsLoadingProfile(true);
@@ -54,11 +76,13 @@ export const useAppInitialization = () => {
         // profile — those fields gate metrics (power zones, W/kg) and are
         // surfaced as an invitation in Settings instead of a locked cockpit.
         if (data && !data.error && data.age > 0 && (data.maxHr > 0 || data.max_hr > 0)) {
-          setUserProfile({
+          setUserProfileState({
             age: data.age,
             maxHr: data.maxHr ?? data.max_hr,
             ftp: data.ftp ?? 0,
             weight: data.weight ?? 0,
+            // No cloud column yet: fall back to what this device recorded.
+            restingHr: data.restingHr ?? data.resting_hr ?? getLatestRestingHr() ?? 0,
           });
         }
       })
@@ -116,6 +140,7 @@ export const useAppInitialization = () => {
   return {
     userProfile,
     setUserProfile,
+    bodyHistory,
     profileStatus,
     profileError,
     retryProfile: loadProfile,

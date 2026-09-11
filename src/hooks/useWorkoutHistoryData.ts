@@ -3,6 +3,7 @@ import { formatDuration } from '../utils/formatters';
 import { HR_ZONES, getSafeMaxHr } from '@/lib/constants';
 import { calculateEdwardsTrimp, calculateLoadTrend, calculateTrainingLoadMetrics, LOAD_TREND_DAYS } from '@/lib/training-load';
 import { computeBodyMetrics } from '@/lib/body-metrics';
+import { summarizeBodyTrend, type BodyHistoryEntry } from '@/lib/body-history';
 import { summarizePowerZones } from '@/lib/power-zones';
 import { getProfileGate } from '@/lib/profile-gate';
 import { getFinalMetrics, getSessionTypeBucket, getWorkoutQuality, SESSION_TYPE_BUCKETS, type SessionTypeBucket } from '@/lib/workout-analysis';
@@ -37,6 +38,11 @@ interface UseWorkoutHistoryDataProps {
   ftp?: number;
   /** Rider body weight, gating W/kg and kcal/kg/h. 0 means "not set". */
   weight?: number;
+  /**
+   * Dated weight / resting-HR entries for the body-mass trends. Kept as a prop
+   * (read from storage once at startup) so this hook stays pure.
+   */
+  bodyHistory?: BodyHistoryEntry[];
   summaryPeriod: 'yearly' | 'monthly' | 'weekly' | 'daily';
   summaryRange: '7d' | '30d' | '90d' | '1y' | 'all';
   weeklyMetric: MetricKey;
@@ -117,7 +123,7 @@ const buildZoneStats = (maxHr: number) => {
  */
 const fullStatsCache = new WeakMap<WorkoutSession, { maxHr: number; stats: FullWorkoutStats }>();
 
-export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, summaryPeriod, summaryRange, offsetDays = 0 }: UseWorkoutHistoryDataProps): WorkoutHistoryData => {
+export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, bodyHistory = [], summaryPeriod, summaryRange, offsetDays = 0 }: UseWorkoutHistoryDataProps): WorkoutHistoryData => {
   const { locale, t } = useI18n();
 
   // One definition of "which metric inputs are usable" for the whole app; the
@@ -680,8 +686,11 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, su
       loadTrend,
       bodyMetrics,
       hasWeight: profileGate.hasWeight,
+      // Trends come straight from the dated entries, independent of the range:
+      // they answer "am I changing?" rather than "what did this range do?".
+      bodyTrend: summarizeBodyTrend(bodyHistory),
     };
-  }, [filteredSessions, globalSummary, loadTrend, bodyMetrics, profileGate]);
+  }, [filteredSessions, globalSummary, loadTrend, bodyMetrics, profileGate, bodyHistory]);
 
   const summaryInsights = useMemo<SummaryInsights | null>(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;
