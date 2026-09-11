@@ -150,12 +150,6 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
           : 'all time');
   // Training-load delta reused by the ratio delta badge in Load Guidance.
   const trainingLoadDelta = comparisonSummary?.deltas.trimp;
-  const baselineDelta = trainingLoadMetrics.chronicLoad > 0
-    ? Math.round(((trainingLoadMetrics.acuteLoad - trainingLoadMetrics.chronicLoad) / trainingLoadMetrics.chronicLoad) * 100)
-    : null;
-  const baselineDeltaLabel = baselineDelta === null
-    ? '--'
-    : `${baselineDelta > 0 ? '+' : ''}${baselineDelta}%`;
   const loadRatio = trainingLoadMetrics.acuteChronicRatio;
   const loadRatioValue = loadRatio ?? 0;
   const loadRatioNeedle = Math.min(100, Math.max(0, (loadRatioValue / 2) * 100));
@@ -240,8 +234,6 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
     peakPoint,
     periodLabel,
     rangeLabel,
-    baselineDelta,
-    baselineDeltaLabel,
     loadRatio,
     loadRatioStatus,
     loadRatioDelta,

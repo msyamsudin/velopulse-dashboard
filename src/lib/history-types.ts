@@ -103,6 +103,8 @@ export interface GlobalSummary {
   hrrSessions: number;
   avgHrr: number | null;
   bestHrr: number | null;
+  /** HRR scores of the range in chronological order, for the trend sparkline. */
+  hrrSeries: number[];
 }
 
 export interface SummaryInsights {

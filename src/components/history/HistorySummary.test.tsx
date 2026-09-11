@@ -23,9 +23,10 @@ const globalSummary: GlobalSummary = {
   totalTrainingLoad: 512.4,
   averageTrainingLoad: 42.7,
   sevenDayTrainingLoad: 120,
-  hrrSessions: 0,
-  avgHrr: null,
-  bestHrr: null,
+  hrrSessions: 3,
+  avgHrr: 24,
+  bestHrr: 31,
+  hrrSeries: [21, 24, 27],
 };
 
 const summaryInsights: SummaryInsights = {
@@ -146,5 +147,27 @@ describe('HistorySummary', () => {
 
     expect(screen.getAllByText('No comparison').length).toBeGreaterThan(0);
     expect(screen.queryByText('New baseline')).not.toBeInTheDocument();
+  });
+
+  it('summarises load once, with a concrete target band and the HRR trend row', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    // Recommendation appears once on the surface (the detail text lives in the
+    // collapsed panel), and the target band is derived from the usual week.
+    expect(screen.getAllByText('Maintain')).toHaveLength(1);
+    expect(screen.getByText('Target next week')).toBeInTheDocument();
+    expect(screen.getByText('88–143')).toBeInTheDocument();
+
+    // HRR is a single row: average, best, latest and its delta vs earlier rides.
+    // (The values are nested elements, so match the label as a substring.)
+    expect(screen.getByText(/Avg HRR/)).toBeInTheDocument();
+    expect(screen.getByText(/Best HRR/)).toBeInTheDocument();
+    expect(screen.getByText('24')).toBeInTheDocument();
+    expect(screen.getByText('31')).toBeInTheDocument();
+    expect(screen.getByText('+4')).toBeInTheDocument();
   });
 });

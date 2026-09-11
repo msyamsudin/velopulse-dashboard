@@ -464,6 +464,11 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     const avgHrr = hrrScores.length > 0
       ? Math.round(hrrScores.reduce((acc, score) => acc + score, 0) / hrrScores.length)
       : null;
+    // Chronological copy for the trend sparkline (filteredSessions order is not
+    // guaranteed — sessions arrive newest-first from the store).
+    const hrrSeries = [...hrrSessions]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(session => session.stats.hrrScore as number);
     const totalTrainingLoad = summaryData.reduce((acc, curr) => acc + (curr.totalTrainingLoad || 0), 0);
     const totalSessions = summaryData.reduce((acc, curr) => acc + curr.sessionCount, 0);
     // Single source for the 7-day load: the raw acute load used by Load
@@ -481,6 +486,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       hrrSessions: hrrSessions.length,
       avgHrr,
       bestHrr,
+      hrrSeries,
     };
   }, [summaryData, filteredSessions, trainingLoadMetrics]);
 

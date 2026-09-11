@@ -8,7 +8,6 @@ import { SummaryHeader } from './summary/SummaryHeader';
 import { RangeTotals } from './summary/RangeTotals';
 import { TrendChart } from './summary/TrendChart';
 import { LoadGuidance } from './summary/LoadGuidance';
-import { HeartRateRecovery } from './summary/HeartRateRecovery';
 import { ConsistencyMap } from './summary/ConsistencyMap';
 
 export interface HistorySummaryProps {
@@ -72,8 +71,6 @@ export const HistorySummary = ({
     peakPoint,
     periodLabel,
     rangeLabel,
-    baselineDelta,
-    baselineDeltaLabel,
     loadRatio,
     loadRatioStatus,
     loadRatioDelta,
@@ -183,9 +180,8 @@ export const HistorySummary = ({
 
       <LoadGuidance
         trainingLoadMetrics={trainingLoadMetrics}
+        globalSummary={globalSummary}
         loadRatio={loadRatio}
-        baselineDelta={baselineDelta}
-        baselineDeltaLabel={baselineDeltaLabel}
         loadRatioStatus={loadRatioStatus}
         loadRatioDelta={loadRatioDelta}
         loadRatioDots={loadRatioDots}
@@ -195,10 +191,6 @@ export const HistorySummary = ({
         loadAnalysisSummary={loadAnalysisSummary}
         loadAnalysisDetail={loadAnalysisDetail}
       />
-
-      {globalSummary.hrrSessions > 0 && (
-        <HeartRateRecovery globalSummary={globalSummary} />
-      )}
     </div>
   );
 };
