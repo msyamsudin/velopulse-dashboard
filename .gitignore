@@ -11,7 +11,9 @@ coverage/
 .app-data/
 src/data/
 scratch/
-docs/
+# docs/ is local scratch space; docs/adr/ holds versioned decision records.
+docs/*
+!docs/adr/
 benchmark/
 next-env.d.ts
 ROADMAP.md

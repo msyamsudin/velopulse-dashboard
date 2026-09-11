@@ -51,7 +51,9 @@ mengacu pada `auth.uid()`.
     aktifkan provider **Email**. Nyalakan **"Enable Sign ups"** jika ingin
     pengguna bisa mendaftar sendiri dari layar login.
 2.  Jalankan file [`supabase/schema.sql`](supabase/schema.sql) di
-    **Supabase Dashboard > SQL Editor** (aman dijalankan ulang).
+    **Supabase Dashboard > SQL Editor** (aman dijalankan ulang). Berkas itu
+    dihasilkan dari migrasi bertimestamp di `supabase/migrations/` — baca
+    [`supabase/README.md`](supabase/README.md) sebelum mengubah skema.
 3.  Buka aplikasi → layar **Masuk** akan muncul. Daftar dengan email pertama
     kali, lalu masuk. Data latihan lama (yang dibuat sebelum migrasi auth)
     otomatis di-claim ke akun Anda — tidak perlu backfill manual.
@@ -71,6 +73,30 @@ pnpm run dev
 ```
 
 Buka [http://localhost:3000](http://localhost:3000) di browser untuk melihat hasilnya.
+
+## Versi & Rilis
+
+Versi mengikuti **Semantic Versioning** dan hidup di satu tempat: field `version`
+pada `package.json`. Nomor itu tidak di-bump manual — `release-please` membuka
+release PR dari pesan [Conventional Commits](https://www.conventionalcommits.org/),
+dan merging PR itulah yang membuat tag git serta GitHub Release.
+
+Setiap build juga menyematkan commit SHA-nya. Identitas build yang sedang berjalan
+terlihat di footer dashboard dan di **Settings > System > Info build**. Sertakan
+`versi+sha` dari sana saat melaporkan bug — nomor versi saja bisa berarti belasan
+deployment berbeda.
+
+- Riwayat perubahan: [`CHANGELOG.md`](CHANGELOG.md)
+- Aturan commit, alur rilis, dan kebijakan cabang: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Alasan di balik keputusan ini: [`docs/adr/`](docs/adr/)
+
+Perintah yang sering dipakai:
+
+```bash
+pnpm run commit:check -- v0.1.0..HEAD        # audit pesan commit pada satu rentang
+pnpm run changelog -- --range v0.1.0..HEAD   # pratinjau catatan rilis
+pnpm run schema:check                        # pastikan schema.sql sinkron dengan migrasi
+```
 
 ## Akses Administratif
 
