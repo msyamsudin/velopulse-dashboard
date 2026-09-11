@@ -13,7 +13,6 @@ interface TrendBarChartProps {
   unit: string;
   metricColor: string;
   primaryMetric: MetricKey;
-  selectedMetrics: MetricKey[];
 }
 
 export const TrendBarChart = ({
@@ -26,7 +25,6 @@ export const TrendBarChart = ({
   unit,
   metricColor,
   primaryMetric,
-  selectedMetrics,
 }: TrendBarChartProps) => {
   return (
     <div className="mt-2">
@@ -68,15 +66,10 @@ export const TrendBarChart = ({
                 <div className="absolute bottom-full left-1/2 z-10 mb-2 hidden w-48 -translate-x-1/2 rounded-xl border border-white/10 bg-[#111] px-3 py-2 text-[10px] font-mono uppercase shadow-xl group-hover:block pointer-events-none">
                   <div className="text-white/60">{day.displayLabel} {day.subLabel}</div>
                   <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
-                    {selectedMetrics.map(metric => {
-                      const config = metricConfigByKey[metric];
-                      return (
-                        <div key={metric} className="contents">
-                          <div style={{ color: config.color }}>{config.name}</div>
-                          <div className="text-right text-white">{formatChartMetric(metric, Number(day[metric]) || 0)} {config.unit}</div>
-                        </div>
-                      );
-                    })}
+                    <div style={{ color: metricConfigByKey[primaryMetric].color }}>{metricConfigByKey[primaryMetric].name}</div>
+                    <div className="text-right text-white">
+                      {formatChartMetric(primaryMetric, Number(day[primaryMetric]) || 0)} {metricConfigByKey[primaryMetric].unit}
+                    </div>
                     <div className="text-white/40">Sessions</div>
                     <div className="text-right text-white">{day.sessions}</div>
                     <div className="text-white/40">Distance</div>
@@ -91,11 +84,11 @@ export const TrendBarChart = ({
                 </div>
 
                 <div className="w-full h-full relative flex items-end gap-px">
-                  {selectedMetrics.map(metric => {
-                    const config = metricConfigByKey[metric];
-                    const pct = (day.scaledValues[metric] || 0) / 100;
+                  {(() => {
+                    const config = metricConfigByKey[primaryMetric];
+                    const pct = (day.scaledValue || 0) / 100;
                     return (
-                      <div key={metric} className="flex-1 h-full relative min-w-0">
+                      <div className="flex-1 h-full relative min-w-0">
                         <div
                           className="absolute bottom-0 w-full"
                           style={{ height: `${pct * 100}%`, minHeight: day.hasData ? '3px' : '0px' }}
@@ -108,14 +101,14 @@ export const TrendBarChart = ({
                                 borderTop: `1px solid rgba(${config.colorRgba},0.3)`,
                                 borderLeft: `1px solid rgba(${config.colorRgba},0.3)`,
                                 borderRight: `1px solid rgba(${config.colorRgba},0.3)`,
-                                boxShadow: day.isHighlight && metric === primaryMetric ? `0 0 12px rgba(${config.colorRgba},0.5)` : 'none',
+                                boxShadow: day.isHighlight ? `0 0 12px rgba(${config.colorRgba},0.5)` : 'none',
                               }}
                             />
                           ) : null}
                         </div>
                       </div>
                     );
-                  })}
+                  })()}
                 </div>
               </div>
 
@@ -127,11 +120,11 @@ export const TrendBarChart = ({
                 }`}
                 style={day.isHighlight ? { color: metricColor } : {}}
               >
-                {day.showMainLabel ? day.displayLabel : '\u00a0'}
+                {day.showLabel ? day.displayLabel : '\u00a0'}
               </div>
 
               <div className={`shrink-0 text-[8px] font-mono leading-none ${day.hasData ? 'text-white/25' : 'text-white/10'}`}>
-                {day.showSubLabel ? day.subLabel : '\u00a0'}
+                {day.showLabel ? day.subLabel : '\u00a0'}
               </div>
             </div>
           );

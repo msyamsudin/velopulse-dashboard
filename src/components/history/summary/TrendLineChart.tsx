@@ -12,7 +12,6 @@ interface TrendLineChartProps {
   unit: string;
   metricColor: string;
   primaryMetric: MetricKey;
-  selectedMetrics: MetricKey[];
   denseData: boolean;
   compactLabels: boolean;
   labelInterval: number;
@@ -26,7 +25,6 @@ export const TrendLineChart = ({
   unit,
   metricColor,
   primaryMetric,
-  selectedMetrics,
   denseData,
   compactLabels,
   labelInterval,
@@ -67,17 +65,11 @@ export const TrendLineChart = ({
                   <div className="bg-[#1a1a1a] border border-white/10 px-4 py-3 rounded shadow-xl">
                     <div className="text-[10px] uppercase font-mono text-hw-muted mt-1">{point.displayLabel} {point.subLabel}</div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-[10px] font-mono uppercase">
-                      {selectedMetrics.map(metric => {
-                        const config = metricConfigByKey[metric];
-                        return (
-                          <div key={metric} className="contents">
-                            <div style={{ color: config.color }}>{config.name}</div>
-                            <div className="text-right text-white">
-                              {formatChartMetric(metric, Number(point[metric]) || 0)} <span className="text-[8px] opacity-40">{config.unit}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      <div style={{ color: metricConfigByKey[primaryMetric].color }}>{metricConfigByKey[primaryMetric].name}</div>
+                      <div className="text-right text-white">
+                        {formatChartMetric(primaryMetric, Number(point[primaryMetric]) || 0)}{' '}
+                        <span className="text-[8px] opacity-40">{metricConfigByKey[primaryMetric].unit}</span>
+                      </div>
                       <div className="text-white/50">Sessions</div>
                       <div className="text-right text-white">{point.sessions}</div>
                       <div className="text-white/50">Distance</div>
@@ -111,22 +103,16 @@ export const TrendLineChart = ({
               }}
             />
           )}
-          {selectedMetrics.map(metric => {
-            const config = metricConfigByKey[metric];
-            return (
-              <Line
-                key={metric}
-                type="monotone"
-                dataKey={(point) => point.scaledValues[metric] || 0}
-                name={config.name}
-                stroke={config.color}
-                strokeWidth={metric === primaryMetric ? 3 : 2}
-                dot={denseData ? false : { r: 4, strokeWidth: 2, fill: '#1a1a1a', stroke: config.color }}
-                activeDot={{ r: 6, fill: config.color, stroke: '#fff', strokeWidth: 2 }}
-                isAnimationActive={false}
-              />
-            );
-          })}
+          <Line
+            type="monotone"
+            dataKey="scaledValue"
+            name={metricConfigByKey[primaryMetric].name}
+            stroke={metricConfigByKey[primaryMetric].color}
+            strokeWidth={3}
+            dot={denseData ? false : { r: 4, strokeWidth: 2, fill: '#1a1a1a', stroke: metricConfigByKey[primaryMetric].color }}
+            activeDot={{ r: 6, fill: metricConfigByKey[primaryMetric].color, stroke: '#fff', strokeWidth: 2 }}
+            isAnimationActive={false}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

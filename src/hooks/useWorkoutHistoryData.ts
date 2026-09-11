@@ -55,7 +55,9 @@ const getRangeStart = (range: UseWorkoutHistoryDataProps['summaryRange'], offset
   if (range === '7d') start.setDate(end.getDate() - 6);
   if (range === '30d') start.setDate(end.getDate() - 29);
   if (range === '90d') start.setDate(end.getDate() - 89);
-  if (range === '1y') start.setFullYear(end.getFullYear() - 1);
+  // 365 days, matching RECORD_RANGE_DAYS['1y'] so the chart, the totals and the
+  // record scope always cover the same window (setFullYear made it 366).
+  if (range === '1y') start.setDate(end.getDate() - 364);
   start.setHours(0, 0, 0, 0);
 
   return start;

@@ -23,7 +23,6 @@ interface TrendChartProps {
   periodLabel: string;
   rangeLabel: string;
   primaryMetric: MetricKey;
-  selectedMetrics: MetricKey[];
   effectiveChartType: 'line' | 'bar';
 }
 
@@ -44,7 +43,6 @@ export const TrendChart = ({
   periodLabel,
   rangeLabel,
   primaryMetric,
-  selectedMetrics,
   effectiveChartType,
 }: TrendChartProps) => {
   const { t } = useI18n();
@@ -124,7 +122,6 @@ export const TrendChart = ({
           unit={unit}
           metricColor={metricColor}
           primaryMetric={primaryMetric}
-          selectedMetrics={selectedMetrics}
           denseData={denseData}
           compactLabels={compactLabels}
           labelInterval={labelInterval}
@@ -140,7 +137,6 @@ export const TrendChart = ({
           unit={unit}
           metricColor={metricColor}
           primaryMetric={primaryMetric}
-          selectedMetrics={selectedMetrics}
         />
       )}
     </div>

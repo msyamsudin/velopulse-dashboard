@@ -38,6 +38,13 @@
   }
 }
 
+/* Custom classes live in the components layer. Unlayered CSS beats Tailwind's
+   utilities regardless of order, so writing them outside a layer silently
+   disabled every utility that shared an element with them (e.g.
+   `hardware-card p-4 border-purple-400/20` kept p-6 and the default border).
+   Inside @layer components, utilities win again — which is what the call sites
+   have always assumed. */
+@layer components {
 .hardware-card {
   @apply rounded-lg border border-hw-border p-6 transition-colors duration-200 relative overflow-hidden;
   background: rgba(13, 15, 17, 0.94);
@@ -118,6 +125,7 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
 }
 
 /* Animated diagonal stripes for the save progress bar while the app waits

@@ -7,13 +7,13 @@ import type {
   WeeklyLoadPoint,
 } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
-import { metricConfigByKey, METRIC_OPTIONS, type MetricOption, type SummaryPeriod, type SummaryRange } from './constants';
+import { metricConfigByKey, type MetricOption, type SummaryPeriod, type SummaryRange } from './constants';
 import { formatChartMetric } from './format';
 
 export type HistoryChartDataPoint = HistoryChartPoint & {
-  scaledValues: Record<MetricKey, number>;
-  showMainLabel: boolean;
-  showSubLabel: boolean;
+  /** Value as a percentage of the selected metric's peak (0–100). */
+  scaledValue: number;
+  showLabel: boolean;
 };
 
 export interface AverageLine {
@@ -63,34 +63,25 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
           ? 3
           : 1;
   const primaryMetric = weeklyMetric;
-  const selectedMetrics = useMemo(() => [weeklyMetric], [weeklyMetric]);
 
   const chartData = useMemo(() => {
-    const maxByMetric = selectedMetrics.reduce((acc, metric) => {
-      acc[metric] = Math.max(0.001, ...normalizedChartData.map(point => Number(point[metric]) || 0));
-      return acc;
-    }, {} as Record<MetricKey, number>);
+    // One metric at a time: every point is scaled against the peak of that
+    // metric. (The previous implementation filled a value for all five metrics
+    // regardless of selection, which meant the four unselected ones always read
+    // 100 — a trap for anyone re-enabling multi-metric charts.)
+    const maxMetricValue = Math.max(0.001, ...normalizedChartData.map(point => Number(point[primaryMetric]) || 0));
 
     return normalizedChartData.map((point, index) => {
       const hasData = Boolean(point.hasData);
-      const showSubLabel = !compactLabels || (hasData && index % labelInterval === 0) || point.isHighlight;
-      const showMainLabel = !compactLabels || (hasData && index % labelInterval === 0) || point.isHighlight;
-      const scaledValues = {} as Record<MetricKey, number>;
-
-      METRIC_OPTIONS.forEach(metric => {
-        const key = metric.value;
-        const maxMetricValue = maxByMetric[key] || 0.001;
-        scaledValues[key] = Math.min(100, Math.max(0, ((Number(point[key]) || 0) / maxMetricValue) * 100));
-      });
+      const showLabel = !compactLabels || (hasData && index % labelInterval === 0) || point.isHighlight;
 
       return {
         ...point,
-        scaledValues,
-        showMainLabel,
-        showSubLabel,
+        scaledValue: Math.min(100, Math.max(0, ((Number(point[primaryMetric]) || 0) / maxMetricValue) * 100)),
+        showLabel,
       };
     });
-  }, [normalizedChartData, compactLabels, labelInterval, selectedMetrics]);
+  }, [normalizedChartData, compactLabels, labelInterval, primaryMetric]);
 
   const chartStats = useMemo(() => {
     return chartData.reduce((stats, point) => {
@@ -224,7 +215,6 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
     compactLabels,
     labelInterval,
     primaryMetric,
-    selectedMetrics,
     chartData,
     unit,
     metricColor,

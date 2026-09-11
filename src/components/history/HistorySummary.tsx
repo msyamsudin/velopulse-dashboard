@@ -67,7 +67,6 @@ export const HistorySummary = ({
     compactLabels,
     labelInterval,
     primaryMetric,
-    selectedMetrics,
     chartData,
     unit,
     metricColor,
@@ -160,7 +159,6 @@ export const HistorySummary = ({
         periodLabel={periodLabel}
         rangeLabel={rangeLabel}
         primaryMetric={primaryMetric}
-        selectedMetrics={selectedMetrics}
         effectiveChartType={effectiveChartType}
       />
 
