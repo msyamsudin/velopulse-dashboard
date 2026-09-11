@@ -363,9 +363,9 @@ export default function App() {
             maxHr={userProfile.maxHr}
             history={workoutHistory}
             sessionStartTime={sessionStartTime ?? 0}
-            onSave={async () => {
+            onSave={async (rpe) => {
               if (isSavingSession) return; // Prevent double-submit while saving
-              await saveSession();
+              await saveSession(rpe);
               setShowSummary(false);
             }}
             onDiscard={() => {

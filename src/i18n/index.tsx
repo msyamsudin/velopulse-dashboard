@@ -764,6 +764,21 @@ const id: Record<string, string> = {
   'HRV at ride start': 'HRV saat mulai',
   'Readiness recorded before the session': 'Kesiapan yang tercatat sebelum sesi',
   'Readiness': 'Kesiapan',
+
+  // Subjective effort / sRPE (Fase 6.5)
+  'Subjective effort': 'Upaya subjektif',
+  '1 = very easy, 10 = maximal': '1 = sangat ringan, 10 = maksimal',
+  'Optional — tap the same number again to clear it.': 'Opsional — ketuk angka yang sama lagi untuk menghapusnya.',
+  'RPE': 'RPE',
+  'sRPE': 'sRPE',
+  'Perceived effort': 'Upaya yang dirasakan',
+  'Subjective effort compared with the recorded load': 'Upaya subjektif dibandingkan dengan beban terekam',
+  'Vs recorded load': 'Vs beban terekam',
+  'Not enough rated sessions yet': 'Sesi yang dinilai belum cukup',
+  'Perceived rank {perceived}% vs recorded {recorded}%': 'Peringkat persepsi {perceived}% vs terekam {recorded}%',
+  'Matched the recorded load': 'Sesuai dengan beban terekam',
+  'Felt harder than the recorded load': 'Terasa lebih berat daripada beban terekam',
+  'Felt easier than the recorded load': 'Terasa lebih ringan daripada beban terekam',
 };
 
 type I18nValue = {

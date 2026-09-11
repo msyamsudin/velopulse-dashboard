@@ -9,6 +9,7 @@ import { generateSessionInsights, getInsightToneClasses, getMetricDelta, getSess
 import { detectSessionAchievements } from '../../lib/milestone-records';
 import { hrrLevelKey } from '../../lib/hrr';
 import { hrvReadinessLabelKey } from '../../lib/hrv';
+import { compareSessionEffort, EFFORT_AGREEMENT_KEYS, getSessionRpeLoad } from '../../lib/rpe';
 import { ShareWorkoutCardModal } from './ShareWorkoutCardModal';
 import { useI18n } from '@/i18n';
 import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
@@ -148,6 +149,13 @@ export const HistoryDetail = ({
     );
   }, [session, allSessions, t]);
 
+  // Rank-based perception vs recorded load. Stable across renders, and null
+  // until enough rated rides exist to rank anything.
+  const effortComparison = useMemo(
+    () => (session ? compareSessionEffort(session, allSessions, maxHr) : null),
+    [session, allSessions, maxHr]
+  );
+
   useEffect(() => {
     const timer = setTimeout(() => setIsDetailReady(true), 350);
     return () => clearTimeout(timer);
@@ -163,6 +171,8 @@ export const HistoryDetail = ({
   const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
   const hrrClassification = t(hrrLevelKey(session.stats?.hrrClassification));
   const hrvReadiness = hrvReadinessLabelKey(session.stats?.hrvReadiness);
+  const rpeScore = typeof session.stats?.rpe === 'number' ? session.stats.rpe : null;
+  const rpeLoad = getSessionRpeLoad(session.stats?.rpe, session.duration);
 
   return (
     <>
@@ -416,6 +426,40 @@ export const HistoryDetail = ({
                   <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.12em] text-white/40">
                     {t('Saved with this workout session')}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {rpeLoad !== null && (
+            <div className="hardware-card border-purple-400/20 bg-purple-400/5 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-purple-400/10 pb-3">
+                <div>
+                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-purple-300">{t('Perceived effort')}</div>
+                  <div className="mt-1 text-[11px] font-mono uppercase tracking-[0.12em] text-white/45">
+                    {t('Subjective effort compared with the recorded load')}
+                  </div>
+                </div>
+                <Activity size={16} className="text-purple-300" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <MiniMetric label={t('RPE')} value={rpeScore ?? '--'} unit="/10" icon={<Activity size={11} />} colorClass="text-purple-300" />
+                <MiniMetric label={t('sRPE')} value={rpeLoad} unit="AU" icon={<Activity size={11} />} colorClass="text-purple-300" />
+                <div className="rounded-lg border border-purple-400/15 bg-black/20 p-3">
+                  <div className="mb-2 text-[9px] font-mono uppercase tracking-widest text-hw-muted">{t('Vs recorded load')}</div>
+                  <div className="text-sm font-bold uppercase tracking-wide text-purple-300">
+                    {effortComparison
+                      ? t(EFFORT_AGREEMENT_KEYS[effortComparison.agreement])
+                      : t('Not enough rated sessions yet')}
+                  </div>
+                  {effortComparison && (
+                    <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.12em] text-white/40">
+                      {t('Perceived rank {perceived}% vs recorded {recorded}%', {
+                        perceived: Math.round(effortComparison.rpePercentile * 100),
+                        recorded: Math.round(effortComparison.trimpPercentile * 100),
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

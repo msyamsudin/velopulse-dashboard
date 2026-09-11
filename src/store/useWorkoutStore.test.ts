@@ -229,6 +229,50 @@ describe('HRV captured with the saved session', () => {
   });
 });
 
+describe('subjective effort stored with the session', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useWorkoutStore.setState({
+      isRecording: false,
+      sessionStartTime: null,
+      elapsed: 0,
+      history: [],
+      sessionHistory: [],
+    });
+  });
+
+  const rideOneMinute = async () => {
+    useBluetoothStore.setState({
+      lastUpdate: { heartRate: Date.now(), power: Date.now() },
+      data: { heartRate: 120, power: 200 },
+    });
+    useWorkoutStore.getState().addHistoryPoint({ heartRate: 120, power: 200 });
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    useWorkoutStore.getState().addHistoryPoint({ heartRate: 130, power: 210 });
+  };
+
+  it('stores the RPE passed by the summary modal', async () => {
+    useWorkoutStore.getState().toggleRecording();
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession(7);
+
+    expect(useWorkoutStore.getState().sessionHistory[0].stats.rpe).toBe(7);
+  });
+
+  it('leaves an unrated session without an RPE instead of a zero', async () => {
+    useWorkoutStore.getState().toggleRecording();
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession();
+    expect(useWorkoutStore.getState().sessionHistory[0].stats.rpe).toBeUndefined();
+
+    // Out-of-range input is treated as "not rated" too.
+    useWorkoutStore.getState().toggleRecording();
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession(0);
+    expect(useWorkoutStore.getState().sessionHistory[0].stats.rpe).toBeUndefined();
+  });
+});
+
 describe('active session recovery', () => {
   beforeEach(() => {
     localStorage.clear();

@@ -4,6 +4,7 @@ import { Activity, Check, ChevronRight, Download, Heart, Loader2, Save, Timer, T
 import type { ReactNode } from 'react';
 import { downloadTCX } from '../lib/export-service';
 import { calculateEdwardsTrimp } from '../lib/training-load';
+import { getSessionRpeLoad } from '../lib/rpe';
 import { Panel, StatusPill } from './ui';
 import { useI18n } from '@/i18n';
 import { hrrLevelKey } from '@/lib/hrr';
@@ -35,9 +36,12 @@ interface SessionSummaryModalProps {
   saveProgress?: number;
   /** Current save stage, used to pick a localized progress label. */
   savePhase?: SaveSessionPhase;
-  onSave: () => void;
+  onSave: (rpe?: number) => void;
   onDiscard: () => void;
 }
+
+/** The 1–10 Borg-style CR10 scale offered when saving. */
+const RPE_SCALE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 interface ResultMetricProps {
   icon: ReactNode;
@@ -97,6 +101,13 @@ export const SessionSummaryModal = ({
     sessionStartTime,
   }));
   const canExport = Boolean(snapshot.history && snapshot.sessionStartTime);
+  // Subjective effort is optional and lives only in this modal: the store keeps
+  // the number, the UI never guesses one.
+  const [rpe, setRpe] = useState<number | null>(null);
+  const rpeLoad = useMemo(
+    () => getSessionRpeLoad(rpe, parseDurationSeconds(snapshot.duration)),
+    [rpe, snapshot.duration]
+  );
 
   // Edwards TRIMP for the captured session, computed from the same history +
   // duration + max HR the saved workout will use, so the summary value matches
@@ -261,10 +272,49 @@ export const SessionSummaryModal = ({
             </div>
           )}
 
+          {/* Subjective effort: the only load signal a sensor cannot measure,
+              and the input that lets the app compare perception with the
+              recorded heart-rate load after the fact. */}
+          <div className="rounded-lg border border-vp-border bg-white/[0.025] p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="vp-label">{t('Subjective effort')}</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+                {t('1 = very easy, 10 = maximal')}
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-10 gap-1.5">
+              {RPE_SCALE.map(value => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRpe(current => (current === value ? null : value))}
+                  disabled={isSaving}
+                  aria-pressed={rpe === value}
+                  aria-label={`${t('RPE')} ${value}`}
+                  className={`vp-focus-ring rounded-md border px-1 py-2 font-mono text-xs font-bold tabular-nums transition-colors disabled:opacity-50 ${
+                    rpe === value
+                      ? 'border-vp-accent/60 bg-vp-accent/15 text-vp-accent'
+                      : 'border-vp-border text-vp-muted hover:text-vp-text'
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+              <span>{t('Optional — tap the same number again to clear it.')}</span>
+              {rpeLoad !== null && (
+                <span>
+                  {t('sRPE')} <b className="text-vp-text">{rpeLoad}</b>
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 border-t border-vp-border pt-5 md:grid-cols-3">
             <button
               type="button"
-              onClick={onSave}
+              onClick={() => onSave(rpe ?? undefined)}
               disabled={isSaving}
               aria-label={t('Save workout session')}
               className="vp-focus-ring flex min-h-12 items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-60"

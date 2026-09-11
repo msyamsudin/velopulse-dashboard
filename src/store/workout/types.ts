@@ -43,6 +43,8 @@ export interface WorkoutSession {
      */
     hrvRmssd?: number;
     hrvReadiness?: ReadinessLevel;
+    /** Subjective effort 1–10 entered when saving (sRPE = RPE × minutes). */
+    rpe?: number;
   };
   history: HistoryData[];
   synced_to_google?: boolean;
@@ -147,7 +149,11 @@ export interface WorkoutActions {
   incrementElapsed: () => void;
   addHistoryPoint: (data: BluetoothData) => void;
   setHrrResult: (score: number, classification: string) => void;
-  saveSession: () => Promise<void>;
+  /**
+   * `rpe` is the subjective 1–10 effort from the summary modal. Optional: a
+   * rider who does not want to rate the ride saves exactly as before.
+   */
+  saveSession: (rpe?: number) => Promise<void>;
   syncPendingSupabaseSessions: () => Promise<void>;
   importTCX: (
     tcxContent: string,

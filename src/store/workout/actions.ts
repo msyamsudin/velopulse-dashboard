@@ -207,7 +207,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
       }));
     },
 
-    saveSession: async () => {
+    saveSession: async (rpe?: number) => {
       // Re-entrancy guard: a fast double-click could fire a second call
       // before the Save button re-renders disabled.
       if (get().isSavingSession) return;
@@ -251,6 +251,9 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           // the stats blob keeps syncing to the same JSON column as before.
           hrvRmssd: sessionHrvRmssd ?? undefined,
           hrvReadiness: sessionHrvReadiness ?? undefined,
+          // Unrated stays undefined rather than 0: "no opinion" and "no effort"
+          // must not look the same in the stored session.
+          rpe: typeof rpe === 'number' && rpe > 0 ? rpe : undefined,
         };
 
         const newSession: WorkoutSession = {
