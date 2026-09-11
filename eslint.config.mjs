@@ -6,8 +6,8 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
   {
-    // Pre-existing `any` usage across the codebase. Tightening types is
-    // tracked in ROADMAP.md item 2.2; keep visible as warnings until then.
+    // `any` was cleaned out of the codebase; this stays a warning (not an
+    // error) as a guard so a new one is visible without blocking the build.
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
     },
