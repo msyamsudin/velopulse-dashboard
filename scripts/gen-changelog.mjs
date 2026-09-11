@@ -64,6 +64,26 @@ function git(args) {
   }).trim();
 }
 
+const USAGE = `Render release notes from git history.
+
+Usage:
+  node scripts/gen-changelog.mjs                          # last tag..HEAD, to stdout
+  node scripts/gen-changelog.mjs --all                    # whole history
+  node scripts/gen-changelog.mjs --range v0.1.0..HEAD
+  node scripts/gen-changelog.mjs --version 0.2.0 --include-internal --write
+
+Options:
+  --range <rev-range>     commits to include (default: last tag..HEAD, else all)
+  --all                   ignore the last tag and use the whole history
+  --version <x.y.z>       version heading (default: package.json version)
+  --date <YYYY-MM-DD>     release date (default: today)
+  --note <text>           paragraph to place under the version heading
+  --include-internal      also list docs/refactor/test/build/ci/chore/style
+  --write                 write into CHANGELOG.md instead of stdout
+
+Commits that do not follow Conventional Commits land under "Other Changes"
+rather than being dropped.`;
+
 function parseArgs(argv) {
   const options = { range: null, all: false, version: null, date: null, note: '', includeInternal: false, write: false };
   for (let i = 0; i < argv.length; i += 1) {
@@ -225,7 +245,7 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
 
   if (options.help) {
-    console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(1, 30).join('\n'));
+    console.log(USAGE);
     return 0;
   }
 
@@ -241,8 +261,13 @@ function main() {
 
   const commits = readCommits(range);
   if (commits.length === 0) {
-    console.error('No commits in range — nothing to write.');
-    return 1;
+    // Nothing to render is a normal outcome for a preview command, not a failure.
+    console.log(
+      range
+        ? `No commits in ${range} — nothing to render.`
+        : 'No commits in the history — nothing to render.'
+    );
+    return 0;
   }
 
   const url = repoUrl();

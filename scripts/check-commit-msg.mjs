@@ -61,13 +61,28 @@ function parseArgs(argv) {
   return options;
 }
 
+const USAGE = `Commit-message linter.
+
+Usage:
+  node scripts/check-commit-msg.mjs <file>                 # validate a message file
+  node scripts/check-commit-msg.mjs --source merge <file>  # as a git hook
+  node scripts/check-commit-msg.mjs --range v0.1.0..HEAD   # audit a revision range
+  node scripts/check-commit-msg.mjs --fix <file>           # strip a leading BOM
+
+Options:
+  --fix                   strip a leading BOM from the message file
+  --source <source>       git hook source (merge/squash skip validation)
+  --range <base>..<head>  validate every commit in a revision range
+  --require-attribution   also require an Assisted-by:/Co-authored-by: trailer
+  --max-header <n>        override the header length limit (default 100)
+
+A leading UTF-8 BOM is an error rather than a warning: it makes every anchored
+pattern miss the message, so release tooling drops the commit silently.
+
+Exit codes: 0 valid, 1 invalid message(s), 2 usage or I/O error.`;
+
 function usage() {
-  const header = fs.readFileSync(new URL(import.meta.url), 'utf8')
-    .split('\n')
-    .slice(1, 27)
-    .map(line => line.replace(/^\/?\*+ ?/, '').replace(/^\/$/, ''))
-    .join('\n');
-  console.log(header.trim());
+  console.log(USAGE);
 }
 
 function readMessageFile(file) {
