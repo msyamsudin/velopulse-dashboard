@@ -251,7 +251,7 @@ export const SystemTab = ({
                   <textarea 
                     value={importToken}
                     onChange={(e) => setImportToken(e.target.value)}
-                    placeholder="Paste token here..."
+                    placeholder={t('Paste token here...')}
                     rows={2}
                     className="w-full rounded border border-vp-border bg-white/[0.02] p-2 font-mono text-[9px] text-vp-text outline-none resize-none"
                   />
@@ -289,7 +289,7 @@ export const SystemTab = ({
                   <p className="text-[9px] text-vp-danger font-mono mt-2">{importError}</p>
                 )}
                 {importSuccess && (
-                  <p className="text-[9px] text-vp-accent font-mono mt-2">Import success! Reloading...</p>
+                  <p className="text-[9px] text-vp-accent font-mono mt-2">{t('Import success! Reloading...')}</p>
                 )}
               </div>
             </div>

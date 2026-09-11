@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
 import { useWorkoutStore } from '@/store/useWorkoutStore';
+import { classifyHrrScore } from '@/lib/hrr';
 
 export type HrrStatus = 'idle' | 'detecting' | 'buffer' | 'measuring' | 'complete';
 
@@ -91,10 +92,9 @@ export const useHeartRateRecovery = () => {
       const initialHr = startHr ?? finalHr;
       const score = Math.max(0, initialHr - finalHr);
 
-      let desc = 'Kurang Optimal';
-      if (score >= 29) desc = 'Sangat Baik (Atletis)';
-      else if (score >= 18) desc = 'Baik (Normal)';
-      else if (score >= 12) desc = 'Cukup';
+      // Store a stable level code, not a translated label: the session may be
+      // read later in another language (see lib/hrr.ts).
+      const desc = classifyHrrScore(score);
 
       setEndHr(finalHr);
       setHrrScore(score);

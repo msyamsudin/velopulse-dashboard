@@ -6,6 +6,7 @@ import { downloadTCX } from '../lib/export-service';
 import { calculateEdwardsTrimp } from '../lib/training-load';
 import { Panel, StatusPill } from './ui';
 import { useI18n } from '@/i18n';
+import { hrrLevelKey } from '@/lib/hrr';
 import type { HistoryData, SaveSessionPhase, WorkoutSession } from '@/store/useWorkoutStore';
 
 interface SessionSummaryModalProps {
@@ -183,7 +184,7 @@ export const SessionSummaryModal = ({
                   <div>
                     <div className="vp-label">{t('Heart Rate Recovery')}</div>
                     <div className="mt-1 text-sm font-semibold uppercase text-vp-accent">
-                      {snapshot.stats.hrrClassification}
+                      {t(hrrLevelKey(snapshot.stats.hrrClassification))}
                     </div>
                   </div>
                 </div>

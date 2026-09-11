@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatDuration } from '../../utils/formatters';
+import { useI18n } from '@/i18n';
 import type { HistoryData } from '@/store/useWorkoutStore';
 
 interface StackedWorkoutChartProps {
@@ -30,6 +31,7 @@ interface StackedWorkoutChartProps {
 
 
 export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) => {
+  const { t } = useI18n();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const handleMouseMove = (e: { activeTooltipIndex?: number | string }) => {
@@ -140,7 +142,7 @@ export const StackedWorkoutChart = ({ data, stats }: StackedWorkoutChartProps) =
       {/* Top Header / Time Axis */}
       <div className="flex items-stretch border-b border-hw-border bg-hw-muted/5">
         <div className="w-[180px] flex flex-col justify-center px-8 py-2 border-r border-hw-border">
-          <div className="text-[10px] text-hw-muted font-mono uppercase tracking-widest opacity-60">Time</div>
+          <div className="text-[10px] text-hw-muted font-mono uppercase tracking-widest opacity-60">{t('Time')}</div>
           <div className="text-sm font-bold text-hw-accent font-mono tabular-nums">
             {activeIndex !== null ? chartData[activeIndex]?.relativeTime : chartData[chartData.length - 1]?.relativeTime}
           </div>

@@ -20,6 +20,8 @@ export interface ShareCardRenderOptions {
   showComparison?: boolean;
   customNote?: string;
   maxHr?: number;
+  /** Translated HRR classification; the canvas itself has no translator. */
+  hrrClassificationLabel?: string;
 }
 
 /**
@@ -494,7 +496,7 @@ export const renderShareCardToCanvas = (
     ctx.font = mono(isStory ? 19 : 17, '700');
     ctx.fillStyle = pal.ink;
     const labelW = ctx.measureText('HEART-RATE RECOVERY').width;
-    ctx.fillText(`   ${hrrScore} BPM  ·  ${(session.stats?.hrrClassification || 'Normal').toUpperCase()}`, padX + labelW, y);
+    ctx.fillText(`   ${hrrScore} BPM  ·  ${(options.hrrClassificationLabel || session.stats?.hrrClassification || '').toUpperCase()}`, padX + labelW, y);
 
     y += isStory ? 30 : 24;
   }

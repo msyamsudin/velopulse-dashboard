@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import type { MetricKey } from '@/lib/history-types';
+import { useI18n } from '@/i18n';
 import { metricConfigByKey } from './constants';
 import { formatChartMetric } from './format';
 import type { AverageLine, HistoryChartDataPoint } from './useHistorySummary';
@@ -29,17 +30,18 @@ export const TrendLineChart = ({
   compactLabels,
   labelInterval,
 }: TrendLineChartProps) => {
+  const { t } = useI18n();
   return (
     <div className="mt-2 min-h-[260px] h-[clamp(260px,40vh,420px)] w-full">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-black/20 px-4 py-2.5">
         <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-[0.16em] text-white/60">
-          <span>{activePeriods} active periods</span>
-          <span>line view</span>
+          <span>{t('{count} active periods', { count: activePeriods })}</span>
+          <span>{t('line view')}</span>
           <span>{metricConfigByKey[primaryMetric].name}</span>
         </div>
         {peakPoint && (
           <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50">
-            Peak: <span style={{ color: metricColor }} className="font-bold">{formatChartMetric(primaryMetric, Number(peakPoint[primaryMetric]) || 0)}</span> {unit} on {peakPoint.displayLabel} {peakPoint.subLabel}
+            {t('Peak')}: <span style={{ color: metricColor }} className="font-bold">{formatChartMetric(primaryMetric, Number(peakPoint[primaryMetric]) || 0)}</span> {unit} · {peakPoint.displayLabel} {peakPoint.subLabel}
           </div>
         )}
       </div>
@@ -70,15 +72,15 @@ export const TrendLineChart = ({
                         {formatChartMetric(primaryMetric, Number(point[primaryMetric]) || 0)}{' '}
                         <span className="text-[8px] opacity-40">{metricConfigByKey[primaryMetric].unit}</span>
                       </div>
-                      <div className="text-white/50">Sessions</div>
+                      <div className="text-white/50">{t('Sessions')}</div>
                       <div className="text-right text-white">{point.sessions}</div>
-                      <div className="text-white/50">Distance</div>
+                      <div className="text-white/50">{t('Distance')}</div>
                       <div className="text-right text-white">{point.distance?.toFixed?.(1) ?? point.distance} <span className="text-[8px] opacity-40">km</span></div>
-                      <div className="text-white/50">Duration</div>
+                      <div className="text-white/50">{t('Duration')}</div>
                       <div className="text-right text-white">{point.duration} <span className="text-[8px] opacity-40">min</span></div>
-                      <div className="text-white/50">Calories</div>
+                      <div className="text-white/50">{t('Calories')}</div>
                       <div className="text-right text-white">{point.calories} <span className="text-[8px] opacity-40">kcal</span></div>
-                      <div className="text-white/50">Cadence</div>
+                      <div className="text-white/50">{t('Cadence')}</div>
                       <div className="text-right text-white">{point.cadence} <span className="text-[8px] opacity-40">rpm</span></div>
                     </div>
                   </div>

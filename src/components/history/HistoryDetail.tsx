@@ -7,6 +7,7 @@ import { formatDate, formatDuration } from '../../utils/formatters';
 import { downloadTCX } from '../../lib/export-service';
 import { generateSessionInsights, getInsightToneClasses, getMetricDelta, getSessionOutcome, getWorkoutQuality, getZoneInsight } from '../../lib/workout-analysis';
 import { detectSessionAchievements } from '../../lib/milestone-records';
+import { hrrLevelKey } from '../../lib/hrr';
 import { ShareWorkoutCardModal } from './ShareWorkoutCardModal';
 import { useI18n } from '@/i18n';
 import type { HistoryData, WorkoutSession } from '@/store/useWorkoutStore';
@@ -59,8 +60,9 @@ const sampleHistoryForChart = (data: HistoryData[]): ChartPoint[] => {
 };
 
 const DeltaPill = ({ delta, unit = '', decimals = 0 }: { delta: ReturnType<typeof getMetricDelta>; unit?: string; decimals?: number }) => {
-  if (!delta) return <span className="text-[9px] font-mono uppercase text-white/30">No baseline</span>;
-  if (delta.direction === 'flat') return <span className="text-[9px] font-mono uppercase text-white/35">No change</span>;
+  const { t } = useI18n();
+  if (!delta) return <span className="text-[9px] font-mono uppercase text-white/30">{t('No baseline')}</span>;
+  if (delta.direction === 'flat') return <span className="text-[9px] font-mono uppercase text-white/35">{t('No change')}</span>;
 
   const sign = delta.direction === 'up' ? '+' : '';
   const color = delta.direction === 'up' ? 'text-green-400' : 'text-red-400';
@@ -158,7 +160,7 @@ export const HistoryDetail = ({
   const zoneInsight = getZoneInsight(fullStats.zones, t);
   const autoInsights = generateSessionInsights({ session, fullStats, previousSession, previousFullStats, maxHr, translate: t });
   const hrrScore = typeof session.stats?.hrrScore === 'number' ? session.stats.hrrScore : null;
-  const hrrClassification = session.stats?.hrrClassification || t('Not classified');
+  const hrrClassification = t(hrrLevelKey(session.stats?.hrrClassification));
 
   return (
     <>
@@ -180,7 +182,7 @@ export const HistoryDetail = ({
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-2xl font-bold tracking-tight uppercase font-mono">
-                  Workout <span className="text-hw-accent">Report</span>
+                  {t('Workout')} <span className="text-hw-accent">{t('Report')}</span>
                 </h2>
                 {achievements.sessionIndex > 0 && (
                   <span className="rounded border border-hw-accent/30 bg-hw-accent/10 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-hw-accent font-bold">

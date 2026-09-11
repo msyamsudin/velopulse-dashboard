@@ -1,5 +1,7 @@
 import { motion } from 'motion/react';
 import { Heart, Award, Activity, X } from 'lucide-react';
+import { useI18n } from '@/i18n';
+import { hrrLevelKey } from '@/lib/hrr';
 
 interface HrrModalProps {
   status: 'idle' | 'detecting' | 'buffer' | 'measuring' | 'complete';
@@ -24,6 +26,7 @@ export const HrrModal = ({
   currentHr,
   onClose,
 }: HrrModalProps) => {
+  const { t } = useI18n();
   if (status === 'idle' || status === 'detecting') return null;
 
   const getScoreColor = (score: number) => {
@@ -67,12 +70,12 @@ export const HrrModal = ({
         <div className="mb-6 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-hw-accent/20 bg-hw-accent/5 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-hw-accent">
             <Activity size={10} className="animate-pulse" />
-            Heart Rate Recovery
+            {t('Heart Rate Recovery')}
           </div>
           <h2 className="mt-3 text-lg font-bold text-white tracking-wide">
-            {status === 'buffer' && 'Persiapan Pemulihan'}
-            {status === 'measuring' && 'Mengukur Pemulihan'}
-            {status === 'complete' && 'Hasil Analisis Pemulihan'}
+            {status === 'buffer' && t('Recovery preparation')}
+            {status === 'measuring' && t('Measuring recovery')}
+            {status === 'complete' && t('Recovery analysis result')}
           </h2>
         </div>
 
@@ -117,7 +120,7 @@ export const HrrModal = ({
                   <span className="text-xs font-normal text-white/50 align-baseline">s</span>
                 </span>
                 <span className="text-[9px] font-mono uppercase tracking-wider text-hw-muted">
-                  {status === 'buffer' ? 'Persiapan' : 'Pengukuran'}
+                  {status === 'buffer' ? t('Preparation') : t('Measuring')}
                 </span>
               </div>
             </div>
@@ -129,7 +132,7 @@ export const HrrModal = ({
               </div>
 
               <div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">Skor HRR Anda</div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">{t('Your HRR score')}</div>
                 <div className="mt-1 font-mono text-6xl font-black tracking-tight text-white">
                   {hrrScore}
                   <span className="text-lg font-normal text-white/45 ml-1">bpm</span>
@@ -139,19 +142,19 @@ export const HrrModal = ({
               {/* Diagnosis box */}
               {hrrScore !== null && (
                 <div className={`mx-auto max-w-[280px] rounded-xl border p-3 text-center ${getScoreColor(hrrScore)}`}>
-                  <div className="text-[9px] font-mono uppercase tracking-[0.14em] opacity-60">Klasifikasi Jantung</div>
-                  <div className="mt-0.5 text-sm font-extrabold tracking-wide uppercase">{classification}</div>
+                  <div className="text-[9px] font-mono uppercase tracking-[0.14em] opacity-60">{t('Heart classification')}</div>
+                  <div className="mt-0.5 text-sm font-extrabold tracking-wide uppercase">{t(hrrLevelKey(classification))}</div>
                 </div>
               )}
 
               {/* Stats detail */}
               <div className="grid grid-cols-2 gap-4 rounded-xl border border-white/5 bg-white/2 p-3 font-mono text-xs w-full">
                 <div className="border-r border-white/5 pr-2">
-                  <div className="text-hw-muted text-[9px] uppercase tracking-wider">Detak Awal (Puncak)</div>
+                  <div className="text-hw-muted text-[9px] uppercase tracking-wider">{t('Peak HR (start)')}</div>
                   <div className="mt-1 text-sm font-bold text-white">{startHr} BPM</div>
                 </div>
                 <div className="pl-2">
-                  <div className="text-hw-muted text-[9px] uppercase tracking-wider">Detak Setelah 2 Mnt</div>
+                  <div className="text-hw-muted text-[9px] uppercase tracking-wider">{t('HR after 2 min')}</div>
                   <div className="mt-1 text-sm font-bold text-white">{endHr} BPM</div>
                 </div>
               </div>
@@ -163,19 +166,19 @@ export const HrrModal = ({
             <div className="mt-6 flex items-center gap-3 rounded-full border border-white/5 bg-white/2 px-4 py-2">
               <div className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
               <span className="font-mono text-xs text-hw-muted">
-                Detak jantung saat ini: <strong className="text-white">{currentHr || '--'} BPM</strong>
+                {t('Current heart rate:')} <strong className="text-white">{currentHr || '--'} BPM</strong>
               </span>
             </div>
           )}
 
           {/* Advice/Tip text */}
           <p className="mt-6 text-center text-xs leading-relaxed text-hw-muted px-4">
-            {status === 'buffer' && 'Kembalikan kayuhan pedal ke 0. Cari posisi istirahat ternyaman Anda sekarang (duduk santai atau bersandar).'}
-            {status === 'measuring' && 'Bernapaslah dengan santai dan dalam. Tetap diam, rileks, dan batasi gerakan tubuh Anda.'}
+            {status === 'buffer' && t('Return the pedals to 0. Find your most comfortable resting position now (sit back or lean).')}
+            {status === 'measuring' && t('Breathe slowly and deeply. Stay still, relaxed, and limit body movement.')}
             {status === 'complete' && hrrScore !== null && (
               hrrScore >= 18
-                ? 'Kapasitas pemulihan jantung yang baik! Ini menunjukkan sistem kardiovaskular Anda bekerja secara efisien.'
-                : 'Skor pemulihan sedikit rendah. Coba tingkatkan porsi kardio secara bertahap atau pastikan tubuh cukup istirahat.'
+                ? t('Good heart recovery capacity! This shows your cardiovascular system is working efficiently.')
+                : t('Recovery score is a little low. Build your cardio gradually or make sure you rest enough.')
             )}
           </p>
         </div>
@@ -187,7 +190,7 @@ export const HrrModal = ({
               onClick={onClose}
               className="w-full rounded-xl bg-hw-accent py-3.5 text-hw-bg font-bold hover:opacity-90 transition-opacity cursor-pointer"
             >
-              SELESAI & SIMPAN SESI
+              {t('FINISH & SAVE SESSION')}
             </button>
           </div>
         )}

@@ -665,6 +665,42 @@ const id: Record<string, string> = {
   '+{value} W higher average': 'rerata {value} W lebih tinggi',
   '+{value} km/h faster': '{value} km/jam lebih cepat',
   '+{value} bpm recovery score': 'skor pemulihan +{value} bpm',
+
+  // HRR classification codes (lib/hrr.ts)
+  'Excellent (athletic)': 'Sangat Baik (Atletis)',
+  'Good (normal)': 'Baik (Normal)',
+  'Fair': 'Cukup',
+  'Not optimal': 'Kurang Optimal',
+  'No change': 'Tidak berubah',
+  'Time': 'Waktu',
+  '{count} active periods': '{count} periode aktif',
+  'bar view': 'tampilan batang',
+  'line view': 'tampilan garis',
+
+  // HRR measurement modal
+  'Recovery preparation': 'Persiapan Pemulihan',
+  'Measuring recovery': 'Mengukur Pemulihan',
+  'Recovery analysis result': 'Hasil Analisis Pemulihan',
+  'Preparation': 'Persiapan',
+  'Measuring': 'Pengukuran',
+  'Your HRR score': 'Skor HRR Anda',
+  'Heart classification': 'Klasifikasi Jantung',
+  'Peak HR (start)': 'Detak Awal (Puncak)',
+  'HR after 2 min': 'Detak Setelah 2 Mnt',
+  'Current heart rate:': 'Detak jantung saat ini:',
+  'Return the pedals to 0. Find your most comfortable resting position now (sit back or lean).': 'Kembalikan kayuhan pedal ke 0. Cari posisi istirahat ternyaman Anda sekarang (duduk santai atau bersandar).',
+  'Breathe slowly and deeply. Stay still, relaxed, and limit body movement.': 'Bernapaslah dengan santai dan dalam. Tetap diam, rileks, dan batasi gerakan tubuh Anda.',
+  'Good heart recovery capacity! This shows your cardiovascular system is working efficiently.': 'Kapasitas pemulihan jantung yang baik! Ini menunjukkan sistem kardiovaskular Anda bekerja secara efisien.',
+  'Recovery score is a little low. Build your cardio gradually or make sure you rest enough.': 'Skor pemulihan sedikit rendah. Coba tingkatkan porsi kardio secara bertahap atau pastikan tubuh cukup istirahat.',
+  'FINISH & SAVE SESSION': 'SELESAI & SIMPAN SESI',
+
+  // Cockpit & settings leftovers
+  'Full telemetry cockpit mode': 'Mode kokpit telemetri lengkap',
+  'High-contrast large numbers interval mode': 'Mode interval angka besar kontras tinggi',
+  'Paste token here...': 'Tempel token di sini...',
+  'Import success! Reloading...': 'Impor berhasil! Memuat ulang...',
+  'Workout': 'Latihan',
+  'Report': 'Laporan',
 };
 
 type I18nValue = {

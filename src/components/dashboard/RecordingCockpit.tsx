@@ -414,7 +414,7 @@ export const RecordingCockpit = ({
                   ? 'bg-vp-accent text-vp-bg shadow-sm'
                   : 'text-vp-muted hover:text-vp-text'
               }`}
-              title="Full telemetry cockpit mode"
+              title={t('Full telemetry cockpit mode')}
             >
               <Minimize2 size={12} />
               <span>{t('Pro Cockpit')}</span>
@@ -427,7 +427,7 @@ export const RecordingCockpit = ({
                   ? 'bg-vp-accent text-vp-bg shadow-sm'
                   : 'text-vp-muted hover:text-vp-text'
               }`}
-              title="High-contrast large numbers interval mode"
+              title={t('High-contrast large numbers interval mode')}
             >
               <Maximize2 size={12} />
               <span>{t('Focus Mode')}</span>

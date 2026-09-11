@@ -12,6 +12,7 @@ import {
 } from '@/lib/share-card-canvas';
 import { detectSessionAchievements } from '@/lib/milestone-records';
 import { useI18n } from '@/i18n';
+import { hrrLevelKey } from '@/lib/hrr';
 
 interface ShareWorkoutCardModalProps {
   session: WorkoutSession;
@@ -54,6 +55,9 @@ export const ShareWorkoutCardModal = ({
     }
   }, [achievements]);
 
+  // The canvas has no translator, so the label is resolved here.
+  const hrrClassificationLabel = t(hrrLevelKey(session.stats?.hrrClassification));
+
   // Re-render canvas whenever options change
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -70,8 +74,9 @@ export const ShareWorkoutCardModal = ({
       showComparison,
       customNote,
       maxHr,
+      hrrClassificationLabel,
     });
-  }, [session, allSessions, previousSession, aspect, theme, showHr, showChart, showComparison, customNote, maxHr, achievements]);
+  }, [session, allSessions, previousSession, aspect, theme, showHr, showChart, showComparison, customNote, maxHr, achievements, hrrClassificationLabel]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -90,6 +95,7 @@ export const ShareWorkoutCardModal = ({
         showComparison,
         customNote,
         maxHr,
+        hrrClassificationLabel,
       }, filename);
       setNotice(t('Image downloaded successfully!'));
       setTimeout(() => setNotice(null), 3000);
@@ -114,6 +120,7 @@ export const ShareWorkoutCardModal = ({
         showComparison,
         customNote,
         maxHr,
+        hrrClassificationLabel,
       });
 
       if (!shared) {

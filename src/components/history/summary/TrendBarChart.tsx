@@ -1,4 +1,5 @@
 import type { MetricKey } from '@/lib/history-types';
+import { useI18n } from '@/i18n';
 import { metricConfigByKey } from './constants';
 import { formatChartMetric } from './format';
 import type { AverageLine, HistoryChartDataPoint } from './useHistorySummary';
@@ -26,17 +27,18 @@ export const TrendBarChart = ({
   metricColor,
   primaryMetric,
 }: TrendBarChartProps) => {
+  const { t } = useI18n();
   return (
     <div className="mt-2">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-black/20 px-4 py-2.5">
         <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-[0.16em] text-white/60">
-          <span>{activePeriods} active periods</span>
-          <span>bar view</span>
+          <span>{t('{count} active periods', { count: activePeriods })}</span>
+          <span>{t('bar view')}</span>
           <span>{metricConfigByKey[primaryMetric].name}</span>
         </div>
         {peakPoint && (
           <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50">
-            Peak: <span style={{ color: metricColor }} className="font-bold">{formatChartMetric(primaryMetric, Number(peakPoint[primaryMetric]) || 0)}</span> {unit} on {peakPoint.displayLabel} {peakPoint.subLabel}
+            {t('Peak')}: <span style={{ color: metricColor }} className="font-bold">{formatChartMetric(primaryMetric, Number(peakPoint[primaryMetric]) || 0)}</span> {unit} · {peakPoint.displayLabel} {peakPoint.subLabel}
           </div>
         )}
       </div>
@@ -70,15 +72,15 @@ export const TrendBarChart = ({
                     <div className="text-right text-white">
                       {formatChartMetric(primaryMetric, Number(day[primaryMetric]) || 0)} {metricConfigByKey[primaryMetric].unit}
                     </div>
-                    <div className="text-white/40">Sessions</div>
+                    <div className="text-white/40">{t('Sessions')}</div>
                     <div className="text-right text-white">{day.sessions}</div>
-                    <div className="text-white/40">Distance</div>
+                    <div className="text-white/40">{t('Distance')}</div>
                     <div className="text-right text-white">{day.distance.toFixed(1)} km</div>
-                    <div className="text-white/40">Duration</div>
+                    <div className="text-white/40">{t('Duration')}</div>
                     <div className="text-right text-white">{day.duration} min</div>
-                    <div className="text-white/40">Calories</div>
+                    <div className="text-white/40">{t('Calories')}</div>
                     <div className="text-right text-white">{day.calories} kcal</div>
-                    <div className="text-white/40">Cadence</div>
+                    <div className="text-white/40">{t('Cadence')}</div>
                     <div className="text-right text-white">{day.cadence} rpm</div>
                   </div>
                 </div>

@@ -233,9 +233,9 @@ export const RecordPacerPanel = ({
           <div className="flex items-center gap-2 font-mono text-xs">
             <span className="text-white font-bold">{targetInfo.title}</span>
             <span className="text-white/40">|</span>
-            <span className="text-vp-muted">Live: <strong className="text-white">{targetInfo.currentLabel}</strong></span>
+            <span className="text-vp-muted">{t('Live')}: <strong className="text-white">{targetInfo.currentLabel}</strong></span>
             <span className="text-white/40">/</span>
-            <span className="text-vp-muted">Target: <strong className="text-amber-300">{targetInfo.targetLabel}</strong></span>
+            <span className="text-vp-muted">{t('Target')}: <strong className="text-amber-300">{targetInfo.targetLabel}</strong></span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${targetInfo.isOnTrack ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
               {targetInfo.deltaLabel}
             </span>
