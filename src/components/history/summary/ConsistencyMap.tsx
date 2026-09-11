@@ -6,9 +6,11 @@ interface ConsistencyMapProps {
   weeklyDailyData: DailySummaryDay[];
   metricColor: string;
   weeklyMetric: MetricKey;
+  /** True when the map is rendered inside a disclosure that already shows the title. */
+  embedded?: boolean;
 }
 
-export const ConsistencyMap = ({ weeklyDailyData, metricColor, weeklyMetric }: ConsistencyMapProps) => {
+export const ConsistencyMap = ({ weeklyDailyData, metricColor, weeklyMetric, embedded = false }: ConsistencyMapProps) => {
   const { locale, t } = useI18n();
 
   const parseLocalDate = (date: string) => new Date(`${date}T00:00:00`);
@@ -26,13 +28,15 @@ export const ConsistencyMap = ({ weeklyDailyData, metricColor, weeklyMetric }: C
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Consistency Map')}</div>
-          <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/40">
-            {t('Daily activity pattern for the selected range')}
+      <div className={`mb-5 flex flex-wrap items-start justify-between gap-4 ${embedded ? 'justify-end' : ''}`}>
+        {!embedded && (
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">{t('Consistency Map')}</div>
+            <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.12em] text-white/40">
+              {t('Daily activity pattern for the selected range')}
+            </div>
           </div>
-        </div>
+        )}
         <div className="flex gap-2">
           {[
             { label: t('Active days'), value: `${activeDays}` },
@@ -73,7 +77,7 @@ export const ConsistencyMap = ({ weeklyDailyData, metricColor, weeklyMetric }: C
                       ? `color-mix(in srgb, var(--color-vp-accent) ${Math.round(opacity * 100)}%, transparent)`
                       : 'rgba(255,255,255,0.04)',
                   }}
-                  title={`${date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })} — ${day.sessions} sessions`}
+                  title={`${date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })} — ${day.sessions} ${t('sessions')}`}
                 >
                   <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-vp-surface-raised px-2.5 py-1.5 text-[9px] font-mono shadow-xl group-hover:block">
                     <div className="text-white/55">{date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
@@ -117,7 +121,7 @@ export const ConsistencyMap = ({ weeklyDailyData, metricColor, weeklyMetric }: C
                       ? 'border-vp-accent/20 bg-vp-accent/7 hover:border-vp-accent/35'
                       : 'border-white/7 bg-white/[0.025] hover:border-white/14'
                 }`}
-                title={`${day.label} ${day.shortDate} - ${day.sessions} sessions`}
+                title={`${day.label} ${day.shortDate} - ${day.sessions} ${t('sessions')}`}
               >
                 <div className="flex items-start justify-between gap-1">
                   <div className="min-w-0">

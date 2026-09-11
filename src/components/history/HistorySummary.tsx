@@ -1,21 +1,17 @@
+import { ChevronRight } from 'lucide-react';
+import { useI18n } from '@/i18n';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
-import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, MetricKey, SummaryInsights, WeeklyLoadPoint, WorkoutSession } from '@/lib/history-types';
+import type { ComparisonSummary, DailySummaryDay, GlobalSummary, HistoryChartPoint, MetricKey, SummaryInsights, WeeklyLoadPoint } from '@/lib/history-types';
 import type { SummaryPeriod, SummaryRange } from './summary/constants';
 import { useHistorySummary } from './summary/useHistorySummary';
 import { SummaryHeader } from './summary/SummaryHeader';
-import { QuickStats } from './summary/QuickStats';
-import { AutoInsights } from './summary/AutoInsights';
-import { PersonalRecords } from './summary/PersonalRecords';
-import { MilestoneProgressBanner } from './summary/MilestoneProgressBanner';
+import { RangeTotals } from './summary/RangeTotals';
 import { TrendChart } from './summary/TrendChart';
-import { TrainingLoadOverview } from './summary/TrainingLoadOverview';
 import { LoadGuidance } from './summary/LoadGuidance';
 import { HeartRateRecovery } from './summary/HeartRateRecovery';
-import { SummaryInsightsCard } from './summary/SummaryInsights';
+import { ConsistencyMap } from './summary/ConsistencyMap';
 
 export interface HistorySummaryProps {
-  sessions: WorkoutSession[];
-  onSelectSession?: (id: string) => void;
   globalSummary: GlobalSummary | null;
   summaryPeriod: SummaryPeriod;
   setSummaryPeriod: (period: SummaryPeriod) => void;
@@ -31,9 +27,21 @@ export interface HistorySummaryProps {
   trainingLoadMetrics: TrainingLoadMetrics;
 }
 
+const capitalize = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
+
+/**
+ * Summary view — four working blocks plus one collapsed detail:
+ *   1. RangeTotals      totals + deltas + per-session caption
+ *   2. TrendChart       one metric over one timeline
+ *   3. LoadGuidance     load, ratio, guidance
+ *   4. HeartRateRecovery
+ *   (collapsed) ConsistencyMap
+ *
+ * The header (and with it the only range selector) renders unconditionally, so
+ * an empty range can never trap the user on a blank page. Personal records and
+ * milestones live in the Records tab; nothing is deleted, only relocated.
+ */
 export const HistorySummary = ({
-  sessions,
-  onSelectSession,
   globalSummary,
   summaryPeriod,
   setSummaryPeriod,
@@ -48,6 +56,7 @@ export const HistorySummary = ({
   comparisonSummary,
   trainingLoadMetrics,
 }: HistorySummaryProps) => {
+  const { t } = useI18n();
   const {
     denseData,
     compactLabels,
@@ -63,10 +72,6 @@ export const HistorySummary = ({
     peakPoint,
     periodLabel,
     rangeLabel,
-    autoInsights,
-    recordSessions,
-    personalRecords,
-    trainingLoadChange,
     baselineDelta,
     baselineDeltaLabel,
     loadRatio,
@@ -79,48 +84,60 @@ export const HistorySummary = ({
     loadAnalysisDetail,
     loadAnalysisText,
   } = useHistorySummary({
-    sessions,
-    globalSummary,
     summaryPeriod,
     summaryRange,
     weeklyMetric,
     normalizedChartData,
-    weeklyDailyData,
     loadRatioWeeklyData,
-    summaryInsights,
     comparisonSummary,
     trainingLoadMetrics,
   });
 
   // Guard placed after the hook so hook order stays stable across renders.
-  if (!globalSummary) return null;
+  if (!globalSummary) {
+    return (
+      <div className="pb-8 flex flex-col gap-4">
+        <SummaryHeader
+          summaryRange={summaryRange}
+          setSummaryRange={setSummaryRange}
+          sessionCount={0}
+          rangeLabel={rangeLabel}
+          headline={t('No sessions in this range')}
+        />
+        <div className="rounded-xl border border-dashed border-white/12 px-4 py-10 text-center">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">
+            {t('Try a wider range or record a workout')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // One sentence for the header: the range comparison followed by the current
+  // load readout. The insight engine that used to feed this line is gone —
+  // every number it described (deltas, averages, streak, volume) now lives in
+  // RangeTotals directly below, so a second phrasing would only duplicate it.
+  const comparisonSentence = comparisonSummary
+    ? `${comparisonSummary.headline} ${comparisonSummary.label}`
+    : '';
+  const headline = capitalize(
+    [comparisonSentence, loadAnalysisSummary].filter(Boolean).join(' · ')
+  );
 
   return (
     <div className="pb-8 flex flex-col gap-4">
       <SummaryHeader
         summaryRange={summaryRange}
         setSummaryRange={setSummaryRange}
-      />
-
-      <MilestoneProgressBanner sessions={sessions} />
-
-      <QuickStats
-        summaryInsights={summaryInsights}
-        metricColor={metricColor}
-      />
-
-      {autoInsights.length > 0 && (
-        <AutoInsights
-          autoInsights={autoInsights}
-          rangeLabel={rangeLabel}
-        />
-      )}
-
-      <PersonalRecords
-        personalRecords={personalRecords}
-        onSelectSession={onSelectSession}
+        sessionCount={globalSummary.totalSessions}
         rangeLabel={rangeLabel}
-        recordCount={recordSessions.length}
+        headline={headline}
+      />
+
+      <RangeTotals
+        globalSummary={globalSummary}
+        comparisonSummary={comparisonSummary}
+        summaryInsights={summaryInsights}
       />
 
       <TrendChart
@@ -144,12 +161,25 @@ export const HistorySummary = ({
         effectiveChartType={effectiveChartType}
       />
 
-      <TrainingLoadOverview
-        globalSummary={globalSummary}
-        trainingLoadChange={trainingLoadChange}
-        comparisonLabel={comparisonSummary?.label ?? ''}
-        rangeLabel={rangeLabel}
-      />
+      {summaryPeriod === 'daily' && weeklyDailyData.length > 0 && (
+        <details className="group rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
+          <summary className="vp-focus-ring flex cursor-pointer list-none items-center gap-2 text-[9px] font-mono uppercase tracking-[0.2em] text-hw-muted">
+            <ChevronRight size={12} className="transition-transform group-open:rotate-90" />
+            {t('Consistency Map')}
+            <span className="tracking-[0.12em] text-white/25">
+              {t('Daily activity pattern for the selected range')}
+            </span>
+          </summary>
+          <div className="mt-4">
+            <ConsistencyMap
+              weeklyDailyData={weeklyDailyData}
+              metricColor={metricColor}
+              weeklyMetric={weeklyMetric}
+              embedded
+            />
+          </div>
+        </details>
+      )}
 
       <LoadGuidance
         trainingLoadMetrics={trainingLoadMetrics}
@@ -169,16 +199,6 @@ export const HistorySummary = ({
       {globalSummary.hrrSessions > 0 && (
         <HeartRateRecovery globalSummary={globalSummary} />
       )}
-
-      <SummaryInsightsCard
-        comparisonSummary={comparisonSummary}
-        summaryInsights={summaryInsights}
-        summaryPeriod={summaryPeriod}
-        weeklyDailyData={weeklyDailyData}
-        rangeLabel={rangeLabel}
-        metricColor={metricColor}
-        weeklyMetric={weeklyMetric}
-      />
     </div>
   );
 };

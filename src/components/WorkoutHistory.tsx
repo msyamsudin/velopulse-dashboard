@@ -586,8 +586,6 @@ export const WorkoutHistory = ({
             ) : (
               <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
                 <HistorySummary 
-                  sessions={sessions}
-                  onSelectSession={setSelectedSessionId}
                   globalSummary={globalSummary}
                   summaryPeriod={summaryPeriod}
                   setSummaryPeriod={setSummaryPeriod}

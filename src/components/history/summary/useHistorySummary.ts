@@ -2,24 +2,13 @@ import { useMemo } from 'react';
 import { useI18n } from '@/i18n';
 import type {
   ComparisonSummary,
-  DailySummaryDay,
-  GlobalSummary,
   HistoryChartPoint,
   MetricKey,
-  SummaryInsights,
   WeeklyLoadPoint,
-  WorkoutSession,
 } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
-import { generateSummaryInsights, getPersonalRecords, type PersonalRecord } from '@/lib/workout-analysis';
-import { metricConfigByKey, METRIC_OPTIONS, RECORD_RANGE_DAYS, type MetricOption, type SummaryPeriod, type SummaryRange } from './constants';
+import { metricConfigByKey, METRIC_OPTIONS, type MetricOption, type SummaryPeriod, type SummaryRange } from './constants';
 import { formatChartMetric } from './format';
-
-export type SummaryInsight = {
-  title: string;
-  body: string;
-  tone: 'good' | 'watch' | 'neutral';
-};
 
 export type HistoryChartDataPoint = HistoryChartPoint & {
   scaledValues: Record<MetricKey, number>;
@@ -41,31 +30,23 @@ export interface LoadRatioDot {
 }
 
 export interface UseHistorySummaryInput {
-  sessions: WorkoutSession[];
-  globalSummary: GlobalSummary | null;
   summaryPeriod: SummaryPeriod;
   summaryRange: SummaryRange;
   weeklyMetric: MetricKey;
   normalizedChartData: HistoryChartPoint[];
-  weeklyDailyData: DailySummaryDay[];
   loadRatioWeeklyData: WeeklyLoadPoint[];
-  summaryInsights: SummaryInsights | null;
   comparisonSummary: ComparisonSummary | null;
   trainingLoadMetrics: TrainingLoadMetrics;
 }
 
 export const useHistorySummary = (input: UseHistorySummaryInput) => {
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const {
-    sessions,
-    globalSummary,
     summaryPeriod,
     summaryRange,
     weeklyMetric,
     normalizedChartData,
-    weeklyDailyData,
     loadRatioWeeklyData,
-    summaryInsights,
     comparisonSummary,
     trainingLoadMetrics,
   } = input;
@@ -167,35 +148,8 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
         : summaryRange === '1y'
           ? '1 year'
           : 'all time');
-  const autoInsights = useMemo(() => generateSummaryInsights({
-    comparisonSummary,
-    summaryInsights,
-    globalSummary,
-    weeklyDailyData,
-    rangeLabel,
-    translate: t,
-  }), [comparisonSummary, summaryInsights, globalSummary, weeklyDailyData, rangeLabel, t]);
-  // Personal Records scope matches the selected range 1:1 so the label
-  // "Best efforts from the selected period" stays accurate.
-  const recordRange = summaryRange;
-  const recordSessions = useMemo(() => {
-    const days = RECORD_RANGE_DAYS[recordRange];
-    if (days === null) return sessions;
-
-    const start = new Date();
-    start.setDate(start.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
-
-    return sessions.filter(session => {
-      const sessionDate = new Date(session.date);
-      return !Number.isNaN(sessionDate.getTime()) && sessionDate >= start;
-    });
-  }, [sessions, recordRange]);
-  const personalRecords: PersonalRecord[] = useMemo(() => getPersonalRecords(recordSessions, locale), [recordSessions, locale]);
+  // Training-load delta reused by the ratio delta badge in Load Guidance.
   const trainingLoadDelta = comparisonSummary?.deltas.trimp;
-  const trainingLoadChange = trainingLoadDelta?.hasBaseline
-    ? `${trainingLoadDelta.direction === 'up' ? '+' : ''}${trainingLoadDelta.value}%`
-    : (globalSummary?.totalTrainingLoad ?? 0) > 0 ? t('New baseline') : t('No load');
   const baselineDelta = trainingLoadMetrics.chronicLoad > 0
     ? Math.round(((trainingLoadMetrics.acuteLoad - trainingLoadMetrics.chronicLoad) / trainingLoadMetrics.chronicLoad) * 100)
     : null;
@@ -272,15 +226,12 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
     });
 
   return {
-    t,
-    locale,
     denseData,
     compactLabels,
     labelInterval,
     primaryMetric,
     selectedMetrics,
     chartData,
-    chartStats,
     unit,
     metricColor,
     effectiveChartType,
@@ -289,15 +240,9 @@ export const useHistorySummary = (input: UseHistorySummaryInput) => {
     peakPoint,
     periodLabel,
     rangeLabel,
-    autoInsights,
-    recordSessions,
-    personalRecords,
-    trainingLoadChange,
     baselineDelta,
     baselineDeltaLabel,
     loadRatio,
-    loadRatioValue,
-    loadRatioNeedle,
     loadRatioStatus,
     loadRatioDelta,
     loadRatioChartData,

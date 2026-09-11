@@ -475,6 +475,40 @@ const id: Record<string, string> = {
   'Already have an account? Sign in': 'Sudah punya akun? Masuk',
   'Continue without account': 'Lanjutkan tanpa akun',
   'Check your email to confirm your account.': 'Periksa email Anda untuk mengonfirmasi akun.',
+
+  // Summary — range totals block (Fase 5) & empty state
+  'Range totals': 'Total rentang',
+  'Try a wider range or record a workout': 'Coba rentang yang lebih luas atau rekam latihan',
+
+  // Records — milestone progress banner
+  'Upcoming Milestones': 'Milestone Mendatang',
+  'Targets on your cycling journey': 'Target perjalanan bersepeda Anda',
+  '{count} Sessions Total': 'Total {count} Sesi',
+  '{remaining} {unit} remaining': 'Sisa {remaining} {unit}',
+  'Almost there!': 'Hampir tercapai!',
+  'rides': 'sesi',
+  'First Ride': 'Ride Pertama',
+  '10 Rides': '10 Ride',
+  'Quarter Century': 'Seperempat Abad',
+  'Half Century': 'Setengah Abad',
+  'Centurion Club': 'Klub Centurion',
+  'Double Centurion': 'Centurion Ganda',
+  '250 Rides': '250 Ride',
+  'Grand Master': 'Grand Master',
+  'Legendary Rider': 'Pesepeda Legendaris',
+  '50 KM Total': 'Total 50 KM',
+  '100 KM Century': 'Century 100 KM',
+  '250 KM': '250 KM',
+  '500 KM': '500 KM',
+  '1,000 KM Club': 'Klub 1.000 KM',
+  '2,500 KM Odyssey': 'Odisse 2.500 KM',
+  '5,000 KM Epic': 'Epik 5.000 KM',
+  '10,000 KM Titan': 'Titan 10.000 KM',
+  '5,000 KCAL': '5.000 KCAL',
+  '10,000 KCAL': '10.000 KCAL',
+  '25,000 KCAL': '25.000 KCAL',
+  '50,000 KCAL': '50.000 KCAL',
+  '100,000 KCAL': '100.000 KCAL',
 };
 
 type I18nValue = {

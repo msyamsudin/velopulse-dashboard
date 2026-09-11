@@ -1,4 +1,4 @@
-import { Trophy, ChevronRight, Award, Target } from 'lucide-react';
+import { Trophy, Award } from 'lucide-react';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import { getUpcomingMilestones } from '@/lib/milestone-records';
 import { useI18n } from '@/i18n';
@@ -7,14 +7,18 @@ interface MilestoneProgressBannerProps {
   sessions: WorkoutSession[];
 }
 
+/**
+ * Upcoming all-time milestones. Lives in the Records tab (not Summary): it is
+ * cumulative, all-time information while the Summary reports on a range.
+ */
 export const MilestoneProgressBanner = ({ sessions }: MilestoneProgressBannerProps) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const upcoming = getUpcomingMilestones(sessions);
 
   if (upcoming.length === 0) return null;
 
   return (
-    <div className="hardware-card border-hw-muted/20 p-4 bg-gradient-to-r from-black/40 via-black/20 to-black/40">
+    <div className="rounded-xl border border-white/8 bg-gradient-to-r from-black/40 via-black/20 to-black/40 p-4">
       <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/5 pb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-amber-400/10 border border-amber-400/20 text-amber-300">
@@ -54,8 +58,8 @@ export const MilestoneProgressBanner = ({ sessions }: MilestoneProgressBannerPro
               </div>
 
               <div className="mt-2 text-base font-bold font-mono text-white tabular-nums">
-                {m.current.toLocaleString()}{' '}
-                <span className="text-xs font-normal text-white/40">/ {m.target.toLocaleString()} {m.unit}</span>
+                {m.current.toLocaleString(locale)}{' '}
+                <span className="text-xs font-normal text-white/40">/ {m.target.toLocaleString(locale)} {m.unit}</span>
               </div>
             </div>
 
@@ -73,7 +77,7 @@ export const MilestoneProgressBanner = ({ sessions }: MilestoneProgressBannerPro
               </div>
 
               <div className="mt-1.5 text-[9px] font-mono text-white/40 flex items-center justify-between">
-                <span>{t('{remaining} {unit} remaining', { remaining: m.remaining.toLocaleString(), unit: m.unit })}</span>
+                <span>{t('{remaining} {unit} remaining', { remaining: m.remaining.toLocaleString(locale), unit: t(m.unit) })}</span>
                 {m.progressPercent >= 90 && (
                   <span className="text-amber-300 font-bold animate-pulse">{t('Almost there!')}</span>
                 )}

@@ -6,6 +6,7 @@ import { getPersonalRecords, type PersonalRecord } from '@/lib/workout-analysis'
 import { formatDuration } from '@/utils/formatters';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import { RANGE_OPTIONS, RECORD_RANGE_DAYS, type SummaryRange } from './summary/constants';
+import { MilestoneProgressBanner } from './MilestoneProgressBanner';
 
 interface RecordsOverviewProps {
   sessions: WorkoutSession[];
@@ -88,6 +89,8 @@ export const RecordsOverview = ({ sessions, onSelectSession }: RecordsOverviewPr
 
   return (
     <div className="pb-8 flex flex-col gap-4">
+      <MilestoneProgressBanner sessions={sessions} />
+
       {/* Header: title + period selector */}
       <div className="flex flex-col gap-3 rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
