@@ -3,10 +3,12 @@ import type { ReactNode } from 'react';
 import { Trophy, Timer, Route, Flame, Zap, Gauge, Activity, ChevronRight } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { getPersonalRecords, type PersonalRecord } from '@/lib/workout-analysis';
+import { summarizeBestEfforts } from '@/lib/best-efforts';
 import { formatDuration } from '@/utils/formatters';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import { RANGE_OPTIONS, RECORD_RANGE_DAYS, type SummaryRange } from './summary/constants';
 import { MilestoneProgressBanner } from './MilestoneProgressBanner';
+import { BestEfforts } from './BestEfforts';
 
 interface RecordsOverviewProps {
   sessions: WorkoutSession[];
@@ -86,6 +88,11 @@ export const RecordsOverview = ({ sessions, onSelectSession }: RecordsOverviewPr
     () => getPersonalRecords(recordSessions, locale),
     [recordSessions, locale]
   );
+
+  // Sustained-power windows and fastest splits over the same scope as the
+  // single-number records above. Per-session results are memoised by session
+  // identity inside the module, so switching ranges does not rescan series.
+  const bestEfforts = useMemo(() => summarizeBestEfforts(recordSessions), [recordSessions]);
 
   return (
     <div className="pb-8 flex flex-col gap-4">
@@ -174,6 +181,8 @@ export const RecordsOverview = ({ sessions, onSelectSession }: RecordsOverviewPr
           </div>
         </div>
       )}
+
+      <BestEfforts bestEfforts={bestEfforts} onSelectSession={onSelectSession} />
 
       <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-white/35">
         {t('{count} sessions in record scope', { count: recordSessions.length })} · {t('Range')}: {rangeLabel}

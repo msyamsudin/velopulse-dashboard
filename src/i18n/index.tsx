@@ -737,6 +737,22 @@ const id: Record<string, string> = {
   'Peak W/kg': 'Puncak W/kg',
   'kcal/kg/h': 'kkal/kg/jam',
   'Add your weight in Settings to see W/kg and kcal/kg per hour.': 'Isi berat badan di Pengaturan untuk melihat W/kg dan kkal/kg per jam.',
+
+  // Best-efforts curve (Fase 6.2). Window/split labels come from
+  // lib/best-efforts.ts and are rendered through t(effort.label).
+  'Best efforts': 'Upaya terbaik',
+  'Sustained windows and fastest splits in the record scope': 'Jendela daya bertahan dan split tercepat dalam cakupan rekor',
+  'Sustained power': 'Daya bertahan',
+  'Fastest splits': 'Split tercepat',
+  'No power data in this scope': 'Belum ada data daya pada cakupan ini',
+  'No distance data in this scope': 'Belum ada data jarak pada cakupan ini',
+  '5 min': '5 menit',
+  '10 min': '10 menit',
+  '20 min': '20 menit',
+  '60 min': '60 menit',
+  '1 km': '1 km',
+  '5 km': '5 km',
+  '10 km': '10 km',
 };
 
 type I18nValue = {
