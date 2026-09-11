@@ -3,7 +3,7 @@ import { useI18n } from '@/i18n';
 import type { AdvancedSummary, IntensitySummary } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
 import { formatDuration } from '@/utils/formatters';
-import { Sparkline } from './Sparkline';
+import { LoadTrendChart } from './LoadTrendChart';
 
 const CTL_COLOR = '#35f0bd';
 const ATL_COLOR = '#f5c542';
@@ -101,18 +101,19 @@ export const AdvancedAnalysis = ({ intensity, advanced, trainingLoadMetrics, ran
         </div>
 
         <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">
-              {t('Fitness & fatigue')}
-            </div>
-            <Sparkline
-              series={[
-                { values: loadTrend.ctlSeries, color: CTL_COLOR },
-                { values: loadTrend.atlSeries, color: ATL_COLOR },
-              ]}
-              label={t('Fitness & fatigue')}
-              width={104}
-              height={28}
+          <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">
+            {t('Fitness & fatigue')}
+          </div>
+          {/* The area between the lines is TSB itself: emerald while fitness
+              holds above fatigue, amber while fatigue is on top. It replaced the
+              sparkline so the same two series are not drawn twice. */}
+          <div className="mt-2">
+            <LoadTrendChart
+              ctlSeries={loadTrend.ctlSeries}
+              atlSeries={loadTrend.atlSeries}
+              label={t('Fitness and fatigue over the last {count} days', { count: loadTrend.days })}
+              width={320}
+              height={96}
             />
           </div>
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.12em] text-white/45">

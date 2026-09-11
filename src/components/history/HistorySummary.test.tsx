@@ -431,6 +431,10 @@ describe('HistorySummary', () => {
     expect(screen.getByText('61.2')).toBeInTheDocument();
     expect(screen.getByText('-8.8')).toBeInTheDocument();
     expect(screen.getByText(/Neutral/)).toBeInTheDocument();
+    // The fitness card carries the area chart, not a second copy of the series:
+    // one band segment (CTL below ATL throughout the fixture) plus both lines.
+    const chart = screen.getByRole('img', { name: 'Fitness and fatigue over the last 90 days' });
+    expect(chart.querySelectorAll('path')).toHaveLength(3);
     // Repetition risk and strain moved here from the load card.
     expect(screen.getByText('1.20')).toBeInTheDocument();
     expect(screen.getByText('144')).toBeInTheDocument();

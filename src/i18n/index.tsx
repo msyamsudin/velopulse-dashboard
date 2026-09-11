@@ -756,6 +756,9 @@ const id: Record<string, string> = {
   // Zone mix per session type (Fase 6.3)
   'Zone mix by session type': 'Komposisi zona per tipe sesi',
   'No heart-rate data': 'Belum ada data detak jantung',
+
+  // Fitness/fatigue chart (Fase 6.4)
+  'Fitness and fatigue over the last {count} days': 'Kebugaran dan kelelahan selama {count} hari terakhir',
 };
 
 type I18nValue = {
