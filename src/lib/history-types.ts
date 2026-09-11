@@ -1,7 +1,13 @@
 import type { LoadTrend, TrainingLoadMetrics, TrainingLoadResult } from '@/lib/training-load';
+import type { BodyMetrics } from '@/lib/body-metrics';
+import type { PowerZoneShare } from '@/lib/power-zones';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 export type { WorkoutSession };
+// Re-exported so view components import every Summary payload type from one
+// place, the same way WorkoutSession is exposed here.
+export type { BodyMetrics } from '@/lib/body-metrics';
+export type { PowerZoneShare, PowerZoneSummary } from '@/lib/power-zones';
 
 export type MetricKey = 'distance' | 'calories' | 'duration' | 'cadence' | 'trimp';
 
@@ -118,6 +124,18 @@ export interface IntensitySummary {
   hardShare: number;
   /** Sessions bucketed by their quality label. */
   sessionTypes: { easy: number; moderate: number; hard: number };
+  /**
+   * Power-zone distribution (Z1–Z7 from POWER_ZONES). Empty while the rider has
+   * no FTP: with `ftp <= 0` all samples would fall into Z1, so no distribution
+   * is reported at all (see `hasFtp`).
+   */
+  powerZones: PowerZoneShare[];
+  /** Seconds attributed to a power zone (samples with power > 0 only). */
+  powerCountedSeconds: number;
+  /** Recorded seconds with no usable power sample (coasting or no power source). */
+  powerBelowZoneSeconds: number;
+  /** False when the FTP gate is closed; the UI shows a prompt instead of zones. */
+  hasFtp: boolean;
 }
 
 /** How many sessions in the range actually carry each data source. */
@@ -132,6 +150,13 @@ export interface CoverageSummary {
 export interface AdvancedSummary {
   coverage: CoverageSummary;
   loadTrend: LoadTrend;
+  /**
+   * W/kg and kcal/kg/h for the range. Null while the rider has no body weight:
+   * a per-kilogram figure divided by zero carries no information.
+   */
+  bodyMetrics: BodyMetrics | null;
+  /** False when the weight gate is closed; the L2 panel shows a prompt instead. */
+  hasWeight: boolean;
 }
 
 export interface GlobalSummary {

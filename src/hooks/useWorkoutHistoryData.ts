@@ -2,6 +2,9 @@ import { useMemo } from 'react';
 import { formatDuration } from '../utils/formatters';
 import { HR_ZONES, getSafeMaxHr } from '@/lib/constants';
 import { calculateEdwardsTrimp, calculateLoadTrend, calculateTrainingLoadMetrics, LOAD_TREND_DAYS } from '@/lib/training-load';
+import { computeBodyMetrics } from '@/lib/body-metrics';
+import { summarizePowerZones } from '@/lib/power-zones';
+import { getProfileGate } from '@/lib/profile-gate';
 import { getFinalMetrics, getWorkoutQuality } from '@/lib/workout-analysis';
 import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
@@ -25,6 +28,14 @@ import type {
 interface UseWorkoutHistoryDataProps {
   sessions: WorkoutSession[];
   maxHr: number;
+  /**
+   * Rider FTP, used for the power-zone distribution. 0 means "not set": the
+   * block reports no zones and the UI asks for the value instead of showing an
+   * all-Z1 chart.
+   */
+  ftp?: number;
+  /** Rider body weight, gating W/kg and kcal/kg/h. 0 means "not set". */
+  weight?: number;
   summaryPeriod: 'yearly' | 'monthly' | 'weekly' | 'daily';
   summaryRange: '7d' | '30d' | '90d' | '1y' | 'all';
   weeklyMetric: MetricKey;
@@ -105,8 +116,13 @@ const buildZoneStats = (maxHr: number) => {
  */
 const fullStatsCache = new WeakMap<WorkoutSession, { maxHr: number; stats: FullWorkoutStats }>();
 
-export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryRange, offsetDays = 0 }: UseWorkoutHistoryDataProps): WorkoutHistoryData => {
+export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, summaryPeriod, summaryRange, offsetDays = 0 }: UseWorkoutHistoryDataProps): WorkoutHistoryData => {
   const { locale, t } = useI18n();
+
+  // One definition of "which metric inputs are usable" for the whole app; the
+  // hook only forwards the derived flags so no component has to re-test the
+  // raw numbers.
+  const profileGate = useMemo(() => getProfileGate({ ftp, weight }), [ftp, weight]);
 
   const calculateFullStats = useMemo(() => (session: WorkoutSession): FullWorkoutStats => {
     const history = session.history || [];
@@ -503,9 +519,10 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     };
   }, [summaryData, filteredSessions, trainingLoadMetrics]);
 
-  // Intensity composition of the range: time in each HR zone plus the
-  // easy/tempo/hard session mix. Both come from data that is already computed
-  // (calculateFullStats is cached per session), so this is one cheap pass.
+  // Intensity composition of the range: time in each HR zone, the
+  // easy/tempo/hard session mix, and the power-zone distribution. All three
+  // come from data that is already computed or from one cheap pass over the
+  // session histories; the power block stays empty while the FTP gate is shut.
   const intensity = useMemo<IntensitySummary>(() => {
     const zoneSeconds = HR_ZONES.map(() => 0);
     const sessionTypes = { easy: 0, moderate: 0, hard: 0 };
@@ -540,6 +557,11 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     const easySeconds = (zoneSeconds[0] ?? 0) + (zoneSeconds[1] ?? 0);
     const hardSeconds = (zoneSeconds[lastZone - 1] ?? 0) + (zoneSeconds[lastZone] ?? 0);
 
+    const power = summarizePowerZones(
+      filteredSessions.map(session => ({ history: session.history || [], duration: session.duration || 0 })),
+      ftp
+    );
+
     return {
       zones,
       countedSeconds,
@@ -547,8 +569,12 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
       easyShare: countedSeconds > 0 ? easySeconds / countedSeconds : 0,
       hardShare: countedSeconds > 0 ? hardSeconds / countedSeconds : 0,
       sessionTypes,
+      powerZones: power.zones,
+      powerCountedSeconds: power.countedSeconds,
+      powerBelowZoneSeconds: power.belowZoneSeconds,
+      hasFtp: profileGate.hasFtp,
     };
-  }, [filteredSessions, calculateFullStats, maxHr]);
+  }, [filteredSessions, calculateFullStats, maxHr, ftp, profileGate]);
 
   // 90 days of daily TRIMP ending today, for the fitness/fatigue model. Load
   // guidance keeps its own 28-day window; this one is deliberately longer and,
@@ -580,8 +606,35 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
     return calculateLoadTrend(Array.from(dailyLoads.values()));
   }, [sessions, offsetDays, calculateFullStats]);
 
-  // L2 payload: how much of the range is actually backed by data, plus the
-  // fitness/fatigue model. Coverage is range-scoped; the model is not.
+  // Body-mass normalised metrics (W/kg, kcal/kg/h). Computed in its own pass so
+  // that a rider without a weight never pays for the calorie scan, and skipped
+  // entirely while the gate is shut: no per-kilogram figure is ever divided by
+  // an empty profile.
+  const bodyMetrics = useMemo(() => {
+    if (!profileGate.hasWeight) return null;
+
+    let totalSeconds = 0;
+    let totalCalories = 0;
+    // Session stats are the single source for average/peak power (the same
+    // values the session list and detail view show), so a W/kg figure can never
+    // contradict the watts printed next to it.
+    const bodySessions = filteredSessions.map(session => {
+      const duration = session.duration || 0;
+      totalSeconds += duration;
+      totalCalories += calculateFullStats(session).totalCalories || 0;
+      return {
+        avgPower: session.stats?.avgPower || 0,
+        maxPower: session.stats?.maxPower || 0,
+        duration,
+      };
+    });
+
+    return computeBodyMetrics({ sessions: bodySessions, totalSeconds, totalCalories, weightKg: weight });
+  }, [filteredSessions, calculateFullStats, profileGate.hasWeight, weight]);
+
+  // L2 payload: how much of the range is actually backed by data, the
+  // fitness/fatigue model, and the body-mass normalised metrics. Coverage and
+  // W/kg are range-scoped; the model is not.
   const advanced = useMemo<AdvancedSummary>(() => {
     let withHeartRate = 0;
     let withPower = 0;
@@ -599,8 +652,10 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, summaryPeriod, summaryR
         withHrr: globalSummary?.hrrSessions ?? 0,
       },
       loadTrend,
+      bodyMetrics,
+      hasWeight: profileGate.hasWeight,
     };
-  }, [filteredSessions, globalSummary, loadTrend]);
+  }, [filteredSessions, globalSummary, loadTrend, bodyMetrics, profileGate]);
 
   const summaryInsights = useMemo<SummaryInsights | null>(() => {
     if (filteredSessions.length === 0 || summaryData.length === 0) return null;

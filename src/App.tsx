@@ -331,6 +331,8 @@ export default function App() {
             sessions={sessionHistory}
             onClose={() => setShowHistory(false)}
             maxHr={userProfile.maxHr}
+            ftp={userProfile.ftp}
+            weight={userProfile.weight}
             onSyncSupabasePending={syncPendingSupabaseSessions}
             onLoadMoreSupabaseHistory={loadMoreHistoryFromSupabase}
             hasMoreSupabaseHistory={hasMoreSupabaseHistory}

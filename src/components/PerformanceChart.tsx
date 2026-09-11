@@ -14,6 +14,7 @@ import type { TooltipPayloadEntry } from 'recharts';
 import type { HistoryData } from '@/store/useWorkoutStore';
 import { downsample } from '../lib/chart-utils';
 import { HR_ZONES, POWER_ZONES, getSafeMaxHr } from '@/lib/constants';
+import { getProfileGate } from '@/lib/profile-gate';
 import { EmptyState, IconButton, SegmentedControl, StatusPill } from './ui';
 
 interface PerformanceChartProps {
@@ -120,6 +121,7 @@ export const PerformanceChart = ({
 
   const powerZones = useMemo(() => getPowerZones(userFtp), [userFtp]);
   const hrZones    = useMemo(() => getHrZones(userMaxHr),  [userMaxHr]);
+  const hasFtp = getProfileGate({ ftp: userFtp }).hasFtp;
 
   return (
     <div className="vp-panel-raised h-full flex flex-col">
@@ -158,14 +160,19 @@ export const PerformanceChart = ({
               />
             )}
             <div className="flex items-center gap-1 rounded-lg border border-vp-border bg-white/[0.03] p-1">
-              <button
-                onClick={() => setShowPowerZones(v => !v)}
-                className={`vp-focus-ring rounded-md px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] transition-colors ${
-                  showPowerZones ? 'bg-vp-power/15 text-vp-power' : 'text-vp-muted hover:text-vp-text'
-                }`}
-              >
-                FTP
-              </button>
+              {/* No FTP → no power-zone bands to toggle: every band would
+                  collapse onto zero and read as a full Z1 ride. The same gate
+                  the Summary block uses keeps the two surfaces consistent. */}
+              {hasFtp && (
+                <button
+                  onClick={() => setShowPowerZones(v => !v)}
+                  className={`vp-focus-ring rounded-md px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] transition-colors ${
+                    showPowerZones ? 'bg-vp-power/15 text-vp-power' : 'text-vp-muted hover:text-vp-text'
+                  }`}
+                >
+                  FTP
+                </button>
+              )}
               <button
                 onClick={() => setShowHrZones(v => !v)}
                 className={`vp-focus-ring rounded-md px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] transition-colors ${
@@ -240,7 +247,7 @@ export const PerformanceChart = ({
               />
 
               {/* FTP Power Zone Bands (right axis) */}
-              {showPowerZones && powerZones.map(zone => (
+              {hasFtp && showPowerZones && powerZones.map(zone => (
                 <ReferenceArea
                   key={`ftp-${zone.label}`}
                   yAxisId="right"

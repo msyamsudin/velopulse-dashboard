@@ -1,7 +1,8 @@
 import { motion } from 'motion/react';
-import { Save, Target, User, Zap } from 'lucide-react';
+import { AlertTriangle, Save, Target, User, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { calculateMaxHr } from '@/lib/constants';
+import { getProfileGate } from '@/lib/profile-gate';
 import { useI18n } from '@/i18n';
 
 interface UserProfile {
@@ -53,6 +54,9 @@ const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }:
 
 export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError }: ProfileTabProps) => {
   const { t } = useI18n();
+  // FTP and weight gate *metrics*, not riding: the notice explains what stays
+  // hidden, it never disables anything in this form or on the cockpit.
+  const gate = getProfileGate(profile);
   return (
     <motion.div
       key="profile"
@@ -102,6 +106,22 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError 
       <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
         {t('Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.')}
       </div>
+
+      {!gate.complete && (
+        <div className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-3">
+          <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-amber-300">
+            <AlertTriangle size={12} />
+            {t('Profile incomplete')}
+          </div>
+          <ul className="mt-2 space-y-1 text-[11px] leading-5 text-vp-muted">
+            {!gate.hasFtp && <li>· {t('Add your FTP to unlock the power-zone block.')}</li>}
+            {!gate.hasWeight && <li>· {t('Add your weight to unlock W/kg and kcal/kg/h.')}</li>}
+          </ul>
+          <p className="mt-1 text-[10px] leading-4 text-vp-muted">
+            {t('Training is never blocked; these values only gate power and body-mass metrics.')}
+          </p>
+        </div>
+      )}
 
       {saveError && saveStatus === 'error' && (
         <div className="rounded-lg border border-vp-danger/30 bg-vp-danger/10 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-danger">

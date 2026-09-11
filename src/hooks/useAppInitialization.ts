@@ -49,12 +49,16 @@ export const useAppInitialization = () => {
         return res.json();
       })
       .then(data => {
-        if (data && !data.error && data.age > 0 && data.weight > 0 && (data.maxHr > 0 || data.max_hr > 0)) {
+        // The setup gate only needs the values the app cannot work without:
+        // age (→ maxHr). A missing FTP or weight no longer discards the stored
+        // profile — those fields gate metrics (power zones, W/kg) and are
+        // surfaced as an invitation in Settings instead of a locked cockpit.
+        if (data && !data.error && data.age > 0 && (data.maxHr > 0 || data.max_hr > 0)) {
           setUserProfile({
             age: data.age,
             maxHr: data.maxHr ?? data.max_hr,
             ftp: data.ftp ?? 0,
-            weight: data.weight,
+            weight: data.weight ?? 0,
           });
         }
       })
@@ -81,13 +85,15 @@ export const useAppInitialization = () => {
     loadProfile();
   }, [loadProfile]);
 
+  // The setup gate asks a different question than the metric gates: it only
+  // needs the values the app cannot work without (age → maxHr). FTP and weight
+  // gate metrics (power zones, W/kg, kcal/kg/h), so they are surfaced as an
+  // invitation in Settings and never turn into a locked cockpit. Consumers ask
+  // `getProfileGate()` for those, so "complete" has one definition.
   const profileStatus = ((): 'loading' | 'ready' | 'error' | 'new' => {
     if (isLoadingProfile) return 'loading';
-    const isComplete = userProfile.age > 0 &&
-                      userProfile.weight > 0 &&
-                      userProfile.maxHr > 0 &&
-                      userProfile.ftp > 0;
-    return isComplete ? 'ready' : 'new';
+    const isUsable = userProfile.age > 0 && userProfile.maxHr > 0;
+    return isUsable ? 'ready' : 'new';
   })();
 
   // Watchdog for stale data

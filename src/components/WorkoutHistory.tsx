@@ -28,6 +28,10 @@ interface WorkoutHistoryProps {
   onDeleteSession?: (sessionId: string) => Promise<DeleteSessionResult>;
   hasMoreSupabaseHistory?: boolean;
   maxHr?: number;
+  /** Rider FTP for the power-zone block; 0 keeps the block behind its prompt. */
+  ftp?: number;
+  /** Rider weight for W/kg and kcal/kg/h; 0 keeps those metrics hidden. */
+  weight?: number;
   supabaseSyncError?: SupabaseErrorInfo | null;
   onDismissSupabaseError?: () => void;
 }
@@ -41,6 +45,8 @@ export const WorkoutHistory = ({
   onDeleteSession,
   hasMoreSupabaseHistory = false,
   maxHr = 190,
+  ftp = 0,
+  weight = 0,
   supabaseSyncError,
   onDismissSupabaseError
 }: WorkoutHistoryProps) => {
@@ -159,6 +165,8 @@ export const WorkoutHistory = ({
   const { calculateFullStats, globalSummary, intensity, advanced, normalizedChartData, summaryInsights, comparisonSummary, trainingLoadMetrics, weeklyDailyData, loadRatioWeeklyData } = useWorkoutHistoryData({
     sessions: summaryInputSessions,
     maxHr,
+    ftp,
+    weight,
     summaryPeriod,
     summaryRange,
     weeklyMetric

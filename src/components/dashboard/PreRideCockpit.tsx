@@ -16,6 +16,7 @@ import { InlineNotice, MetricCard, Panel, StatusPill } from '../ui';
 import { ResistancePlanPanel } from './ResistancePlanPanel';
 import { useI18n } from '@/i18n';
 import type { RiderProfile, TelemetrySnapshot } from '@/lib/cockpit-types';
+import { getProfileGate } from '@/lib/profile-gate';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
 
 const HRV_READINESS_TONES: Record<string, 'danger' | 'warning' | 'ready'> = {
@@ -145,7 +146,9 @@ export const PreRideCockpit = ({
   const hrvReadiness = useBluetoothStore((s) => s.hrvReadiness);
   const sensorCount = Number(hrConnected) + Number(bikeConnected);
   const hasSignal = Boolean(currentData.hr || currentData.cadence || currentData.power || currentData.speed);
-  const profileReady = Boolean(userProfile.ftp && userProfile.maxHr && userProfile.weight);
+  // Same gate the Summary blocks use: the badge warns about missing metric
+  // inputs (FTP / weight) and never blocks the Start button.
+  const profileReady = getProfileGate(userProfile).complete;
   // The HR strap is REQUIRED to start a workout: there is no fallback
   // heart-rate source anymore, so a session without it would record no HR.
   const canStart = hrConnected;

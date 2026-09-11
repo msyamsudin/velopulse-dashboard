@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { HistorySummary } from './HistorySummary';
-import type { AdvancedSummary, ComparisonSummary, GlobalSummary, IntensitySummary, SummaryInsights } from '@/lib/history-types';
+import type { AdvancedSummary, ComparisonSummary, GlobalSummary, IntensitySummary, PowerZoneShare, SummaryInsights } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
 
 // Pin the locale so number formatting (e.g. 3,980 kcal) is deterministic
@@ -54,6 +54,16 @@ const comparisonSummary: ComparisonSummary = {
   },
 };
 
+const powerZones: PowerZoneShare[] = [
+  { label: 'Z1', name: 'Recovery', color: 'bg-hw-muted', range: '<110', seconds: 600, percent: 20, time: '10:00' },
+  { label: 'Z2', name: 'Endurance', color: 'bg-blue-400', range: '110-150', seconds: 900, percent: 30, time: '15:00' },
+  { label: 'Z3', name: 'Tempo', color: 'bg-green-400', range: '150-180', seconds: 600, percent: 20, time: '10:00' },
+  { label: 'Z4', name: 'Threshold', color: 'bg-yellow-400', range: '180-210', seconds: 450, percent: 15, time: '07:30' },
+  { label: 'Z5', name: 'VO2 Max', color: 'bg-orange-500', range: '210-240', seconds: 240, percent: 8, time: '04:00' },
+  { label: 'Z6', name: 'Anaerobic', color: 'bg-red-500', range: '240-300', seconds: 150, percent: 5, time: '02:30' },
+  { label: 'Z7', name: 'Neuro', color: 'bg-purple-500', range: '>300', seconds: 60, percent: 2, time: '01:00' },
+];
+
 const intensity: IntensitySummary = {
   zones: [
     { label: 'Z1', range: '<95', seconds: 600, percent: 20, time: '10:00' },
@@ -67,6 +77,10 @@ const intensity: IntensitySummary = {
   easyShare: 0.72,
   hardShare: 0.1,
   sessionTypes: { easy: 8, moderate: 3, hard: 1 },
+  powerZones,
+  powerCountedSeconds: 3000,
+  powerBelowZoneSeconds: 0,
+  hasFtp: true,
 };
 
 const trainingLoadMetrics: TrainingLoadMetrics = {
@@ -92,6 +106,14 @@ const advanced: AdvancedSummary = {
     trainingDays: 30,
     established: true,
   },
+  bodyMetrics: {
+    avgPower: 172,
+    peakPower: 420,
+    avgWkg: 2.15,
+    peakWkg: 5.25,
+    kcalPerKgHour: 8.4,
+  },
+  hasWeight: true,
 };
 
 const baseProps = {
@@ -210,12 +232,68 @@ describe('HistorySummary', () => {
     );
 
     expect(screen.getByText('Time in heart-rate zones')).toBeInTheDocument();
-    expect(screen.getByText('Z5')).toBeInTheDocument();
+    // Z5 exists in both the heart-rate and the power legend.
+    expect(screen.getAllByText('Z5').length).toBeGreaterThan(0);
     expect(screen.getByText(/Easy volume/)).toBeInTheDocument();
     // 72% easy / 10% hard is neither "mostly easy" nor hard-heavy.
     expect(screen.getByText('Balanced mix of easy and hard riding.')).toBeInTheDocument();
     expect(screen.getByText('8 Easy')).toBeInTheDocument();
     expect(screen.getByText('1 Hard')).toBeInTheDocument();
+  });
+
+  it('renders the power-zone distribution only once an FTP is set', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('Power zones')).toBeInTheDocument();
+    expect(screen.getByText('Time in power zones')).toBeInTheDocument();
+    // Z6/Z7 only exist in the power legend (heart-rate zones stop at Z5) and
+    // the legend spells out the POWER_ZONES name with the absolute watt range.
+    expect(screen.getByText('Z7')).toBeInTheDocument();
+    expect(screen.getAllByText('Z6').length).toBeGreaterThan(0);
+    expect(screen.getByText('Recovery · <110')).toBeInTheDocument();
+    expect(screen.getByText('Neuro · >300')).toBeInTheDocument();
+    expect(screen.queryByText('Set your FTP to see power zones.')).not.toBeInTheDocument();
+  });
+
+  it('shows only an invitation when the FTP gate is closed', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary
+          {...baseProps}
+          intensity={{ ...intensity, powerZones: [], powerCountedSeconds: 0, powerBelowZoneSeconds: 0, hasFtp: false }}
+          globalSummary={globalSummary}
+          summaryInsights={summaryInsights}
+        />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('Set your FTP to see power zones.')).toBeInTheDocument();
+    // Regression guard: no zone number may leak out of a closed gate — not even
+    // a 0% bar that would read as "all of it was Recovery".
+    expect(screen.queryByText('Z6')).not.toBeInTheDocument();
+    expect(screen.queryByText('Z7')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recovery · <110')).not.toBeInTheDocument();
+    expect(screen.queryByText('Time in power zones')).not.toBeInTheDocument();
+  });
+
+  it('reports missing power data instead of an empty power bar', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary
+          {...baseProps}
+          intensity={{ ...intensity, powerZones: [], powerCountedSeconds: 0, powerBelowZoneSeconds: 1200, hasFtp: true }}
+          globalSummary={globalSummary}
+          summaryInsights={summaryInsights}
+        />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('No power data in this range')).toBeInTheDocument();
+    expect(screen.queryByText('Z7')).not.toBeInTheDocument();
   });
 
   it('degrades gracefully when no session in the range has heart-rate data', () => {
@@ -264,5 +342,39 @@ describe('HistorySummary', () => {
     // Repetition risk and strain moved here from the load card.
     expect(screen.getByText('1.20')).toBeInTheDocument();
     expect(screen.getByText('144')).toBeInTheDocument();
+  });
+
+  it('shows W/kg and kcal/kg/h in the L2 panel when a weight is set', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    // Body-mass metrics sit in the collapsed panel: they re-scale numbers that
+    // already hold the first screen, so they must not consume its budget.
+    expect(screen.getByText('Per body mass')).toBeInTheDocument();
+    expect(screen.getAllByText(/Avg W\/kg/).length).toBeGreaterThan(0);
+    expect(screen.getByText('2.15')).toBeInTheDocument();
+    expect(screen.getByText('5.25')).toBeInTheDocument();
+    expect(screen.getByText('8.4')).toBeInTheDocument();
+    expect(screen.queryByText('Add your weight in Settings to see W/kg and kcal/kg per hour.')).not.toBeInTheDocument();
+  });
+
+  it('hides every per-kilogram figure without a body weight', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary
+          {...baseProps}
+          advanced={{ ...advanced, bodyMetrics: null, hasWeight: false }}
+          globalSummary={globalSummary}
+          summaryInsights={summaryInsights}
+        />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('Add your weight in Settings to see W/kg and kcal/kg per hour.')).toBeInTheDocument();
+    expect(screen.queryByText(/Avg W\/kg/)).not.toBeInTheDocument();
+    expect(screen.queryByText('2.15')).not.toBeInTheDocument();
   });
 });

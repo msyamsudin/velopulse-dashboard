@@ -25,13 +25,20 @@ interface AdvancedAnalysisProps {
  * for it on every visit.
  */
 export const AdvancedAnalysis = ({ intensity, advanced, trainingLoadMetrics, rangeLabel }: AdvancedAnalysisProps) => {
-  const { t } = useI18n();
-  const { coverage, loadTrend } = advanced;
+  const { t, locale } = useI18n();
+  const { coverage, loadTrend, bodyMetrics, hasWeight } = advanced;
 
   const recordedSeconds = intensity.countedSeconds + intensity.belowZoneSeconds;
   const activePercent = recordedSeconds > 0
     ? Math.round((intensity.countedSeconds / recordedSeconds) * 100)
     : 0;
+
+  // W/kg and kcal/kg/h are only rendered when the rider's weight is set; the
+  // row keeps a single formatting rule so the two decimals cannot drift.
+  const formatMetric = (value: number | null, digits: number) =>
+    value === null
+      ? '--'
+      : value.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
   const form = !loadTrend.established
     ? { label: t('Building baseline'), tone: 'text-white/45' }
@@ -125,6 +132,38 @@ export const AdvancedAnalysis = ({ intensity, advanced, trainingLoadMetrics, ran
             {t('Last {count} days of Edwards TRIMP.', { count: loadTrend.days })}
           </div>
         </div>
+      </div>
+
+      {/* Body-mass normalised metrics live here (L2) rather than in RangeTotals:
+          they are a different scale of the same power/energy numbers already
+          shown in L1, so they must not compete for the first-screen budget. */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-white/8 bg-black/20 px-3 py-2.5">
+        <div className="text-[8px] font-mono uppercase tracking-[0.2em] text-hw-muted">
+          {t('Per body mass')}
+        </div>
+        {hasWeight && bodyMetrics ? (
+          <div
+            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-[0.12em] text-white/45"
+            title={`${bodyMetrics.avgPower} W · ${bodyMetrics.peakPower} W`}
+          >
+            <span>
+              {t('Avg W/kg')}{' '}
+              <b className="text-base text-white/85 tabular-nums">{formatMetric(bodyMetrics.avgWkg, 2)}</b>
+            </span>
+            <span>
+              {t('Peak W/kg')}{' '}
+              <b className="text-base text-white/85 tabular-nums">{formatMetric(bodyMetrics.peakWkg, 2)}</b>
+            </span>
+            <span>
+              {t('kcal/kg/h')}{' '}
+              <b className="text-base text-white/85 tabular-nums">{formatMetric(bodyMetrics.kcalPerKgHour, 1)}</b>
+            </span>
+          </div>
+        ) : (
+          <p className="text-[10px] leading-4 text-white/40">
+            {t('Add your weight in Settings to see W/kg and kcal/kg per hour.')}
+          </p>
+        )}
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

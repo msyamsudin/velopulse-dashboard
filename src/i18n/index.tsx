@@ -718,6 +718,25 @@ const id: Record<string, string> = {
   '{count} pending': '{count} tertunda',
   '{count} skipped': '{count} dilewati',
   'Import failed': 'Impor gagal',
+
+  // Profile metric gate & power zones (Fase 6.1)
+  'Add your FTP to unlock the power-zone block.': 'Isi FTP untuk membuka blok zona daya.',
+  'Add your weight to unlock W/kg and kcal/kg/h.': 'Isi berat badan untuk membuka W/kg dan kkal/kg/jam.',
+  'Training is never blocked; these values only gate power and body-mass metrics.': 'Latihan tidak pernah diblokir; nilai ini hanya menggerbangi metrik daya dan massa tubuh.',
+  'Power zones': 'Zona daya',
+  'Time in power zones': 'Waktu di zona daya',
+  'Set your FTP to see power zones.': 'Isi FTP untuk melihat zona daya.',
+  'No power data in this range': 'Tidak ada data daya pada rentang ini',
+  '{percent}% of the recorded time had no power sample (coasting or no power meter).': '{percent}% waktu terekam tanpa sampel daya (menggelinding atau tanpa power meter).',
+  // POWER_ZONES zone names (lib/constants.ts), rendered through t(zone.name).
+  'Threshold': 'Threshold',
+  'VO2 Max': 'VO2 Max',
+  'Neuro': 'Neuro',
+  'Per body mass': 'Per massa tubuh',
+  'Avg W/kg': 'Rerata W/kg',
+  'Peak W/kg': 'Puncak W/kg',
+  'kcal/kg/h': 'kkal/kg/jam',
+  'Add your weight in Settings to see W/kg and kcal/kg per hour.': 'Isi berat badan di Pengaturan untuk melihat W/kg dan kkal/kg per jam.',
 };
 
 type I18nValue = {

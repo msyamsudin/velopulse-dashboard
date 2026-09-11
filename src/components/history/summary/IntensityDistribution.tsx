@@ -21,15 +21,36 @@ const ZONE_BAR = [
  * neither says whether the riding was mostly easy or mostly hard. This block is
  * the evidence behind the abstract "repetition risk" warning: a monotony score
  * of 3.1 becomes readable when the zone bar shows 82% of the time in Z3.
+ *
+ * Two sub-blocks share the card: heart-rate zones (always) and power zones
+ * (only while the rider has an FTP). They use the same definitions — samples
+ * outside the lowest countable zone belong to no zone and are reported as a
+ * coverage footnote instead of being folded into the catch-all zone.
  */
 export const IntensityDistribution = ({ intensity }: IntensityDistributionProps) => {
   const { t } = useI18n();
-  const { zones, countedSeconds, belowZoneSeconds, easyShare, hardShare, sessionTypes } = intensity;
+  const {
+    zones,
+    countedSeconds,
+    belowZoneSeconds,
+    easyShare,
+    hardShare,
+    sessionTypes,
+    powerZones,
+    powerCountedSeconds,
+    powerBelowZoneSeconds,
+    hasFtp,
+  } = intensity;
 
   const recordedSeconds = countedSeconds + belowZoneSeconds;
   const belowZonePercent = recordedSeconds > 0 ? Math.round((belowZoneSeconds / recordedSeconds) * 100) : 0;
   const easyPercent = Math.round(easyShare * 100);
   const hardPercent = Math.round(hardShare * 100);
+
+  const powerRecordedSeconds = powerCountedSeconds + powerBelowZoneSeconds;
+  const powerBelowPercent = powerRecordedSeconds > 0
+    ? Math.round((powerBelowZoneSeconds / powerRecordedSeconds) * 100)
+    : 0;
 
   const verdict = easyShare >= 0.75
     ? t('Mostly easy volume — a solid aerobic base.')
@@ -110,6 +131,66 @@ export const IntensityDistribution = ({ intensity }: IntensityDistributionProps)
           )}
         </>
       )}
+
+      {/* Power zones are gated on FTP, independently of the heart-rate data
+          above: without an FTP every sample would read as Z1, so the block
+          shows an invitation instead of a misleading distribution. */}
+      <div className="mt-3 border-t border-white/6 pt-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-hw-muted">
+            {t('Power zones')}
+          </div>
+          {hasFtp && powerCountedSeconds > 0 && (
+            <div className="text-[9px] font-mono uppercase tracking-[0.12em] text-white/30">
+              {t('Time in power zones')}
+            </div>
+          )}
+        </div>
+
+        {!hasFtp ? (
+          <p className="mt-2 text-[11px] leading-5 text-white/40">
+            {t('Set your FTP to see power zones.')}
+          </p>
+        ) : powerCountedSeconds === 0 ? (
+          <p className="mt-2 text-[11px] leading-5 text-white/40">
+            {t('No power data in this range')}
+          </p>
+        ) : (
+          <>
+            <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-white/5">
+              {powerZones.map(zone => (
+                <div
+                  key={zone.label}
+                  className={zone.color}
+                  style={{ width: `${(zone.seconds / powerCountedSeconds) * 100}%` }}
+                  title={`${zone.label} ${t(zone.name)} ${zone.range} · ${zone.percent}% · ${zone.time}`}
+                />
+              ))}
+            </div>
+
+            <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+              {powerZones.map(zone => (
+                <div key={zone.label} className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 shrink-0 rounded-sm ${zone.color}`} />
+                    <span className="text-[9px] font-mono font-bold uppercase text-white/70">{zone.label}</span>
+                  </div>
+                  <div className="mt-0.5 font-mono text-sm font-bold tabular-nums text-white">{zone.percent}%</div>
+                  <div className="truncate text-[8px] font-mono uppercase tracking-[0.1em] text-white/30">
+                    {t(zone.name)} · {zone.range}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {powerBelowPercent >= 5 && (
+              <p className="mt-1 text-[9px] font-mono uppercase tracking-[0.1em] text-white/30">
+                {t('{percent}% of the recorded time had no power sample (coasting or no power meter).', { percent: powerBelowPercent })}
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 };
