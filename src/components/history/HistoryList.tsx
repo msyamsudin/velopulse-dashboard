@@ -34,7 +34,7 @@ export const HistoryList = ({
   onToggleSelectSession,
   onDeleteSession
 }: HistoryListProps) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const groupedSessions = sessions.reduce<Array<{
     key: string;
     label: string;
@@ -47,8 +47,8 @@ export const HistoryList = ({
       ? 'unknown'
       : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const label = Number.isNaN(date.getTime())
-      ? 'Unknown Date'
-      : date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      ? t('Unknown date')
+      : date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     const outcome = getSessionOutcome(session);
     const existing = groups.find(group => group.key === key);
 
@@ -72,8 +72,8 @@ export const HistoryList = ({
   if (sessions.length === 0) {
     return (
       <EmptyState
-        title="No matching sessions"
-        detail="Try a different search or import workouts"
+        title={t('No matching sessions')}
+        detail={t('Try a different search or import workouts')}
         icon={<Calendar size={20} />}
         className="py-20"
       />
@@ -88,7 +88,7 @@ export const HistoryList = ({
             <div>
               <div className="text-sm font-bold font-mono uppercase tracking-[0.16em] text-vp-text">{group.label}</div>
               <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.2em] text-vp-muted">
-                {group.sessions.length} sessions
+                {group.sessions.length} {t('sessions')}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -140,20 +140,20 @@ export const HistoryList = ({
                       </span>
                     </div>
                     <div className={`shrink-0 rounded border px-2 py-1 text-[8px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
-                      {quality.label}
+                      {t(quality.label)}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-4 flex-1">
-                    <MetricCell label="Distance" colorClass="text-vp-distance" icon={<Route size={12} />} value={<>{outcome.distanceKm.toFixed(2)}<span className="text-[10px] font-normal opacity-50">KM</span></>} />
-                    <MetricCell label="Duration" colorClass="text-vp-text" icon={<Clock size={12} />} value={formatDuration(outcome.duration)} />
-                    <MetricCell label="Calories" colorClass="text-vp-calories" icon={<Flame size={12} />} value={<>{outcome.calories}<span className="text-[10px] font-normal opacity-50">KCAL</span></>} />
-                    <MetricCell label="Avg Power" colorClass="text-vp-power" icon={<Zap size={12} />} value={<>{outcome.avgPower}<span className="text-[10px] font-normal opacity-50">W</span></>} />
+                    <MetricCell label={t('Distance')} colorClass="text-vp-distance" icon={<Route size={12} />} value={<>{outcome.distanceKm.toFixed(2)}<span className="text-[10px] font-normal opacity-50">KM</span></>} />
+                    <MetricCell label={t('Duration')} colorClass="text-vp-text" icon={<Clock size={12} />} value={formatDuration(outcome.duration)} />
+                    <MetricCell label={t('Calories')} colorClass="text-vp-calories" icon={<Flame size={12} />} value={<>{outcome.calories}<span className="text-[10px] font-normal opacity-50">KCAL</span></>} />
+                    <MetricCell label={t('Avg Power')} colorClass="text-vp-power" icon={<Zap size={12} />} value={<>{outcome.avgPower}<span className="text-[10px] font-normal opacity-50">W</span></>} />
                   </div>
 
                   <div className="mt-auto flex justify-between items-center pt-3 border-t border-vp-border">
                     <span className="text-[9px] text-vp-accent uppercase font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                      {isSelectionMode ? (isSelected ? 'Deselect' : 'Select') : 'View Details'}
+                      {isSelectionMode ? t(isSelected ? 'Deselect' : 'Select') : t('View Details')}
                     </span>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {!isSelectionMode && onDeleteSession && (

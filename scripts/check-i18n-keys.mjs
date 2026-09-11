@@ -48,12 +48,15 @@ while ((match = keyPattern.exec(i18nSource.slice(idStart, idEnd)))) {
 
 /** @type {Map<string, Set<string>>} */
 const missing = new Map();
+/** @type {Set<string>} */
+const used = new Set();
 for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   const callPattern = /\bt\(\s*'((?:[^'\\]|\\.)*)'/g;
   let call;
   while ((call = callPattern.exec(source))) {
     const key = call[1];
+    used.add(key);
     if (dictionaryKeys.has(key)) continue;
     if (!missing.has(key)) missing.set(key, new Set());
     missing.get(key).add(path.relative(root, file).replace(/\\/g, '/'));
@@ -63,13 +66,23 @@ for (const file of files) {
 console.log(`Dictionary keys: ${dictionaryKeys.size}`);
 if (missing.size === 0) {
   console.log('i18n keys: OK — every literal t() key exists in the Indonesian dictionary.');
-  process.exit(0);
+} else {
+  console.log(`Missing Indonesian translations: ${missing.size}\n`);
+  for (const [key, locations] of [...missing].sort()) {
+    console.log(`  ${JSON.stringify(key)}`);
+    console.log(`      ${[...locations].sort().join('\n      ')}`);
+  }
+  console.log('\nAdd these keys to the `id` map in src/i18n/index.tsx.');
 }
 
-console.log(`Missing Indonesian translations: ${missing.size}\n`);
-for (const [key, locations] of [...missing].sort()) {
-  console.log(`  ${JSON.stringify(key)}`);
-  console.log(`      ${[...locations].sort().join('\n      ')}`);
+// Keys that no literal t() call references. Dynamic lookups (t(variable) over
+// recommendations, quality labels, milestone titles, zone names, …) cannot be
+// detected here, so treat this list as candidates to review, never as a
+// delete-list.
+if (process.argv.includes('--unused')) {
+  const unused = [...dictionaryKeys].filter(key => !used.has(key)).sort();
+  console.log(`\nUnused dictionary keys (candidates — verify dynamic t() calls): ${unused.length}\n`);
+  for (const key of unused) console.log(`  ${JSON.stringify(key)}`);
 }
-console.log('\nAdd these keys to the `id` map in src/i18n/index.tsx.');
-process.exit(strict ? 1 : 0);
+
+process.exit(strict && missing.size > 0 ? 1 : 0);

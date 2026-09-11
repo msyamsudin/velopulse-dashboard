@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n-keys.mjs",
+    "i18n:check:strict": "node scripts/check-i18n-keys.mjs --strict",
     "test": "vitest run",
     "test:watch": "vitest"
   },

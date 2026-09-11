@@ -59,19 +59,28 @@ export const getWorkoutQuality = (session: WorkoutSession, maxHr: number) => {
   return { label: 'Easy', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/25' };
 };
 
-export const getZoneInsight = (zones: WorkoutZoneStat[] = []) => {
-  if (zones.length === 0) return 'No heart-rate zone data';
+/** Translator injected by the UI layer; defaults to an English passthrough. */
+export type Translate = (key: string, values?: Record<string, string | number>) => string;
+
+export const defaultTranslate: Translate = (key, values = {}) =>
+  Object.entries(values).reduce(
+    (result, [name, value]) => result.replaceAll(`{${name}}`, String(value)),
+    key
+  );
+
+export const getZoneInsight = (zones: WorkoutZoneStat[] = [], translate: Translate = defaultTranslate) => {
+  if (zones.length === 0) return translate('No heart-rate zone data');
 
   const dominant = zones.reduce((best, zone) => zone.percent > best.percent ? zone : best, zones[0]);
   const highZoneMinutes = zones
     .filter(zone => ['Anaerobic', 'Peak'].includes(zone.label))
     .reduce((total, zone) => total + (Number(zone.seconds) || 0) / 60, 0);
 
-  if (highZoneMinutes >= 10) return `${Math.round(highZoneMinutes)} min above Z3`;
-  if (dominant.label === 'Aerobic') return 'Mostly aerobic';
-  if (dominant.label === 'Fat Burn') return 'Steady endurance';
-  if (dominant.label === 'Warm Up') return 'Low-intensity session';
-  return `${dominant.label} dominant`;
+  if (highZoneMinutes >= 10) return translate('{minutes} min above Z3', { minutes: Math.round(highZoneMinutes) });
+  if (dominant.label === 'Aerobic') return translate('Mostly aerobic');
+  if (dominant.label === 'Fat Burn') return translate('Steady endurance');
+  if (dominant.label === 'Warm Up') return translate('Low-intensity session');
+  return translate('{zone} dominant', { zone: translate(dominant.label) });
 };
 
 export const getMetricDelta = (current: number, previous?: number) => {
@@ -117,18 +126,20 @@ export const generateSessionInsights = ({
   previousSession,
   previousFullStats,
   maxHr,
+  translate = defaultTranslate,
 }: {
   session: WorkoutSession;
   fullStats: FullWorkoutStats;
   previousSession?: WorkoutSession;
   previousFullStats?: FullWorkoutStats;
   maxHr: number;
+  translate?: Translate;
 }): TrainingInsight[] => {
   const insights: TrainingInsight[] = [];
   const current = getSessionOutcome(session);
   const previous = previousSession ? getSessionOutcome(previousSession) : null;
   const quality = getWorkoutQuality(session, maxHr);
-  const zoneText = getZoneInsight(fullStats?.zones || []);
+  const zoneText = getZoneInsight(fullStats?.zones || [], translate);
   const durationMinutes = current.duration / 60;
   const previousDurationMinutes = previous ? previous.duration / 60 : undefined;
   const powerDelta = getMetricDelta(session?.stats?.avgPower || 0, previousSession?.stats?.avgPower);
@@ -138,28 +149,38 @@ export const generateSessionInsights = ({
   const speedDelta = getMetricDelta(Number(fullStats?.avgSpeed || 0), previousFullStats ? Number(previousFullStats.avgSpeed || 0) : undefined);
 
   insights.push({
-    title: quality.label,
-    body: `${zoneText}. Avg HR ${session?.stats?.avgHr || 0} bpm with ${fullStats?.moveMinutes || 0} active minutes.`,
+    title: translate(quality.label),
+    body: `${zoneText}. ${translate('Avg HR {hr} bpm with {minutes} active minutes.', {
+      hr: session?.stats?.avgHr || 0,
+      minutes: fullStats?.moveMinutes || 0,
+    })}`,
     tone: quality.label === 'Easy' ? 'neutral' : quality.label === 'Peak' || quality.label === 'Hard' ? 'watch' : 'good',
   });
 
   if (powerDelta && durationDelta) {
     if (powerDelta.direction === 'up' && durationDelta.direction === 'down') {
       insights.push({
-        title: 'Higher intensity',
-        body: `Avg power ${formatDelta(powerDelta.delta, 'W')} while duration ${formatDelta(durationDelta.delta, 'min')}. Shorter, harder effort.`,
+        title: translate('Higher intensity'),
+        body: translate('Avg power {power} while duration {duration}. Shorter, harder effort.', {
+          power: formatDelta(powerDelta.delta, 'W'),
+          duration: formatDelta(durationDelta.delta, 'min'),
+        }),
         tone: 'watch',
       });
     } else if (powerDelta.direction === 'up') {
       insights.push({
-        title: 'Power improved',
-        body: `Avg power rose ${formatDelta(powerDelta.delta, 'W')} versus the previous workout.`,
+        title: translate('Power improved'),
+        body: translate('Avg power rose {power} versus the previous workout.', {
+          power: formatDelta(powerDelta.delta, 'W'),
+        }),
         tone: 'good',
       });
     } else if (powerDelta.direction === 'down' && durationDelta.direction === 'up') {
       insights.push({
-        title: 'Longer endurance work',
-        body: `Duration ${formatDelta(durationDelta.delta, 'min')} with lower power, indicating an easier longer ride.`,
+        title: translate('Longer endurance work'),
+        body: translate('Duration {duration} with lower power, indicating an easier longer ride.', {
+          duration: formatDelta(durationDelta.delta, 'min'),
+        }),
         tone: 'neutral',
       });
     }
@@ -167,22 +188,28 @@ export const generateSessionInsights = ({
 
   if (distanceDelta && distanceDelta.direction === 'up') {
     insights.push({
-      title: 'More distance',
-      body: `Distance increased ${formatDelta(distanceDelta.delta, 'km', 2)} from the previous workout.`,
+      title: translate('More distance'),
+      body: translate('Distance increased {distance} from the previous workout.', {
+        distance: formatDelta(distanceDelta.delta, 'km', 2),
+      }),
       tone: 'good',
     });
   } else if (speedDelta && speedDelta.direction === 'up') {
     insights.push({
-      title: 'Faster pace',
-      body: `Average speed improved ${formatDelta(speedDelta.delta, 'km/h', 1)} with this session.`,
+      title: translate('Faster pace'),
+      body: translate('Average speed improved {speed} with this session.', {
+        speed: formatDelta(speedDelta.delta, 'km/h', 1),
+      }),
       tone: 'good',
     });
   }
 
   if (hrDelta && Math.abs(hrDelta.delta) >= 5 && powerDelta && powerDelta.direction !== 'down') {
     insights.push({
-      title: hrDelta.direction === 'up' ? 'Higher cardiac load' : 'Lower HR for similar work',
-      body: `Avg HR ${formatDelta(hrDelta.delta, 'bpm')} while power did not drop.`,
+      title: translate(hrDelta.direction === 'up' ? 'Higher cardiac load' : 'Lower HR for similar work'),
+      body: translate('Avg HR {hr} while power did not drop.', {
+        hr: formatDelta(hrDelta.delta, 'bpm'),
+      }),
       tone: hrDelta.direction === 'up' ? 'watch' : 'good',
     });
   }

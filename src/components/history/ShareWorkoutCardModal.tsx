@@ -44,8 +44,8 @@ export const ShareWorkoutCardModal = ({
 
   // Compute achievements
   const achievements = useMemo(() => {
-    return detectSessionAchievements(session, allSessions.length > 0 ? allSessions : [session]);
-  }, [session, allSessions]);
+    return detectSessionAchievements(session, allSessions.length > 0 ? allSessions : [session], t);
+  }, [session, allSessions, t]);
 
   // Set default theme to Gold if session is a milestone or Centurion
   useEffect(() => {

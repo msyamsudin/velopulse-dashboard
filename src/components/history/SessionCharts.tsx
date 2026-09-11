@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, Calendar, Trophy, Sparkles } from 'lucide-react';
+import { Activity, Calendar, Trophy } from 'lucide-react';
 import { getSessionOutcome, getWorkoutQuality } from '../../lib/workout-analysis';
 import { calculateEdwardsTrimp } from '../../lib/training-load';
 import { detectSessionAchievements } from '../../lib/milestone-records';
@@ -150,7 +150,7 @@ const formatDayValue = (sessions: SessionChartPoint[], metric: SessionMetricKey)
 };
 
 export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChartsProps) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [metric, setMetric] = useState<SessionMetricKey>('trimp');
   const [range, setRange] = useState<SummaryRange>('all');
 
@@ -164,13 +164,13 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
       const trimp = calculateEdwardsTrimp(session.history, session.duration || 0, safeMax).score;
       const date = new Date(ts);
       const fullLabel = Number.isNaN(ts)
-        ? 'Unknown date'
-        : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        ? t('Unknown date')
+        : date.toLocaleDateString(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       const timeLabel = Number.isNaN(ts)
         ? ''
-        : date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        : date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
-      const achievements = detectSessionAchievements(session, sessions);
+      const achievements = detectSessionAchievements(session, sessions, t);
       const achievementLabels = [
         ...achievements.milestones.map(m => `${m.icon} ${m.title}`),
         ...achievements.personalRecords.map(pr => `${pr.icon} ${pr.title}`),
@@ -205,7 +205,7 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
     return valid
       .filter(point => cutoff === null || point.ts >= cutoff)
       .sort((a, b) => a.ts - b.ts);
-  }, [sessions, maxHr, safeMax, range]);
+  }, [sessions, maxHr, safeMax, range, t, locale]);
 
   const dayPoints = useMemo(
     () => groupSessionsByDay(points, range === '1y' || range === 'all'),
@@ -386,7 +386,7 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
                               <span className="flex items-center gap-1.5 text-white/70">
                                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: session.fill }} />
                                 <span>{session.timeLabel}</span>
-                                <span className="text-[8px] opacity-50">{session.quality}</span>
+                                <span className="text-[8px] opacity-50">{t(session.quality)}</span>
                                 {session.hasAchievement && <span className="text-[9px]">🏆</span>}
                               </span>
                               <span className="text-right text-white">
@@ -462,7 +462,7 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
             {QUALITY_ORDER.map(quality => (
               <span key={quality} className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-vp-muted">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: QUALITY_HEX[quality] }} />
-                {quality}
+                {t(quality)}
               </span>
             ))}
           </div>

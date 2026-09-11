@@ -1,5 +1,5 @@
 import type { WorkoutSession } from '@/store/useWorkoutStore';
-import { getSessionOutcome } from './workout-analysis';
+import { defaultTranslate, getSessionOutcome, type Translate } from './workout-analysis';
 
 export interface MilestoneBadge {
   id: string;
@@ -77,7 +77,8 @@ export const sortSessionsAscending = (sessions: WorkoutSession[]): WorkoutSessio
  */
 export const detectSessionAchievements = (
   session: WorkoutSession,
-  allSessions: WorkoutSession[]
+  allSessions: WorkoutSession[],
+  translate: Translate = defaultTranslate
 ): SessionMilestonesResult => {
   const sorted = sortSessionsAscending(allSessions);
   const sessionIndex = sorted.findIndex(s => s.id === session.id);
@@ -116,8 +117,8 @@ export const detectSessionAchievements = (
     milestones.push({
       id: `session_count_${countMilestone.count}`,
       type: 'session_count',
-      title: countMilestone.title,
-      subtitle: countMilestone.subtitle,
+      title: translate(countMilestone.title),
+      subtitle: translate(countMilestone.subtitle),
       icon: countMilestone.icon,
       valueFormatted: `#${chronologicalIndex}`,
       tier: countMilestone.tier,
@@ -133,8 +134,8 @@ export const detectSessionAchievements = (
       milestones.push({
         id: `cumulative_distance_${m.km}`,
         type: 'distance',
-        title: m.title,
-        subtitle: m.subtitle,
+        title: translate(m.title),
+        subtitle: translate(m.subtitle),
         icon: m.icon,
         valueFormatted: `${newTotalKm.toFixed(1)} km`,
         tier: m.tier,
@@ -151,8 +152,8 @@ export const detectSessionAchievements = (
       milestones.push({
         id: `cumulative_calories_${m.kcal}`,
         type: 'calories',
-        title: m.title,
-        subtitle: m.subtitle,
+        title: translate(m.title),
+        subtitle: translate(m.subtitle),
         icon: m.icon,
         valueFormatted: `${newTotalKcal.toLocaleString()} kcal`,
         tier: m.tier,
@@ -188,8 +189,10 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_distance',
         type: 'pr',
-        title: 'New Distance PR',
-        subtitle: `+${(currentOutcome.distanceKm - priorBestDistance).toFixed(2)} km vs previous best`,
+        title: translate('New Distance PR'),
+        subtitle: translate('+{value} km vs previous best', {
+          value: (currentOutcome.distanceKm - priorBestDistance).toFixed(2),
+        }),
         icon: '🚀',
         valueFormatted: `${currentOutcome.distanceKm.toFixed(2)} km`,
         tier: 'gold',
@@ -201,8 +204,8 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_duration',
         type: 'pr',
-        title: 'Longest Ride PR',
-        subtitle: `+${diffMin} min longer endurance`,
+        title: translate('Longest Ride PR'),
+        subtitle: translate('+{value} min longer endurance', { value: diffMin }),
         icon: '⏱️',
         valueFormatted: `${Math.round(currentOutcome.duration / 60)} min`,
         tier: 'gold',
@@ -213,8 +216,10 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_calories',
         type: 'pr',
-        title: 'Top Calorie Burn PR',
-        subtitle: `+${currentOutcome.calories - priorTopCalories} kcal vs previous best`,
+        title: translate('Top Calorie Burn PR'),
+        subtitle: translate('+{value} kcal vs previous best', {
+          value: currentOutcome.calories - priorTopCalories,
+        }),
         icon: '🔥',
         valueFormatted: `${currentOutcome.calories} kcal`,
         tier: 'gold',
@@ -225,8 +230,10 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_peak_power',
         type: 'pr',
-        title: 'Peak Power PR',
-        subtitle: `+${currentMaxPower - priorPeakPower} W sprint power record`,
+        title: translate('Peak Power PR'),
+        subtitle: translate('+{value} W sprint power record', {
+          value: currentMaxPower - priorPeakPower,
+        }),
         icon: '⚡',
         valueFormatted: `${currentMaxPower} W`,
         tier: 'diamond',
@@ -237,8 +244,10 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_avg_power',
         type: 'pr',
-        title: 'Best Avg Power PR',
-        subtitle: `+${currentAvgPower - priorBestAvgPower} W higher average`,
+        title: translate('Best Avg Power PR'),
+        subtitle: translate('+{value} W higher average', {
+          value: currentAvgPower - priorBestAvgPower,
+        }),
         icon: '👑',
         valueFormatted: `${currentAvgPower} W`,
         tier: 'diamond',
@@ -249,8 +258,10 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_speed',
         type: 'pr',
-        title: 'Fastest Pace PR',
-        subtitle: `+${(currentSpeed - priorFastestSpeed).toFixed(1)} km/h faster`,
+        title: translate('Fastest Pace PR'),
+        subtitle: translate('+{value} km/h faster', {
+          value: (currentSpeed - priorFastestSpeed).toFixed(1),
+        }),
         icon: '🚴',
         valueFormatted: `${currentSpeed.toFixed(1)} km/h`,
         tier: 'gold',
@@ -261,8 +272,10 @@ export const detectSessionAchievements = (
       personalRecords.push({
         id: 'pr_hrr',
         type: 'pr',
-        title: 'Best HR Recovery PR',
-        subtitle: `+${currentHrr - priorBestHrr} bpm recovery score`,
+        title: translate('Best HR Recovery PR'),
+        subtitle: translate('+{value} bpm recovery score', {
+          value: currentHrr - priorBestHrr,
+        }),
         icon: '🫀',
         valueFormatted: `${currentHrr} bpm`,
         tier: 'diamond',

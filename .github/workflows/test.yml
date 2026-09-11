@@ -33,5 +33,8 @@ jobs:
     - name: Run Lint
       run: pnpm run lint
 
+    - name: Check i18n keys
+      run: pnpm run i18n:check:strict
+
     - name: Run Tests
       run: pnpm test

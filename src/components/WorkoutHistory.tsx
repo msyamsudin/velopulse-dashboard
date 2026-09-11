@@ -44,7 +44,7 @@ export const WorkoutHistory = ({
   supabaseSyncError,
   onDismissSupabaseError
 }: WorkoutHistoryProps) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'sessions' | 'charts' | 'summary' | 'records'>('sessions');
   const [summaryPeriod, setSummaryPeriod] = useState<'yearly' | 'monthly' | 'weekly' | 'daily'>('daily');
@@ -174,7 +174,7 @@ export const WorkoutHistory = ({
       const date = new Date(session.date);
       const dateText = Number.isNaN(date.getTime())
         ? ''
-        : date.toLocaleDateString('en-US', {
+        : date.toLocaleDateString(locale, {
           weekday: 'long',
           month: 'long',
           day: 'numeric',
@@ -182,11 +182,14 @@ export const WorkoutHistory = ({
         });
       const monthText = Number.isNaN(date.getTime())
         ? ''
-        : date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        : date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
       const searchable = [
         dateText,
         monthText,
         quality.label,
+        // Both the English label and its translation are indexed: the badge
+        // shows the translated one, so searching for either must work.
+        t(quality.label),
         `${outcome.distanceKm.toFixed(2)} km`,
         `${outcome.calories} kcal`,
         `${outcome.avgPower} w`,
@@ -196,7 +199,7 @@ export const WorkoutHistory = ({
 
       return searchable.includes(query);
     });
-  }, [sessions, sessionSearch, maxHr]);
+  }, [sessions, sessionSearch, maxHr, locale, t]);
 
   const visibleSelectedCount = useMemo(() =>
     filteredSessions.filter(session => selectedSessionIds.includes(session.id)).length,
