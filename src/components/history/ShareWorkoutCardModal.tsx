@@ -29,7 +29,7 @@ export const ShareWorkoutCardModal = ({
   maxHr = 190,
   onClose,
 }: ShareWorkoutCardModalProps) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [aspect, setAspect] = useState<ShareCardAspect>('square');
@@ -55,8 +55,9 @@ export const ShareWorkoutCardModal = ({
     }
   }, [achievements]);
 
-  // The canvas has no translator, so the label is resolved here.
+  // The canvas has no translator, so the labels it draws are resolved here.
   const hrrClassificationLabel = t(hrrLevelKey(session.stats?.hrrClassification));
+  const recentWorkoutLabel = t('Recent Workout');
 
   // Re-render canvas whenever options change
   useEffect(() => {
@@ -75,8 +76,10 @@ export const ShareWorkoutCardModal = ({
       customNote,
       maxHr,
       hrrClassificationLabel,
+      locale,
+      recentWorkoutLabel,
     });
-  }, [session, allSessions, previousSession, aspect, theme, showHr, showChart, showComparison, customNote, maxHr, achievements, hrrClassificationLabel]);
+  }, [session, allSessions, previousSession, aspect, theme, showHr, showChart, showComparison, customNote, maxHr, achievements, hrrClassificationLabel, locale, recentWorkoutLabel]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -96,6 +99,8 @@ export const ShareWorkoutCardModal = ({
         customNote,
         maxHr,
         hrrClassificationLabel,
+        locale,
+        recentWorkoutLabel,
       }, filename);
       setNotice(t('Image downloaded successfully!'));
       setTimeout(() => setNotice(null), 3000);
@@ -121,6 +126,8 @@ export const ShareWorkoutCardModal = ({
         customNote,
         maxHr,
         hrrClassificationLabel,
+        locale,
+        recentWorkoutLabel,
       });
 
       if (!shared) {

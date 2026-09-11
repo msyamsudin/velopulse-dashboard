@@ -22,6 +22,10 @@ export interface ShareCardRenderOptions {
   maxHr?: number;
   /** Translated HRR classification; the canvas itself has no translator. */
   hrrClassificationLabel?: string;
+  /** BCP-47 tag for dates and numbers; defaults to en-US. */
+  locale?: string;
+  /** Label used when the session has no valid date. */
+  recentWorkoutLabel?: string;
 }
 
 /**
@@ -119,8 +123,8 @@ export const renderShareCardToCanvas = (
   const outcome = getSessionOutcome(session);
   const sessionDate = new Date(session.sessionStartTime || session.date || Date.now());
   const dateFormatted = Number.isNaN(sessionDate.getTime())
-    ? 'Recent Workout'
-    : sessionDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    ? (options.recentWorkoutLabel || 'Recent Workout')
+    : sessionDate.toLocaleDateString(options.locale || 'en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
   // Session number (RIDE #N)
   let sessionNumber = 1;

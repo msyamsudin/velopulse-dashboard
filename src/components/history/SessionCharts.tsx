@@ -100,7 +100,7 @@ export const resolveSessionMetric = (point: SessionChartPoint, metric: SessionMe
 };
 
 /** Groups sessions into local-day buckets, one bar per day. */
-export const groupSessionsByDay = (points: SessionChartPoint[], includeYear: boolean): DayChartPoint[] => {
+export const groupSessionsByDay = (points: SessionChartPoint[], includeYear: boolean, locale = 'en-US'): DayChartPoint[] => {
   const byKey = new Map<string, DayChartPoint>();
 
   for (const point of points) {
@@ -111,10 +111,10 @@ export const groupSessionsByDay = (points: SessionChartPoint[], includeYear: boo
     if (!day) {
       day = {
         key,
-        label: date.toLocaleDateString('en-US', includeYear
+        label: date.toLocaleDateString(locale, includeYear
           ? { month: 'short', day: 'numeric', year: 'numeric' }
           : { month: 'short', day: 'numeric' }),
-        fullLabel: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+        fullLabel: date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
         ts: new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime(),
         sessions: [],
       };
@@ -208,8 +208,8 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
   }, [sessions, maxHr, safeMax, range, t, locale]);
 
   const dayPoints = useMemo(
-    () => groupSessionsByDay(points, range === '1y' || range === 'all'),
-    [points, range],
+    () => groupSessionsByDay(points, range === '1y' || range === 'all', locale),
+    [points, range, locale],
   );
 
   // Number of stacked segments needed = most sessions seen in a single day.
@@ -332,7 +332,7 @@ export const SessionCharts = ({ sessions, maxHr, onSelectSession }: SessionChart
                 tickLine={false}
                 minTickGap={24}
                 tickFormatter={(ts: number) =>
-                  new Date(ts).toLocaleDateString('en-US',
+                  new Date(ts).toLocaleDateString(locale,
                     range === '1y' || range === 'all'
                       ? { month: 'short', year: '2-digit' }
                       : { month: 'short', day: 'numeric' })

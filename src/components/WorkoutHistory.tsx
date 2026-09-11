@@ -24,7 +24,7 @@ interface WorkoutHistoryProps {
   onClose: () => void;
   onSyncSupabasePending?: () => Promise<void>;
   onLoadMoreSupabaseHistory?: () => Promise<void>;
-  onImportTCX?: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
+  onImportTCX?: (tcxContent: string, filename?: string, translate?: (key: string, values?: Record<string, string | number>) => string) => Promise<ImportTcxResult>;
   onDeleteSession?: (sessionId: string) => Promise<DeleteSessionResult>;
   hasMoreSupabaseHistory?: boolean;
   maxHr?: number;
@@ -243,25 +243,25 @@ export const WorkoutHistory = ({
       for (const file of Array.from(files)) {
         try {
           const content = await file.text();
-          const result = await onImportTCX(content, file.name);
+          const result = await onImportTCX(content, file.name, t);
           totals.imported += result.imported;
           totals.skipped += result.skipped;
           totals.synced += result.synced;
           totals.pending += result.pending;
           messages.push(...result.messages);
         } catch (err) {
-          messages.push(`${file.name}: ${err instanceof Error ? err.message : 'Import failed'}`);
+          messages.push(`${file.name}: ${err instanceof Error ? err.message : t('Import failed')}`);
         }
       }
 
       const summary = [
-        totals.imported > 0 ? `${totals.imported} imported` : '',
-        totals.synced > 0 ? `${totals.synced} synced` : '',
-        totals.pending > 0 ? `${totals.pending} pending` : '',
-        totals.skipped > 0 ? `${totals.skipped} skipped` : '',
+        totals.imported > 0 ? t('{count} imported', { count: totals.imported }) : '',
+        totals.synced > 0 ? t('{count} synced', { count: totals.synced }) : '',
+        totals.pending > 0 ? t('{count} pending', { count: totals.pending }) : '',
+        totals.skipped > 0 ? t('{count} skipped', { count: totals.skipped }) : '',
       ].filter(Boolean).join(' / ');
 
-      setImportNotice(summary || messages[0] || 'No sessions imported');
+      setImportNotice(summary || messages[0] || t('No sessions imported'));
       if (messages.length > 0 && !summary) {
         console.warn('[TCX Import]', messages.join('\n'));
       }
@@ -369,7 +369,7 @@ export const WorkoutHistory = ({
                       <button
                         type="button"
                         onClick={() => {
-                          printSummaryPDF(sessions);
+                          printSummaryPDF(sessions, locale, t);
                           setExportMenuOpen(false);
                         }}
                         className="block w-full px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-widest text-vp-text transition-colors hover:bg-white/5"

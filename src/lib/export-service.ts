@@ -396,9 +396,15 @@ export const downloadSummaryJSON = (sessions: WorkoutSession[]) => {
   downloadTextFile(JSON.stringify(report, null, 2), `velopulse_summary_${dateStr}.json`, 'application/json;charset=utf-8');
 };
 
-export const printSummaryPDF = (sessions: WorkoutSession[]) => {
+export const printSummaryPDF = (
+  sessions: WorkoutSession[],
+  locale = 'en-US',
+  translate: (key: string, values?: Record<string, string | number>) => string = (key, values = {}) =>
+    Object.entries(values).reduce((result, [name, value]) => result.replaceAll(`{${name}}`, String(value)), key)
+) => {
   if (sessions.length === 0) return;
 
+  const t = translate;
   const rows = getSessionReportRows(sessions);
   const totals = rows.reduce((acc, row) => {
     acc.sessions += 1;
@@ -407,7 +413,7 @@ export const printSummaryPDF = (sessions: WorkoutSession[]) => {
     acc.calories += row.calories;
     return acc;
   }, { sessions: 0, durationSeconds: 0, distanceKm: 0, calories: 0 });
-  const generatedAt = new Date().toLocaleString();
+  const generatedAt = new Date().toLocaleString(locale);
   const totalHours = totals.durationSeconds / 3600;
   const avgDistance = totals.sessions > 0 ? totals.distanceKm / totals.sessions : 0;
   const avgDuration = totals.sessions > 0 ? totals.durationSeconds / totals.sessions : 0;
@@ -416,7 +422,7 @@ export const printSummaryPDF = (sessions: WorkoutSession[]) => {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>VeloPulse Summary Report</title>
+  <title>${t('VeloPulse Summary Report')}</title>
   <style>
     body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
     h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -433,36 +439,36 @@ export const printSummaryPDF = (sessions: WorkoutSession[]) => {
   </style>
 </head>
 <body>
-  <h1>VeloPulse Summary Report</h1>
-  <div class="muted">Generated ${generatedAt}</div>
+  <h1>${t('VeloPulse Summary Report')}</h1>
+  <div class="muted">${t('Generated {date}', { date: generatedAt })}</div>
   <div class="grid">
-    <div class="card"><div class="label">Sessions</div><div class="value">${totals.sessions}</div></div>
-    <div class="card"><div class="label">Distance</div><div class="value">${totals.distanceKm.toFixed(2)} km</div></div>
-    <div class="card"><div class="label">Time</div><div class="value">${totalHours.toFixed(1)} h</div></div>
-    <div class="card"><div class="label">Calories</div><div class="value">${totals.calories} kcal</div></div>
+    <div class="card"><div class="label">${t('Sessions')}</div><div class="value">${totals.sessions}</div></div>
+    <div class="card"><div class="label">${t('Distance')}</div><div class="value">${totals.distanceKm.toFixed(2)} km</div></div>
+    <div class="card"><div class="label">${t('Time')}</div><div class="value">${totalHours.toFixed(1)} h</div></div>
+    <div class="card"><div class="label">${t('Calories')}</div><div class="value">${totals.calories} kcal</div></div>
   </div>
   <div class="grid">
-    <div class="card"><div class="label">Avg Distance</div><div class="value">${avgDistance.toFixed(2)} km</div></div>
-    <div class="card"><div class="label">Avg Duration</div><div class="value">${Math.round(avgDuration / 60)} min</div></div>
-    <div class="card"><div class="label">Best Distance</div><div class="value">${Math.max(...rows.map(row => row.distanceKm)).toFixed(2)} km</div></div>
-    <div class="card"><div class="label">Best Avg Power</div><div class="value">${Math.max(...rows.map(row => row.avgPower))} w</div></div>
+    <div class="card"><div class="label">${t('Avg Distance')}</div><div class="value">${avgDistance.toFixed(2)} km</div></div>
+    <div class="card"><div class="label">${t('Avg Duration')}</div><div class="value">${Math.round(avgDuration / 60)} min</div></div>
+    <div class="card"><div class="label">${t('Best Distance')}</div><div class="value">${Math.max(...rows.map(row => row.distanceKm)).toFixed(2)} km</div></div>
+    <div class="card"><div class="label">${t('Best Avg Power')}</div><div class="value">${Math.max(...rows.map(row => row.avgPower))} w</div></div>
   </div>
   <table>
     <thead>
       <tr>
-        <th>Date</th>
-        <th>Duration</th>
-        <th>Distance</th>
-        <th>Calories</th>
-        <th>Avg Power</th>
-        <th>Avg HR</th>
-        <th>Avg Cadence</th>
+        <th>${t('Date')}</th>
+        <th>${t('Duration')}</th>
+        <th>${t('Distance')}</th>
+        <th>${t('Calories')}</th>
+        <th>${t('Avg Power')}</th>
+        <th>${t('Avg HR')}</th>
+        <th>${t('Avg Cadence')}</th>
       </tr>
     </thead>
     <tbody>
       ${rows.map(row => `
       <tr>
-        <td>${new Date(row.date).toLocaleDateString()}</td>
+        <td>${new Date(row.date).toLocaleDateString(locale)}</td>
         <td>${Math.round(row.durationSeconds / 60)} min</td>
         <td>${row.distanceKm.toFixed(2)} km</td>
         <td>${row.calories}</td>

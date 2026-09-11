@@ -701,6 +701,23 @@ const id: Record<string, string> = {
   'Import success! Reloading...': 'Impor berhasil! Memuat ulang...',
   'Workout': 'Latihan',
   'Report': 'Laporan',
+  'Recent Workout': 'Aktivitas Terbaru',
+  'VeloPulse Summary Report': 'Laporan Ringkasan VeloPulse',
+  'Generated {date}': 'Dibuat {date}',
+  'Avg Distance': 'Rerata Jarak',
+  'Avg Duration': 'Rerata Durasi',
+  'Date': 'Tanggal',
+  '{date} already exists locally.': '{date} sudah ada di perangkat ini.',
+  '{date} already exists in Supabase.': '{date} sudah ada di Supabase.',
+  '{date} imported locally, Supabase sync pending.': '{date} diimpor ke perangkat, sinkronisasi Supabase tertunda.',
+  'Could not check Supabase duplicate for {filename}: {message}': 'Tidak dapat memeriksa duplikat Supabase untuk {filename}: {message}',
+  'No importable sessions found in {filename}.': 'Tidak ada sesi yang bisa diimpor di {filename}.',
+  'No sessions imported': 'Tidak ada sesi yang diimpor',
+  '{count} imported': '{count} diimpor',
+  '{count} synced': '{count} tersinkron',
+  '{count} pending': '{count} tertunda',
+  '{count} skipped': '{count} dilewati',
+  'Import failed': 'Impor gagal',
 };
 
 type I18nValue = {

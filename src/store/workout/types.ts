@@ -138,7 +138,12 @@ export interface WorkoutActions {
   setHrrResult: (score: number, classification: string) => void;
   saveSession: () => Promise<void>;
   syncPendingSupabaseSessions: () => Promise<void>;
-  importTCX: (tcxContent: string, filename?: string) => Promise<ImportTcxResult>;
+  importTCX: (
+    tcxContent: string,
+    filename?: string,
+    /** Translator from the UI layer; the store itself has no locale. */
+    translate?: (key: string, values?: Record<string, string | number>) => string
+  ) => Promise<ImportTcxResult>;
   deleteSession: (sessionId: string) => Promise<DeleteSessionResult>;
   discardSession: () => void;
   loadHistory: () => void;

@@ -329,7 +329,14 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
       }
     },
 
-    importTCX: async (tcxContent, filename = 'TCX file') => {
+    importTCX: async (tcxContent, filename = 'TCX file', translate) => {
+      // The store has no translator of its own, so the UI passes the active one
+      // in (see WorkoutActions.importTCX); it falls back to English keys.
+      const tr = translate ?? ((key: string, values: Record<string, string | number> = {}) =>
+        Object.entries(values).reduce(
+          (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+          key
+        ));
       // Sanitize imported durations too: a TCX written from a legacy session
       // (or split across laps) can carry a Lap TotalTimeSeconds far shorter
       // than the trackpoints it contains, which would otherwise recreate the
@@ -353,7 +360,9 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
 
         if (localDuplicate) {
           result.skipped += 1;
-          result.messages.push(`${new Date(importedSession.sessionStartTime).toLocaleString()} already exists locally.`);
+          result.messages.push(tr('{date} already exists locally.', {
+            date: new Date(importedSession.sessionStartTime).toLocaleString(),
+          }));
           continue;
         }
 
@@ -361,7 +370,10 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         try {
           remoteDuplicate = await findSupabaseDuplicate(importedSession);
         } catch (err) {
-          result.messages.push(`Could not check Supabase duplicate for ${filename}: ${err instanceof Error ? err.message : String(err)}`);
+          result.messages.push(tr('Could not check Supabase duplicate for {filename}: {message}', {
+            filename,
+            message: err instanceof Error ? err.message : String(err),
+          }));
         }
 
         if (remoteDuplicate) {
@@ -369,7 +381,9 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           nextHistory = mergeSessionHistories(nextHistory, [remoteDuplicate]);
           set({ sessionHistory: nextHistory });
           persistSessionHistory(nextHistory);
-          result.messages.push(`${new Date(importedSession.sessionStartTime).toLocaleString()} already exists in Supabase.`);
+          result.messages.push(tr('{date} already exists in Supabase.', {
+            date: new Date(importedSession.sessionStartTime).toLocaleString(),
+          }));
           continue;
         }
 
@@ -389,12 +403,14 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           result.synced += 1;
         } else {
           result.pending += 1;
-          result.messages.push(`${new Date(importedSession.sessionStartTime).toLocaleString()} imported locally, Supabase sync pending.`);
+          result.messages.push(tr('{date} imported locally, Supabase sync pending.', {
+            date: new Date(importedSession.sessionStartTime).toLocaleString(),
+          }));
         }
       }
 
       if (result.imported === 0 && result.skipped === 0) {
-        result.messages.push(`No importable sessions found in ${filename}.`);
+        result.messages.push(tr('No importable sessions found in {filename}.', { filename }));
       }
 
       return result;
