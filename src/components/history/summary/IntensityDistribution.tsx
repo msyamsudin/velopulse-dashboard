@@ -1,5 +1,6 @@
 import { useI18n } from '@/i18n';
 import type { IntensitySummary } from '@/lib/history-types';
+import { SESSION_TYPE_LABELS } from '@/lib/workout-analysis';
 
 interface IntensityDistributionProps {
   intensity: IntensitySummary;
@@ -35,7 +36,7 @@ export const IntensityDistribution = ({ intensity }: IntensityDistributionProps)
     belowZoneSeconds,
     easyShare,
     hardShare,
-    sessionTypes,
+    zoneByType,
     powerZones,
     powerCountedSeconds,
     powerBelowZoneSeconds,
@@ -109,19 +110,6 @@ export const IntensityDistribution = ({ intensity }: IntensityDistributionProps)
             </span>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase tracking-[0.12em] text-white/40">
-            <span className="text-white/30">{t('Session types')}</span>
-            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5">
-              {sessionTypes.easy} {t('Easy')}
-            </span>
-            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5">
-              {sessionTypes.moderate} {t('Tempo')}
-            </span>
-            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5">
-              {sessionTypes.hard} {t('Hard')}
-            </span>
-          </div>
-
           <p className="mt-2 text-[11px] leading-5 text-white/55">{verdict}</p>
 
           {belowZonePercent >= 5 && (
@@ -130,6 +118,54 @@ export const IntensityDistribution = ({ intensity }: IntensityDistributionProps)
             </p>
           )}
         </>
+      )}
+
+      {/* Same zones, split by session type: the aggregate bar above cannot show
+          that, say, nine of ten Tempo sessions sit in Z3/Z4 with almost no Z2.
+          The per-type session counts live here now (one place), which is why the
+          plain chips they replaced are gone. An empty range never reaches this
+          component (the Summary shows its own empty state), so there is no
+          second "no data" wording to reconcile. */}
+      {zoneByType.length > 0 && (
+        <div className="mt-3 border-t border-white/6 pt-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-hw-muted">
+              {t('Zone mix by session type')}
+            </div>
+            <div className="text-[9px] font-mono uppercase tracking-[0.12em] text-white/25">
+              {t('Sessions')}
+            </div>
+          </div>
+
+          <div className="mt-2 flex flex-col gap-1.5">
+            {zoneByType.map(entry => (
+              <div key={entry.type} className="flex items-center gap-2">
+                <span className="w-14 shrink-0 text-[9px] font-mono uppercase tracking-[0.12em] text-white/45">
+                  {t(SESSION_TYPE_LABELS[entry.type])}
+                </span>
+                {entry.countedSeconds === 0 ? (
+                  <span className="min-w-0 flex-1 text-[9px] font-mono uppercase tracking-[0.1em] text-white/25">
+                    {t('No heart-rate data')}
+                  </span>
+                ) : (
+                  <span className="flex h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/5">
+                    {entry.zones.map((zone, index) => (
+                      <span
+                        key={zone.label}
+                        className={ZONE_BAR[index] ?? 'bg-white/20'}
+                        style={{ width: `${(zone.seconds / entry.countedSeconds) * 100}%` }}
+                        title={`${zone.label} ${zone.range} · ${zone.percent}% · ${zone.time}`}
+                      />
+                    ))}
+                  </span>
+                )}
+                <span className="w-6 shrink-0 text-right font-mono text-[11px] font-bold tabular-nums text-white/70">
+                  {entry.sessions}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Power zones are gated on FTP, independently of the heart-rate data

@@ -99,7 +99,63 @@ describe('zone time aggregation', () => {
     expect(intensity.belowZoneSeconds).toBe(50);
     expect(intensity.easyShare).toBe(1);
     expect(intensity.hardShare).toBe(0);
-    expect(intensity.sessionTypes).toEqual({ easy: 1, moderate: 0, hard: 0 });
+    expect(intensity.zoneByType).toHaveLength(1);
+    expect(intensity.zoneByType[0]).toMatchObject({ type: 'easy', sessions: 1, countedSeconds: 50 });
+  });
+});
+
+describe('zone mix per session type', () => {
+  const point = (index: number, hr: number) => ({
+    time: `${index}`,
+    ts: Date.parse(daysAgo(1)) + index * 1000,
+    hr,
+    cadence: 80,
+    power: 150,
+    speed: 20,
+    distance: 0,
+    resistance: 0,
+    calories: 0,
+  });
+
+  // maxHr 200: 130 bpm is Z2 (easy), 165 bpm is Z4 (hard by quality ratio).
+  const bucketSession = (id: string, hr: number, avgHr: number): WorkoutSession => ({
+    id,
+    sessionStartTime: Date.parse(daysAgo(1)),
+    date: daysAgo(1),
+    duration: 100,
+    stats: { avgHr, maxHr: 170, avgPower: 120, maxPower: 250, avgCadence: 80, maxCadence: 90 },
+    history: Array.from({ length: 10 }, (_, index) => point(index, hr)),
+  });
+
+  it('buckets each session by quality and keeps its own zone distribution', () => {
+    // avgHr 120 / maxHr 200 = 0.6 → Endurance (easy); avgHr 150 → Tempo.
+    const easy = bucketSession('easy', 130, 120);
+    const tempo = bucketSession('tempo', 130, 150);
+
+    const { result } = renderHistoryHook([easy, tempo]);
+    const { zoneByType } = result.current.intensity;
+
+    expect(zoneByType.map(entry => entry.type)).toEqual(['easy', 'moderate']);
+    expect(zoneByType[0].sessions).toBe(1);
+    expect(zoneByType[0].countedSeconds).toBe(100);
+    expect(zoneByType[1].sessions).toBe(1);
+    // The buckets partition the aggregate zone seconds, they do not duplicate
+    // a different definition of them.
+    expect(zoneByType.reduce((total, entry) => total + entry.countedSeconds, 0))
+      .toBe(result.current.intensity.countedSeconds);
+  });
+
+  it('keeps a bucket that recorded no heart rate visible by name', () => {
+    // A session with no HR still has a quality label and must not vanish from
+    // the mix: it is the "9 of 10 sessions had no Z2" reading.
+    const noHr = bucketSession('no-hr', 0, 0);
+
+    const { result } = renderHistoryHook([noHr]);
+    const { zoneByType } = result.current.intensity;
+
+    expect(zoneByType).toHaveLength(1);
+    expect(zoneByType[0]).toMatchObject({ type: 'easy', sessions: 1, countedSeconds: 0 });
+    expect(zoneByType[0].zones.every(zone => zone.seconds === 0)).toBe(true);
   });
 });
 

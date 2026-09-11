@@ -1,6 +1,7 @@
 import type { LoadTrend, TrainingLoadMetrics, TrainingLoadResult } from '@/lib/training-load';
 import type { BodyMetrics } from '@/lib/body-metrics';
 import type { PowerZoneShare } from '@/lib/power-zones';
+import type { SessionTypeBucket } from '@/lib/workout-analysis';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 export type { WorkoutSession };
@@ -111,6 +112,21 @@ export interface ZoneShare {
   time: string;
 }
 
+/**
+ * Zone composition of one session-type bucket. The count and the zones are
+ * tracked apart on purpose: a bucket can hold sessions that recorded no heart
+ * rate at all, and dropping those rows would hide the very monotony the block
+ * is there to expose.
+ */
+export interface SessionTypeZones {
+  type: SessionTypeBucket;
+  /** Sessions in this bucket, with or without heart-rate data. */
+  sessions: number;
+  zones: ZoneShare[];
+  /** Zone seconds inside this bucket (Z1–Z5); 0 when none of them carried HR. */
+  countedSeconds: number;
+}
+
 /** Intensity composition of the selected range (block 4 of the Summary). */
 export interface IntensitySummary {
   zones: ZoneShare[];
@@ -122,8 +138,12 @@ export interface IntensitySummary {
   easyShare: number;
   /** (Z4+Z5) / countedSeconds, 0..1. */
   hardShare: number;
-  /** Sessions bucketed by their quality label. */
-  sessionTypes: { easy: number; moderate: number; hard: number };
+  /**
+   * Zone mix split by session type (easy/moderate/hard), in display order and
+   * limited to the buckets the range actually contains. This is also where the
+   * per-type session counts live — the same number is not repeated elsewhere.
+   */
+  zoneByType: SessionTypeZones[];
   /**
    * Power-zone distribution (Z1–Z7 from POWER_ZONES). Empty while the rider has
    * no FTP: with `ftp <= 0` all samples would fall into Z1, so no distribution

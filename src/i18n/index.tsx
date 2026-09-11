@@ -466,7 +466,6 @@ const id: Record<string, string> = {
   'Time in heart-rate zones': 'Waktu di zona detak jantung',
   'Easy volume': 'Volume mudah',
   'Hard volume': 'Volume keras',
-  'Session types': 'Tipe sesi',
   'Easy': 'Ringan',
   'Tempo': 'Tempo',
   'Hard': 'Berat',
@@ -753,6 +752,10 @@ const id: Record<string, string> = {
   '1 km': '1 km',
   '5 km': '5 km',
   '10 km': '10 km',
+
+  // Zone mix per session type (Fase 6.3)
+  'Zone mix by session type': 'Komposisi zona per tipe sesi',
+  'No heart-rate data': 'Belum ada data detak jantung',
 };
 
 type I18nValue = {

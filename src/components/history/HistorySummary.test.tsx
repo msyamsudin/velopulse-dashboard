@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { HistorySummary } from './HistorySummary';
-import type { AdvancedSummary, ComparisonSummary, GlobalSummary, IntensitySummary, PowerZoneShare, SummaryInsights } from '@/lib/history-types';
+import type { AdvancedSummary, ComparisonSummary, GlobalSummary, IntensitySummary, PowerZoneShare, SessionTypeZones, SummaryInsights } from '@/lib/history-types';
 import type { TrainingLoadMetrics } from '@/lib/training-load';
 
 // Pin the locale so number formatting (e.g. 3,980 kcal) is deterministic
@@ -64,6 +64,45 @@ const powerZones: PowerZoneShare[] = [
   { label: 'Z7', name: 'Neuro', color: 'bg-purple-500', range: '>300', seconds: 60, percent: 2, time: '01:00' },
 ];
 
+const zoneByType: SessionTypeZones[] = [
+  {
+    type: 'easy',
+    sessions: 8,
+    countedSeconds: 1800,
+    zones: [
+      { label: 'Z1', range: '<95', seconds: 600, percent: 33, time: '10:00' },
+      { label: 'Z2', range: '95-114', seconds: 900, percent: 50, time: '15:00' },
+      { label: 'Z3', range: '114-133', seconds: 300, percent: 17, time: '05:00' },
+      { label: 'Z4', range: '133-152', seconds: 0, percent: 0, time: '00:00' },
+      { label: 'Z5', range: '>152', seconds: 0, percent: 0, time: '00:00' },
+    ],
+  },
+  {
+    type: 'moderate',
+    sessions: 3,
+    countedSeconds: 900,
+    zones: [
+      { label: 'Z1', range: '<95', seconds: 0, percent: 0, time: '00:00' },
+      { label: 'Z2', range: '95-114', seconds: 90, percent: 10, time: '01:30' },
+      { label: 'Z3', range: '114-133', seconds: 450, percent: 50, time: '07:30' },
+      { label: 'Z4', range: '133-152', seconds: 360, percent: 40, time: '06:00' },
+      { label: 'Z5', range: '>152', seconds: 0, percent: 0, time: '00:00' },
+    ],
+  },
+  {
+    type: 'hard',
+    sessions: 1,
+    countedSeconds: 300,
+    zones: [
+      { label: 'Z1', range: '<95', seconds: 0, percent: 0, time: '00:00' },
+      { label: 'Z2', range: '95-114', seconds: 0, percent: 0, time: '00:00' },
+      { label: 'Z3', range: '114-133', seconds: 0, percent: 0, time: '00:00' },
+      { label: 'Z4', range: '133-152', seconds: 90, percent: 30, time: '01:30' },
+      { label: 'Z5', range: '>152', seconds: 210, percent: 70, time: '03:30' },
+    ],
+  },
+];
+
 const intensity: IntensitySummary = {
   zones: [
     { label: 'Z1', range: '<95', seconds: 600, percent: 20, time: '10:00' },
@@ -76,7 +115,7 @@ const intensity: IntensitySummary = {
   belowZoneSeconds: 0,
   easyShare: 0.72,
   hardShare: 0.1,
-  sessionTypes: { easy: 8, moderate: 3, hard: 1 },
+  zoneByType,
   powerZones,
   powerCountedSeconds: 3000,
   powerBelowZoneSeconds: 0,
@@ -237,8 +276,57 @@ describe('HistorySummary', () => {
     expect(screen.getByText(/Easy volume/)).toBeInTheDocument();
     // 72% easy / 10% hard is neither "mostly easy" nor hard-heavy.
     expect(screen.getByText('Balanced mix of easy and hard riding.')).toBeInTheDocument();
-    expect(screen.getByText('8 Easy')).toBeInTheDocument();
-    expect(screen.getByText('1 Hard')).toBeInTheDocument();
+  });
+
+  it('splits the zone mix by session type and keeps the per-type counts there', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary {...baseProps} globalSummary={globalSummary} summaryInsights={summaryInsights} />
+      </I18nProvider>
+    );
+
+    expect(screen.getByText('Zone mix by session type')).toBeInTheDocument();
+    // One row per bucket, carrying the count that the old chips duplicated.
+    // ("Sessions" itself is also a RangeTotals cell, so it is not asserted by
+    // text here.)
+    const countIn = (bucket: string, count: string) => {
+      const row = screen.getByText(bucket).closest('div');
+      expect(row).not.toBeNull();
+      expect(within(row as HTMLElement).getByText(count)).toBeInTheDocument();
+    };
+    countIn('Easy', '8');
+    countIn('Tempo', '3');
+    countIn('Hard', '1');
+    expect(screen.queryByText('Session types')).not.toBeInTheDocument();
+  });
+
+  it('names a session-type bucket that recorded no heart rate instead of hiding it', () => {
+    render(
+      <I18nProvider>
+        <HistorySummary
+          {...baseProps}
+          intensity={{
+            ...intensity,
+            zoneByType: [
+              zoneByType[0],
+              {
+                ...zoneByType[1],
+                sessions: 2,
+                countedSeconds: 0,
+                zones: zoneByType[1].zones.map(zone => ({ ...zone, seconds: 0, percent: 0, time: '00:00' })),
+              },
+            ],
+          }}
+          globalSummary={globalSummary}
+          summaryInsights={summaryInsights}
+        />
+      </I18nProvider>
+    );
+
+    // The 2 sessions must stay visible even though they have no zone data.
+    expect(screen.getByText('No heart-rate data')).toBeInTheDocument();
+    const row = screen.getByText('Tempo').closest('div') as HTMLElement;
+    expect(within(row).getByText('2')).toBeInTheDocument();
   });
 
   it('renders the power-zone distribution only once an FTP is set', () => {
@@ -308,7 +396,11 @@ describe('HistorySummary', () => {
             belowZoneSeconds: 0,
             easyShare: 0,
             hardShare: 0,
-            sessionTypes: { easy: 0, moderate: 0, hard: 0 },
+            zoneByType: intensity.zoneByType.map(entry => ({
+              ...entry,
+              countedSeconds: 0,
+              zones: entry.zones.map(zone => ({ ...zone, seconds: 0, percent: 0, time: '00:00' })),
+            })),
           }}
           globalSummary={globalSummary}
           summaryInsights={summaryInsights}

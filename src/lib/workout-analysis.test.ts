@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPersonalRecords } from './workout-analysis';
+import { getPersonalRecords, getSessionTypeBucket, SESSION_TYPE_BUCKETS, SESSION_TYPE_LABELS } from './workout-analysis';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 const makeSession = (
@@ -128,5 +128,25 @@ describe('getPersonalRecords — Fastest Avg Speed', () => {
     // a = 27.0 km/h, b = 36.0 km/h → b is the legitimate record.
     expect(fastest?.value).toBe('36.0');
     expect(fastest?.sessionId).toBe('b');
+  });
+});
+
+describe('getSessionTypeBucket', () => {
+  it('folds the five quality labels into three buckets', () => {
+    expect(getSessionTypeBucket('Easy')).toBe('easy');
+    expect(getSessionTypeBucket('Endurance')).toBe('easy');
+    expect(getSessionTypeBucket('Tempo')).toBe('moderate');
+    expect(getSessionTypeBucket('Hard')).toBe('hard');
+    expect(getSessionTypeBucket('Peak')).toBe('hard');
+  });
+
+  it('treats an unknown label as hard rather than dropping the session', () => {
+    expect(getSessionTypeBucket('')).toBe('hard');
+    expect(getSessionTypeBucket('something-new')).toBe('hard');
+  });
+
+  it('keeps the display order and labels in step with the bucket list', () => {
+    expect(SESSION_TYPE_BUCKETS).toEqual(['easy', 'moderate', 'hard']);
+    expect(SESSION_TYPE_BUCKETS.map(bucket => SESSION_TYPE_LABELS[bucket])).toEqual(['Easy', 'Tempo', 'Hard']);
   });
 });

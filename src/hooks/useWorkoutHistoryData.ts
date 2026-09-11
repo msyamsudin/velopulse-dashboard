@@ -5,7 +5,7 @@ import { calculateEdwardsTrimp, calculateLoadTrend, calculateTrainingLoadMetrics
 import { computeBodyMetrics } from '@/lib/body-metrics';
 import { summarizePowerZones } from '@/lib/power-zones';
 import { getProfileGate } from '@/lib/profile-gate';
-import { getFinalMetrics, getWorkoutQuality } from '@/lib/workout-analysis';
+import { getFinalMetrics, getSessionTypeBucket, getWorkoutQuality, SESSION_TYPE_BUCKETS, type SessionTypeBucket } from '@/lib/workout-analysis';
 import { useI18n } from '@/i18n';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 import type { HistoryData } from '@/store/useWorkoutStore';
@@ -19,6 +19,7 @@ import type {
   AdvancedSummary,
   MetricKey,
   PeriodSummaryEntry,
+  SessionTypeZones,
   SummaryInsights,
   WeeklyLoadPoint,
   WorkoutHistoryData,
@@ -519,43 +520,65 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, su
     };
   }, [summaryData, filteredSessions, trainingLoadMetrics]);
 
-  // Intensity composition of the range: time in each HR zone, the
-  // easy/tempo/hard session mix, and the power-zone distribution. All three
-  // come from data that is already computed or from one cheap pass over the
-  // session histories; the power block stays empty while the FTP gate is shut.
+  // Intensity composition of the range: time in each HR zone, the same zones
+  // split by session type, and the power-zone distribution. All of it comes
+  // from data that is already computed or from one cheap pass over the session
+  // histories; the power block stays empty while the FTP gate is shut.
   const intensity = useMemo<IntensitySummary>(() => {
     const zoneSeconds = HR_ZONES.map(() => 0);
-    const sessionTypes = { easy: 0, moderate: 0, hard: 0 };
+    // Per bucket: session count plus its own zone seconds. Both are needed —
+    // a bucket whose sessions recorded no HR must still show up by name.
+    const buckets: Record<SessionTypeBucket, { sessions: number; zoneSeconds: number[] }> = {
+      easy: { sessions: 0, zoneSeconds: HR_ZONES.map(() => 0) },
+      moderate: { sessions: 0, zoneSeconds: HR_ZONES.map(() => 0) },
+      hard: { sessions: 0, zoneSeconds: HR_ZONES.map(() => 0) },
+    };
     let recordedSeconds = 0;
 
     filteredSessions.forEach(session => {
       recordedSeconds += session.duration || 0;
 
-      calculateFullStats(session).zones.forEach((zone, index) => {
-        if (index < zoneSeconds.length) zoneSeconds[index] += zone.seconds;
-      });
+      const bucket = getSessionTypeBucket(getWorkoutQuality(session, maxHr).label);
+      buckets[bucket].sessions += 1;
 
-      const quality = getWorkoutQuality(session, maxHr).label;
-      if (quality === 'Easy' || quality === 'Endurance') sessionTypes.easy += 1;
-      else if (quality === 'Tempo') sessionTypes.moderate += 1;
-      else sessionTypes.hard += 1;
+      calculateFullStats(session).zones.forEach((zone, index) => {
+        if (index >= zoneSeconds.length) return;
+        zoneSeconds[index] += zone.seconds;
+        buckets[bucket].zoneSeconds[index] += zone.seconds;
+      });
     });
 
-    const countedSeconds = zoneSeconds.reduce((total, value) => total + value, 0);
     // Zone boundaries are identical for every session of a render, so the first
     // session supplies the absolute bpm ranges for the legend.
     const zoneRanges = filteredSessions.length > 0 ? calculateFullStats(filteredSessions[0]).zones : [];
-    const zones: ZoneShare[] = zoneSeconds.map((seconds, index) => ({
-      label: `Z${index + 1}`,
-      range: zoneRanges[index]?.range ?? '',
-      seconds,
-      percent: countedSeconds > 0 ? Math.round((seconds / countedSeconds) * 100) : 0,
-      time: formatDuration(seconds),
-    }));
+    const buildZoneShares = (seconds: number[]): { zones: ZoneShare[]; countedSeconds: number } => {
+      const counted = seconds.reduce((total, value) => total + value, 0);
+      return {
+        countedSeconds: counted,
+        zones: seconds.map((value, index) => ({
+          label: `Z${index + 1}`,
+          range: zoneRanges[index]?.range ?? '',
+          seconds: value,
+          percent: counted > 0 ? Math.round((value / counted) * 100) : 0,
+          time: formatDuration(value),
+        })),
+      };
+    };
 
+    const overall = buildZoneShares(zoneSeconds);
+    const countedSeconds = overall.countedSeconds;
+    const zones = overall.zones;
     const lastZone = zoneSeconds.length - 1;
     const easySeconds = (zoneSeconds[0] ?? 0) + (zoneSeconds[1] ?? 0);
     const hardSeconds = (zoneSeconds[lastZone - 1] ?? 0) + (zoneSeconds[lastZone] ?? 0);
+
+    const zoneByType: SessionTypeZones[] = SESSION_TYPE_BUCKETS
+      .map(type => ({
+        type,
+        sessions: buckets[type].sessions,
+        ...buildZoneShares(buckets[type].zoneSeconds),
+      }))
+      .filter(entry => entry.sessions > 0);
 
     const power = summarizePowerZones(
       filteredSessions.map(session => ({ history: session.history || [], duration: session.duration || 0 })),
@@ -568,7 +591,7 @@ export const useWorkoutHistoryData = ({ sessions, maxHr, ftp = 0, weight = 0, su
       belowZoneSeconds: Math.max(0, recordedSeconds - countedSeconds),
       easyShare: countedSeconds > 0 ? easySeconds / countedSeconds : 0,
       hardShare: countedSeconds > 0 ? hardSeconds / countedSeconds : 0,
-      sessionTypes,
+      zoneByType,
       powerZones: power.zones,
       powerCountedSeconds: power.countedSeconds,
       powerBelowZoneSeconds: power.belowZoneSeconds,

@@ -59,6 +59,31 @@ export const getWorkoutQuality = (session: WorkoutSession, maxHr: number) => {
   return { label: 'Easy', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/25' };
 };
 
+/** Coarse session-type buckets used by the Summary's zone mix. */
+export type SessionTypeBucket = 'easy' | 'moderate' | 'hard';
+
+/** Display order of the buckets, and the i18n keys they are rendered with. */
+export const SESSION_TYPE_BUCKETS: SessionTypeBucket[] = ['easy', 'moderate', 'hard'];
+
+export const SESSION_TYPE_LABELS: Record<SessionTypeBucket, string> = {
+  easy: 'Easy',
+  moderate: 'Tempo',
+  hard: 'Hard',
+};
+
+/**
+ * Maps a quality label to its coarse bucket.
+ *
+ * Single definition shared by the session-type counts and the per-type zone
+ * mix, so the two readings of the same range can never disagree about which
+ * bucket a session belongs to.
+ */
+export const getSessionTypeBucket = (qualityLabel: string): SessionTypeBucket => {
+  if (qualityLabel === 'Easy' || qualityLabel === 'Endurance') return 'easy';
+  if (qualityLabel === 'Tempo') return 'moderate';
+  return 'hard';
+};
+
 /** Translator injected by the UI layer; defaults to an English passthrough. */
 export type Translate = (key: string, values?: Record<string, string | number>) => string;
 
