@@ -786,6 +786,13 @@ const id: Record<string, string> = {
   'Body trend': 'Tren tubuh',
   'From {count} entries on this device': 'Dari {count} entri di perangkat ini',
   'at {weight} kg': 'pada {weight} kg',
+
+  // Build identity (footer + Settings > System)
+  'Version': 'Versi',
+  'Commit': 'Commit',
+  'Built': 'Dibangun',
+  'Build info': 'Info build',
+  'Build identity of the running deployment — include it in bug reports.': 'Identitas build dari deployment yang sedang berjalan — sertakan saat melaporkan bug.',
 };
 
 type I18nValue = {

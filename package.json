@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "velopulse-dashboard",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "engines": {
@@ -15,7 +15,13 @@
     "i18n:check": "node scripts/check-i18n-keys.mjs",
     "i18n:check:strict": "node scripts/check-i18n-keys.mjs --strict",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "commit:check": "node scripts/check-commit-msg.mjs --range",
+    "changelog": "node scripts/gen-changelog.mjs",
+    "changelog:write": "node scripts/gen-changelog.mjs --write",
+    "hooks:install": "node scripts/setup-git-hooks.mjs",
+    "hooks:uninstall": "node scripts/setup-git-hooks.mjs --uninstall",
+    "prepare": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",

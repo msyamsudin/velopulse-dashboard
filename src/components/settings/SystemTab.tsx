@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle, Lock, Target, Loader2, AlertCircle, Server, Copy, Eye, EyeOff } from 'lucide-react';
 import { AppConfig } from '@/lib/config-helper';
+import { APP_VERSION, formatBuildDate, shortSha } from '@/lib/version';
 import { useI18n } from '@/i18n';
 
 interface SystemTabProps {
@@ -296,6 +297,30 @@ export const SystemTab = ({
           </div>
         </div>
         
+        {/* Build identity — the deployment the user is actually running. */}
+        <div className="space-y-2 border-t border-vp-border pt-4">
+          <h4 className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-vp-accent">
+            <Server size={12} /> {t('Build info')}
+          </h4>
+          <dl className="grid grid-cols-1 gap-3 font-mono text-[10px] sm:grid-cols-3">
+            <div className="space-y-1">
+              <dt className="vp-label text-[8px]">{t('Version')}</dt>
+              <dd className="select-all text-vp-text/80">{APP_VERSION}</dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="vp-label text-[8px]">{t('Commit')}</dt>
+              <dd className="select-all text-vp-text/80">{shortSha()}</dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="vp-label text-[8px]">{t('Built')}</dt>
+              <dd className="select-all text-vp-text/80">{formatBuildDate() || '—'}</dd>
+            </div>
+          </dl>
+          <p className="text-[8px] font-mono uppercase leading-tight text-vp-muted">
+            {t('Build identity of the running deployment — include it in bug reports.')}
+          </p>
+        </div>
+
         <button 
           onClick={onSave}
           disabled={saveStatus === 'saving'}
