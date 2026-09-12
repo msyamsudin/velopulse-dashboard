@@ -4,9 +4,13 @@ Dokumen ini menjelaskan cara perubahan masuk ke repositori ini: format commit,
 cara versi ditentukan, cara rilis dibuat, dan bagaimana pekerjaan yang dibantu AI
 dicatat.
 
-**Bahasa:** dokumen untuk manusia (README, CONTRIBUTING, ADR) ditulis dalam
-**Indonesia**. Kode, komentar, dan pesan commit ditulis dalam **Inggris**.
-Pemisahan ini disengaja — jangan campur.
+**Bahasa:** dokumen untuk manusia (README, CONTRIBUTING, ADR), komentar kode,
+dan pesan commit ditulis dalam **Indonesia**. Identifier — nama variabel,
+fungsi, tipe, dan berkas — serta kunci i18n tetap **Inggris**: bahasa Indonesia
+masuk ke kalimat, bukan ke nama. Token yang dibaca mesin (tipe/scope commit,
+`BREAKING CHANGE:`, `Assisted-by:`) juga tetap Inggris. Karena identifier tetap
+Inggris, satu berkas sumber wajar memuat dua bahasa; yang dilarang adalah
+mencampurnya dalam satu paragraf.
 
 ---
 
@@ -41,9 +45,9 @@ Tipe yang diizinkan:
 Contoh yang baik:
 
 ```
-feat(history): add the best-efforts power curve
-fix(i18n): translate the rest of the app and enforce the check in CI
-feat(api)!: drop the legacy sync endpoint
+feat(history): gambar kurva power upaya terbaik
+fix(i18n): terjemahkan sisa aplikasi dan tegakkan pemeriksaannya di CI
+feat(api)!: hapus endpoint sinkronisasi lama
 ```
 
 ### Kenapa ini bukan sekadar preferensi gaya
@@ -52,6 +56,12 @@ feat(api)!: drop the legacy sync endpoint
 dan `scripts/gen-changelog.mjs` memakainya untuk menyusun catatan rilis. Pesan
 commit yang tidak sesuai **tidak menghasilkan error di mana pun** — perubahannya
 hanya hilang dari changelog. Karena itu pelanggarannya dijadikan kegagalan build.
+
+Subjek boleh berbahasa Indonesia, tetapi **tipe dan scope tidak**. Keduanya
+dibaca mesin: `scripts/lib/conventional-commits.mjs` mencocokkan tipe terhadap
+daftar tertutup, dan `release-please-config.json` memetakan tipe itu ke section
+changelog. Header seperti `fitur(riwayat): ...` karena itu ditolak hook, dan
+`BREAKING CHANGE:` harus tetap ditulis dalam bahasa Inggris agar terdeteksi.
 
 ### Jebakan BOM
 
@@ -269,8 +279,8 @@ membacanya otomatis alih-alih menebak.
 
 ### 5.2 Yang tetap harus dilakukan manusia
 
-- **Tulis "kenapa" pada body commit/PR.** Subjek "add the advanced analysis
-  panel" tidak memberi tahu apa pun tentang alasan. Agen bisa mengubah 20 file
+- **Tulis "kenapa" pada body commit/PR.** Subjek "tambahkan panel analisis
+  lanjutan" tidak memberi tahu apa pun tentang alasan. Agen bisa mengubah 20 file
   dalam satu langkah; niatnya harus ditulis manusia.
 - **Tinjau diff-nya, bukan ringkasannya.** Ringkasan agen selalu terdengar yakin,
   termasuk saat salah.

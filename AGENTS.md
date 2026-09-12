@@ -35,11 +35,15 @@ gate gagal, laporkan kegagalannya.
 `<tipe>(<scope>): <subjek>`
 
 Tipe yang sah: `feat`, `fix`, `perf`, `revert`, `docs`, `refactor`, `test`,
-`build`, `ci`, `chore`, `style`.
+`build`, `ci`, `chore`, `style`. Subjek ditulis dalam **Indonesia**; tipe dan
+scope tetap **Inggris** (lihat §8).
 
 - **Jangan pernah memulai pesan commit dengan BOM** (`U+FEFF`). Hook dan CI
   menolaknya, dan alasannya nyata: BOM membuat tooling rilis melewati commit itu
   tanpa satu pun pesan error.
+- **Header harus cocok dengan daftar tipe tertutup.** `scripts/lib/conventional-commits.mjs`
+  mencocokkan tipe terhadap daftar di atas, jadi `fitur(riwayat): ...` ditolak
+  hook. Terjemahkan subjeknya, bukan tipenya.
 - Tulis **kenapa** di body, bukan hanya apa. Perubahan agen cenderung besar dan
   multi-tujuan, dan subjek satu baris tidak bisa membawa niat itu.
 - `.githooks/commit-msg` memvalidasi secara lokal; job `commits` di CI
@@ -52,7 +56,7 @@ Tipe yang sah: `feat`, `fix`, `perf`, `revert`, `docs`, `refactor`, `test`,
 Tambahkan trailer `Assisted-by: <agent> <versi model>` pada commit yang dibantu AI.
 
 ```
-feat(history): add the interval breakdown
+feat(history): tambahkan rincian interval
 
 Kenapa perubahan ini ada, dan apa yang diverifikasi manual.
 
@@ -133,6 +137,18 @@ Commit lokal di cabang kerja sendiri aman dan diharapkan.
 
 - Dokumen untuk manusia (`README.md`, `CONTRIBUTING.md`, `docs/adr/`, `AGENTS.md`):
   **Indonesia**.
-- Kode, komentar kode, dan pesan commit: **Inggris**.
+- Komentar kode dan pesan commit: **Indonesia**.
+- Identifier — nama variabel, fungsi, tipe, komponen, hook, dan nama berkas —
+  tetap **Inggris**. Bahasa Indonesia masuk ke kalimat, bukan ke nama.
+- Token yang dibaca mesin tetap **Inggris** walau kalimat di sekitarnya
+  Indonesia: tipe dan scope pada header commit, `BREAKING CHANGE:`, trailer
+  `Assisted-by:`, dan nama section di `release-please-config.json`.
+- Kunci i18n di `src/i18n/index.tsx` tetap **Inggris**; teks untuk pengguna
+  diterjemahkan lewat nilainya, bukan dengan mengganti kuncinya.
 
-Jangan mencampur keduanya dalam satu berkas yang sama.
+Aturan ini mengikat tulisan **baru**. Komentar Inggris yang sudah ada tidak perlu
+ditulis ulang demi aturan ini — rapikan saat berkas itu memang sedang disentuh.
+
+Karena identifier tetap Inggris, satu berkas sumber wajar memuat dua bahasa:
+komentar Indonesia, kode Inggris. Yang dilarang adalah mencampur keduanya dalam
+satu paragraf komentar atau satu blok dokumen.
