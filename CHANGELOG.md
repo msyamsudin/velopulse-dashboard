@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/msyamsudin/velopulse-dashboard/compare/v0.3.0...v0.3.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **dev:** cegah EADDRINUSE dengan penjaga port di start.bat ([64eead1](https://github.com/msyamsudin/velopulse-dashboard/commit/64eead1f8e37babf75827b4eca6f65a831fd3661))
+
+
+### Documentation
+
+* **agents:** jadikan komentar kode dan pesan commit berbahasa Indonesia ([#4](https://github.com/msyamsudin/velopulse-dashboard/issues/4)) ([fc1c8ff](https://github.com/msyamsudin/velopulse-dashboard/commit/fc1c8ffa3e7c4cb62071a4140fecd8834af79432))
+
 ## [0.3.0](https://github.com/msyamsudin/velopulse-dashboard/compare/v0.2.0...v0.3.0) (2026-09-12)
 
 
