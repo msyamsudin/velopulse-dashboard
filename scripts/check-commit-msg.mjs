@@ -191,7 +191,7 @@ function checkFile(options) {
   console.error(
     '\nFormat: type(scope): subject\n' +
       'Types : feat, fix, perf, revert, docs, refactor, test, build, ci, chore, style\n' +
-      'Example: feat(history): add the best-efforts power curve'
+      'Example: feat(history): gambar kurva power upaya terbaik'
   );
   return 1;
 }
