@@ -114,6 +114,8 @@ echo [INFO] VeloPulse Pro will launch at http://localhost:%PORT%
 start cmd /c "timeout /t 5 /nobreak > nul && start http://localhost:%PORT%"
 echo [INFO] Ignition... All systems GO.
 echo.
-call pnpm run dev -- -p %PORT%
+:: Tanpa pemisah `--`: pnpm 11 meneruskan `--` itu apa adanya ke skrip, dan
+:: `next dev -- -p 3000` membacanya sebagai nama direktori proyek.
+call pnpm run dev -p %PORT%
 
 pause
