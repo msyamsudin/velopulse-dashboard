@@ -572,7 +572,9 @@ export const RecordingCockpit = ({
             </div>
 
             {/* 3. MACHINE & RHYTHM GRID (4 Cols) */}
-            <div className="lg:col-span-4 grid grid-cols-2 gap-3 flex-1">
+            {/* Baris terakhir memakai 1fr supaya sisa tinggi kolom diserap kartu
+                TRAINING LOAD, bukan menyisakan celah kosong di bawahnya. */}
+            <div className="lg:col-span-4 grid grid-cols-2 grid-rows-[auto_auto_1fr] gap-3">
               {/* Cadence Card */}
               <MiniMetricCard
                 label={t('Cadence')}
@@ -660,7 +662,7 @@ export const RecordingCockpit = ({
               </section>
 
               {/* Edwards TRIMP Card */}
-              <div className="col-span-2">
+              <div className="col-span-2 flex flex-col">
                 <MiniMetricCard
                   label={t('Training Load (TRIMP)')}
                   value={trimp.score || '--'}
