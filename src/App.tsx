@@ -466,41 +466,6 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      {/* Stealth Floating Stop Button */}
-      <AnimatePresence>
-        {isRideSurface && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.5 }}
-            whileHover={{
-              width: 128,
-              height: 40,
-              borderRadius: '8px'
-            }}
-            type="button"
-            onClick={handleStopRecording}
-            aria-label={t('Stop workout session')}
-            title={t('Stop workout session')}
-            className="vp-focus-ring fixed top-6 right-6 z-100 group flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-vp-danger/30 bg-vp-danger/10 text-vp-danger shadow-2xl backdrop-blur-sm transition-colors hover:border-vp-danger/60 hover:bg-vp-danger hover:text-white"
-          >
-            {/* The Stealth Dot (Normal state) */}
-            <div className="group-hover:hidden relative w-2 h-2">
-              <div className="absolute inset-0 rounded-full bg-white animate-ping opacity-60" />
-              <div className="absolute inset-0 rounded-full bg-white opacity-100" />
-            </div>
-
-            {/* The Stop Content (Hover state) */}
-            <div className="hidden group-hover:flex items-center gap-2 px-3 animate-in fade-in zoom-in duration-300">
-              <div className="w-2.5 h-2.5 bg-white rounded-sm" />
-              <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap text-white">
-                Stop Session
-              </span>
-            </div>
-          </motion.button>
-        )}
-      </AnimatePresence>
-
       {/* PerformanceChart is now inside the viewMode conditional block above */}
 
       <AnimatePresence>

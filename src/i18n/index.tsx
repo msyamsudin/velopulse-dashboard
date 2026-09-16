@@ -402,7 +402,6 @@ const id: Record<string, string> = {
   'Raw Bluetooth Telemetry': 'Telemetri Bluetooth Mentah',
   'Waiting for device connection...': 'Menunggu koneksi perangkat...',
   'Stop this workout session?': 'Hentikan sesi latihan ini?',
-  'Stop workout session': 'Hentikan sesi latihan',
   'Loading panel': 'Memuat panel',
   'Preparing telemetry view': 'Menyiapkan tampilan telemetri',
 
