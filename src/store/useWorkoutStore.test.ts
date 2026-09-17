@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useBluetoothStore } from './useBluetoothStore';
 import { calculateSessionCalories, useWorkoutStore } from './useWorkoutStore';
+import { isSupabaseSyncPending } from './workout/session-utils';
 
 describe('Workout Store calorie calculation', () => {
   it('accumulates fractional power calories without per-second rounding', () => {
@@ -270,6 +271,81 @@ describe('subjective effort stored with the session', () => {
     await rideOneMinute();
     await useWorkoutStore.getState().saveSession(0);
     expect(useWorkoutStore.getState().sessionHistory[0].stats.rpe).toBeUndefined();
+  });
+});
+
+describe('demo sessions stay on this device', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useWorkoutStore.setState({
+      isRecording: false,
+      sessionStartTime: null,
+      elapsed: 0,
+      history: [],
+      sessionHistory: [],
+      isSimulatedSession: false,
+    });
+    useBluetoothStore.setState({ isSimulating: false, data: {}, lastUpdate: {} });
+  });
+
+  const rideOneMinute = async () => {
+    useBluetoothStore.setState({
+      lastUpdate: { heartRate: Date.now(), power: Date.now() },
+      data: { heartRate: 120, power: 200 },
+    });
+    useWorkoutStore.getState().addHistoryPoint({ heartRate: 120, power: 200 });
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    useWorkoutStore.getState().addHistoryPoint({ heartRate: 130, power: 210 });
+  };
+
+  it('marks a ride started in demo mode and keeps it out of the Supabase queue', async () => {
+    useBluetoothStore.setState({ isSimulating: true, data: { heartRate: 120, power: 200 } });
+    useWorkoutStore.getState().toggleRecording();
+    expect(useWorkoutStore.getState().isSimulatedSession).toBe(true);
+
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession();
+
+    const saved = useWorkoutStore.getState().sessionHistory[0];
+    expect(saved.simulated).toBe(true);
+    expect(saved.synced_to_supabase).toBe(false);
+    // Tidak pernah dihitung sebagai tertunda: tidak ada badge "pending sync",
+    // tidak ada percobaan auto-sync berulang.
+    expect(isSupabaseSyncPending(saved)).toBe(false);
+
+    // The retry queue walks past it: no error is ever attached, because the
+    // Supabase client is never reached for a simulated session.
+    await useWorkoutStore.getState().syncPendingSupabaseSessions();
+    const after = useWorkoutStore.getState().sessionHistory[0];
+    expect(after.supabase_sync_error).toBeUndefined();
+    expect(after.supabase_sync_error_code).toBeUndefined();
+  });
+
+  it('leaves a real ride unflagged so it still syncs as before', async () => {
+    useBluetoothStore.setState({ isSimulating: false, data: { heartRate: 120, power: 200 } });
+    useWorkoutStore.getState().toggleRecording();
+    expect(useWorkoutStore.getState().isSimulatedSession).toBe(false);
+
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession();
+
+    const saved = useWorkoutStore.getState().sessionHistory[0];
+    expect(saved.simulated).toBeUndefined();
+    expect('simulated' in saved).toBe(true);
+    // Sesi asli tetap menunggu sinkronisasi seperti sebelumnya.
+    expect(isSupabaseSyncPending(saved)).toBe(true);
+  });
+
+  it('freezes the origin at start so stopping the demo mid-ride cannot make it syncable', async () => {
+    useBluetoothStore.setState({ isSimulating: true, data: { heartRate: 120, power: 200 } });
+    useWorkoutStore.getState().toggleRecording();
+
+    // Demo dimatikan setelah beberapa saat mengayuh: sesi tetap dianggap demo.
+    useBluetoothStore.setState({ isSimulating: false });
+    await rideOneMinute();
+    await useWorkoutStore.getState().saveSession();
+
+    expect(useWorkoutStore.getState().sessionHistory[0].simulated).toBe(true);
   });
 });
 

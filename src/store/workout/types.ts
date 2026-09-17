@@ -47,6 +47,11 @@ export interface WorkoutSession {
     rpe?: number;
   };
   history: HistoryData[];
+  /**
+   * Direkam dengan simulator mode demo (bukan perangkat BLE). Sesi seperti ini
+   * hidup hanya di perangkat ini dan tidak pernah dikirim ke Supabase.
+   */
+  simulated?: boolean;
   synced_to_google?: boolean;
   synced_to_supabase?: boolean;
   supabase_id?: string;
@@ -110,6 +115,8 @@ export interface ActiveSessionSnapshot {
   hasPowerSource: boolean;
   lastHistoryPointTs: number | null;
   history: HistoryData[];
+  /** Ikut dipersistensi agar pemulihan sesi demo tetap tahu asalnya. */
+  simulated?: boolean;
 }
 
 export interface WorkoutStateFields {
@@ -131,6 +138,12 @@ export interface WorkoutStateFields {
   /** HRV captured when the current session started; saved into its stats. */
   sessionHrvRmssd: number | null;
   sessionHrvReadiness: ReadinessLevel | null;
+  /**
+   * True bila sesi yang sedang berjalan dimulai dari simulator demo. Dibekukan
+   * saat sesi mulai: menghentikan demo di tengah ride tidak mengubah asal data
+   * yang sudah terekam, sehingga sesi demo tetap tidak ikut tersinkron.
+   */
+  isSimulatedSession: boolean;
   liveStats: LiveWorkoutStats;
   liveStatsTotals: LiveWorkoutTotals;
   supabaseHistoryLoadedCount: number;

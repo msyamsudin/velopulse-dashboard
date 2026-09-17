@@ -75,6 +75,7 @@ export default function App() {
   const addHistoryPoint = useWorkoutStore(state => state.addHistoryPoint);
   const saveSession = useWorkoutStore(state => state.saveSession);
   const isSavingSession = useWorkoutStore(state => state.isSavingSession);
+  const isSimulatedSession = useWorkoutStore(state => state.isSimulatedSession);
   const saveSessionProgress = useWorkoutStore(state => state.saveSessionProgress);
   const saveSessionPhase = useWorkoutStore(state => state.saveSessionPhase);
   const syncPendingSupabaseSessions = useWorkoutStore(state => state.syncPendingSupabaseSessions);
@@ -323,7 +324,16 @@ export default function App() {
       </AnimatePresence>
       <AnimatePresence>
         {showDebug && (
-          <TelemetryLog rawLogs={bleRawLogs} copyLogs={copyLogs} copyStatus={copyStatus} />
+          <TelemetryLog
+            rawLogs={bleRawLogs}
+            copyLogs={copyLogs}
+            copyStatus={copyStatus}
+            riderProfile={{
+              ftp: userProfile.ftp,
+              maxHr: userProfile.maxHr,
+              restingHr: userProfile.restingHr,
+            }}
+          />
         )}
       </AnimatePresence>
 
@@ -366,6 +376,7 @@ export default function App() {
             maxHr={userProfile.maxHr}
             history={workoutHistory}
             sessionStartTime={sessionStartTime ?? 0}
+            simulated={isSimulatedSession}
             onSave={async (rpe) => {
               if (isSavingSession) return; // Prevent double-submit while saving
               await saveSession(rpe);

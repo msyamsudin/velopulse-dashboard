@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { computeRmssd, parseHeartRateMeasurement, recordHrvReading, type ReadinessLevel } from '@/lib/hrv';
+import {
+  advanceSimulation,
+  createSimulationState,
+  SIMULATION_TICK_MS,
+  type SimulationProfile,
+  type SimulationState,
+} from '@/lib/telemetry-simulator';
 
 export interface BluetoothData {
   heartRate?: number;
@@ -37,7 +44,10 @@ interface BluetoothState {
   data: BluetoothData;
   error: string | null;
   rawLogs: string[];
-  
+
+  /** True saat telemetri berasal dari simulator demo, bukan perangkat BLE. */
+  isSimulating: boolean;
+
   // Internal refs
   hrDevice: BluetoothDevice | null;
   bikeDevice: BluetoothDevice | null;
@@ -69,11 +79,37 @@ interface BluetoothState {
   connectBike: () => Promise<void>;
   disconnect: () => void;
   clearStaleData: () => void;
+  /** Menggantikan perangkat BLE dengan telemetri sintetis (mode demo). */
+  startSimulation: (profile: SimulationProfile) => void;
+  stopSimulation: () => void;
 }
 
 export type BluetoothSetState = (
   partial: Partial<BluetoothState> | ((state: BluetoothState) => Partial<BluetoothState> | BluetoothState)
 ) => void;
+
+/** CSC tracker dalam keadaan netral (belum ada paket perangkat). */
+const emptyCsc = (): CscTracker => ({
+  lastWheelRevs: -1,
+  lastWheelEventTime: -1,
+  lastCrankRevs: -1,
+  lastCrankEventTime: -1
+});
+
+/**
+ * Timer dan keadaan simulasi hidup di modul, bukan di state zustand: keduanya
+ * adalah sumber daya (bukan data tampilan) dan tidak boleh ikut ter-render.
+ */
+let simulationTimer: ReturnType<typeof setInterval> | null = null;
+let simulationState: SimulationState | null = null;
+
+const stopSimulationTimer = () => {
+  if (simulationTimer !== null) {
+    clearInterval(simulationTimer);
+    simulationTimer = null;
+  }
+  simulationState = null;
+};
 
 const getCharacteristicValue = (event: Event): DataView | null =>
   (event.target as BluetoothRemoteGATTCharacteristic).value;
@@ -446,6 +482,7 @@ export const attachBikeDevice = async (device: BluetoothDevice, set: BluetoothSe
 export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   hrConnected: false,
   bikeConnected: false,
+  isSimulating: false,
   rrIntervals: [],
   hrvRmssd: null,
   hrvReadiness: null,
@@ -460,12 +497,7 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   lastRawDistance: 0,
   lastRawCalories: 0,
   distanceFromDevice: false,
-  csc: {
-    lastWheelRevs: -1,
-    lastWheelEventTime: -1,
-    lastCrankRevs: -1,
-    lastCrankEventTime: -1
-  },
+  csc: emptyCsc(),
   wheelCircumferenceM: 0,
 
   addLog: (message: string) => {
@@ -480,6 +512,9 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   connectHeartRate: async () => {
     const { addLog } = get();
     try {
+      // Telemetri asli menggantikan yang sintetis: hentikan demo lebih dulu.
+      stopSimulationTimer();
+      set({ isSimulating: false });
       addLog("Requesting Heart Rate device...");
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ services: ['heart_rate'] }],
@@ -495,6 +530,9 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
   connectBike: async () => {
     const { addLog } = get();
     try {
+      // Telemetri asli menggantikan yang sintetis: hentikan demo lebih dulu.
+      stopSimulationTimer();
+      set({ isSimulating: false });
       addLog("Requesting Fitness Machine device...");
       const device = await navigator.bluetooth.requestDevice({
         filters: [
@@ -512,12 +550,14 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
 
   disconnect: () => {
     const { hrDevice, bikeDevice, addLog } = get();
+    stopSimulationTimer();
     set({ hrDevice: null, bikeDevice: null });
     hrDevice?.gatt?.disconnect();
     bikeDevice?.gatt?.disconnect();
     set({ 
       hrConnected: false, 
       bikeConnected: false, 
+      isSimulating: false,
       data: {},
       rrIntervals: [],
       hrvRmssd: null,
@@ -527,14 +567,95 @@ export const useBluetoothStore = create<BluetoothState>((set, get) => ({
       lastRawDistance: 0,
       lastRawCalories: 0,
       distanceFromDevice: false,
-      csc: {
-        lastWheelRevs: -1,
-        lastWheelEventTime: -1,
-        lastCrankRevs: -1,
-        lastCrankEventTime: -1
-      }
+      csc: emptyCsc()
     });
     addLog("Disconnected all devices");
+  },
+
+  /**
+   * Mode demo: menyalakan strap HR dan sepeda statis palsu supaya kokpit bisa
+   * dibuka tanpa perangkat keras, lalu mengalirkan satu paket telemetri per
+   * detik. Paketnya masuk lewat state yang sama dengan paket BLE, jadi seluruh
+   * pipeline (history point, kalori, zona, HRR) bekerja seperti sesi sungguhan.
+   */
+  startSimulation: (profile) => {
+    const { addLog } = get();
+    stopSimulationTimer();
+    simulationState = createSimulationState(profile);
+    const startedAt = Date.now();
+
+    set({
+      isSimulating: true,
+      hrConnected: true,
+      bikeConnected: true,
+      error: null,
+      data: {},
+      // Timestamp awal harus segar, kalau tidak watchdog stale-data langsung
+      // menganggap simulasi sebagai sinyal hilang.
+      lastUpdate: { heartRate: startedAt, cadence: startedAt, power: startedAt, speed: startedAt },
+      cumulativeDistance: 0,
+      cumulativeCalories: 0,
+      lastRawDistance: 0,
+      lastRawCalories: 0,
+      distanceFromDevice: false,
+      rrIntervals: [],
+      hrvRmssd: null,
+      hrvReadiness: null,
+      csc: emptyCsc()
+    });
+    addLog('Demo mode: simulated heart-rate strap and bike connected');
+
+    simulationTimer = setInterval(() => {
+      const current = simulationState;
+      if (!current) return;
+
+      const { state: next, telemetry } = advanceSimulation(current, profile);
+      simulationState = next;
+      const tickAt = Date.now();
+
+      set(state => ({
+        data: {
+          ...state.data,
+          heartRate: telemetry.heartRate,
+          cadence: telemetry.cadence,
+          power: telemetry.power,
+          speed: telemetry.speed,
+          distance: telemetry.distance,
+          calories: telemetry.calories,
+          resistance: telemetry.resistance
+        },
+        lastUpdate: {
+          ...state.lastUpdate,
+          heartRate: tickAt,
+          cadence: tickAt,
+          power: tickAt,
+          speed: tickAt
+        },
+        cumulativeDistance: telemetry.distance,
+        cumulativeCalories: telemetry.calories
+      }));
+    }, SIMULATION_TICK_MS);
+  },
+
+  stopSimulation: () => {
+    const { addLog } = get();
+    stopSimulationTimer();
+    set({
+      isSimulating: false,
+      hrConnected: false,
+      bikeConnected: false,
+      data: {},
+      rrIntervals: [],
+      hrvRmssd: null,
+      hrvReadiness: null,
+      cumulativeDistance: 0,
+      cumulativeCalories: 0,
+      lastRawDistance: 0,
+      lastRawCalories: 0,
+      distanceFromDevice: false,
+      csc: emptyCsc()
+    });
+    addLog('Demo mode stopped');
   },
 
   clearStaleData: () => {

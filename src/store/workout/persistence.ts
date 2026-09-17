@@ -52,8 +52,14 @@ export const sampleHistoryPoints = (history: HistoryData[], maxPoints: number) =
   return sampled;
 };
 
+/**
+ * Snapshot eksplisit dari `toggleRecording`, atau state store penuh yang
+ * dikirim oleh penulisan berkala (nama field-nya `isSimulatedSession`).
+ */
+type ActiveSessionSnapshotInput = ActiveSessionSnapshot & { isSimulatedSession?: boolean };
+
 export const buildActiveSessionStorageSnapshot = (
-  state: ActiveSessionSnapshot,
+  state: ActiveSessionSnapshotInput,
   maxHistoryPoints = state.history.length
 ) => ({
   isRecording: state.isRecording,
@@ -64,7 +70,10 @@ export const buildActiveSessionStorageSnapshot = (
   calorieAccumulator: state.calorieAccumulator,
   hasPowerSource: state.hasPowerSource,
   lastHistoryPointTs: state.lastHistoryPointTs,
-  history: sampleHistoryPoints(state.history, maxHistoryPoints)
+  history: sampleHistoryPoints(state.history, maxHistoryPoints),
+  // Asal sesi ikut disimpan, kalau tidak pemulihan setelah crash akan
+  // menganggap sesi demo sebagai sesi asli yang boleh disinkronkan.
+  simulated: state.simulated === true || state.isSimulatedSession === true ? true : undefined
 });
 
 export const compactSessionsForStorage = (

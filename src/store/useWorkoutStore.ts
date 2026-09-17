@@ -21,6 +21,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get, api) => ({
   hrrClassification: null,
   sessionHrvRmssd: null,
   sessionHrvReadiness: null,
+  isSimulatedSession: false,
   liveStats: EMPTY_LIVE_STATS,
   liveStatsTotals: EMPTY_LIVE_TOTALS,
   supabaseHistoryLoadedCount: 0,
