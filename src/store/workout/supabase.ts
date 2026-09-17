@@ -58,6 +58,11 @@ export const buildSupabasePayload = async (session: WorkoutSession) => {
 };
 
 export const syncSessionToSupabase = async (session: WorkoutSession): Promise<WorkoutSession> => {
+  // Sesi demo hanya untuk verifikasi lokal dan tidak pernah ditulis ke cloud.
+  // Penjaganya diletakkan di pintu keluar ini supaya jalur panggil mana pun
+  // (saveSession, retry antrean, impor) tetap aman.
+  if (session.simulated) return session;
+
   const client = await getSupabaseClient();
   if (!client) {
     return {

@@ -13,6 +13,7 @@ import { HistoryDetail } from './history/HistoryDetail';
 import { SessionCharts } from './history/SessionCharts';
 import { Download, RefreshCw, Search, Upload, X, AlertTriangle, Trash2 } from 'lucide-react';
 import type { DeleteSessionResult, ImportTcxResult, WorkoutSession } from '../store/useWorkoutStore';
+import { isSupabaseSyncPending } from '../store/workout/session-utils';
 import { getSessionOutcome, getWorkoutQuality } from '../lib/workout-analysis';
 import { downloadSummaryCSV, downloadSummaryJSON, printSummaryPDF } from '../lib/export-service';
 import { IconButton, SegmentedControl, StatusPill } from './ui';
@@ -220,7 +221,7 @@ export const WorkoutHistory = ({
   );
 
   const pendingSupabaseCount = useMemo(() =>
-    sessions.filter(session => !session.synced_to_supabase).length,
+    sessions.filter(isSupabaseSyncPending).length,
     [sessions]
   );
 

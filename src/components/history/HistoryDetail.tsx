@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, Download, Route, Flame, Cloud, CloudOff, Trash2, Share2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar, Timer, Zap, Heart, Bike, Activity, Download, Route, Flame, Cloud, CloudOff, FlaskConical, Trash2, Share2, Sparkles } from 'lucide-react';
 import { StackedWorkoutChart } from './StackedWorkoutChart';
 import { formatDate, formatDuration } from '../../utils/formatters';
 import { downloadTCX } from '../../lib/export-service';
@@ -218,7 +218,15 @@ export const HistoryDetail = ({
                 <span className={`rounded border px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
                   {t(quality.label)}
                 </span>
-                {session.synced_to_supabase ? (
+                {session.simulated ? (
+                  <span
+                    title={t('Demo session, stored on this device only')}
+                    className="inline-flex items-center gap-1 rounded border border-vp-warning/25 bg-vp-warning/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-vp-warning"
+                  >
+                    <FlaskConical size={10} />
+                    {t('Demo — local only')}
+                  </span>
+                ) : session.synced_to_supabase ? (
                   <span className="inline-flex items-center gap-1 rounded border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-1 text-[9px] font-mono uppercase tracking-widest text-emerald-300">
                     <Cloud size={10} />
                     {t('Supabase synced')}

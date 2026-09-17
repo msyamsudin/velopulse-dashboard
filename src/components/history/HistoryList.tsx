@@ -139,8 +139,17 @@ export const HistoryList = ({
                         {formatDate(session.date)}
                       </span>
                     </div>
-                    <div className={`shrink-0 rounded border px-2 py-1 text-[8px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
-                      {t(quality.label)}
+                    <div className="flex shrink-0 items-center gap-2">
+                      {/* Sesi demo hanya hidup di perangkat ini: diberi label agar
+                          tidak terbaca sebagai sesi asli yang menunggu sinkron. */}
+                      {session.simulated && (
+                        <span className="rounded border border-vp-warning/30 bg-vp-warning/10 px-2 py-1 text-[8px] font-mono uppercase tracking-widest text-vp-warning">
+                          {t('Demo')}
+                        </span>
+                      )}
+                      <div className={`rounded border px-2 py-1 text-[8px] font-mono uppercase tracking-widest ${quality.bg} ${quality.color}`}>
+                        {t(quality.label)}
+                      </div>
                     </div>
                   </div>
 
@@ -170,7 +179,12 @@ export const HistoryList = ({
                           <Trash2 size={10} />
                         </button>
                       )}
-                      {session.synced_to_supabase ? (
+                      {session.simulated ? (
+                        <span
+                          title={t('Demo session, stored on this device only')}
+                          className="h-2 w-2 rounded-full bg-vp-warning"
+                        />
+                      ) : session.synced_to_supabase ? (
                         <span
                           title={t('Supabase synced')}
                           className="h-2 w-2 rounded-full bg-emerald-400"

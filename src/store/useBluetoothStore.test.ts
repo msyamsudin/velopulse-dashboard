@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   handleFtmsIndoorBikeNotification,
   parseCscMeasurement,
@@ -268,6 +268,106 @@ describe('bike FTMS heart-rate is never used (strap is the only HR source)', () 
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('demo simulation (mode latihan tanpa perangkat)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useBluetoothStore.setState({
+      isSimulating: false,
+      hrConnected: false,
+      bikeConnected: false,
+      data: {},
+      lastUpdate: {},
+      rawLogs: [],
+    });
+  });
+
+  afterEach(() => {
+    useBluetoothStore.getState().stopSimulation();
+    vi.useRealTimers();
+  });
+
+  it('brings both fake devices online and streams telemetry every second', () => {
+    useBluetoothStore.getState().startSimulation({ ftp: 200, maxHr: 190, restingHr: 60 });
+
+    const started = useBluetoothStore.getState();
+    expect(started.isSimulating).toBe(true);
+    expect(started.hrConnected).toBe(true);
+    expect(started.bikeConnected).toBe(true);
+    // Belum ada sampel pada detik nol; telemetri mulai pada tick pertama.
+    expect(started.data).toEqual({});
+
+    vi.advanceTimersByTime(1_000);
+
+    // Mulai dari istirahat: HR di sekitar nilai resting, kayuhan masih kecil.
+    const firstSample = useBluetoothStore.getState().data;
+    expect(firstSample.heartRate).toBeGreaterThanOrEqual(58);
+    expect(firstSample.heartRate).toBeLessThan(70);
+    expect(firstSample.power).toBeLessThan(40);
+
+    vi.advanceTimersByTime(59_000);
+
+    const { data, lastUpdate, cumulativeDistance } = useBluetoothStore.getState();
+    expect(data.power).toBeGreaterThan(0);
+    expect(data.cadence).toBeGreaterThan(0);
+    expect(data.speed).toBeGreaterThan(0);
+    expect(data.heartRate).toBeGreaterThan(60);
+    expect(data.resistance).toBeGreaterThan(0);
+    expect(cumulativeDistance).toBeGreaterThan(0);
+    expect(data.distance).toBe(cumulativeDistance);
+    expect(lastUpdate.heartRate).toBeGreaterThan(0);
+  });
+
+  it('keeps the simulated samples fresh for the stale-data watchdog', () => {
+    useBluetoothStore.getState().startSimulation({ ftp: 150, maxHr: 185, restingHr: 55 });
+    vi.advanceTimersByTime(5_000);
+
+    useBluetoothStore.getState().clearStaleData();
+
+    // Tanpa timestamp yang diperbarui tiap detik, watchdog akan menolkan
+    // semuanya di detik ketiga dan UI menampilkan "Waiting".
+    expect(useBluetoothStore.getState().data.heartRate).toBeGreaterThan(0);
+    expect(useBluetoothStore.getState().data.power).toBeGreaterThan(0);
+  });
+
+  it('stops the stream and clears the fake devices when stopped', () => {
+    useBluetoothStore.getState().startSimulation({ ftp: 150, maxHr: 185, restingHr: 55 });
+    vi.advanceTimersByTime(10_000);
+
+    useBluetoothStore.getState().stopSimulation();
+
+    const stopped = useBluetoothStore.getState();
+    expect(stopped.isSimulating).toBe(false);
+    expect(stopped.hrConnected).toBe(false);
+    expect(stopped.bikeConnected).toBe(false);
+    expect(stopped.data).toEqual({});
+
+    // Timer tidak boleh menyentuh state lagi setelah dihentikan.
+    vi.advanceTimersByTime(10_000);
+    expect(useBluetoothStore.getState().data.heartRate).toBeUndefined();
+  });
+
+  it('stops simulating when the user disconnects the devices', () => {
+    useBluetoothStore.getState().startSimulation({ ftp: 150, maxHr: 185, restingHr: 55 });
+    vi.advanceTimersByTime(5_000);
+
+    useBluetoothStore.getState().disconnect();
+
+    expect(useBluetoothStore.getState().isSimulating).toBe(false);
+    vi.advanceTimersByTime(5_000);
+    expect(useBluetoothStore.getState().data.heartRate).toBeUndefined();
+  });
+
+  it('still produces finite numbers when the profile is empty', () => {
+    useBluetoothStore.getState().startSimulation({ ftp: 0, maxHr: 0, restingHr: 0 });
+    vi.advanceTimersByTime(30_000);
+
+    const { data } = useBluetoothStore.getState();
+    expect(Number.isFinite(data.power)).toBe(true);
+    expect(Number.isFinite(data.heartRate)).toBe(true);
+    expect(data.power).toBeGreaterThan(0);
   });
 });
 

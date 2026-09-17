@@ -1,4 +1,4 @@
-import { Activity, Bike, Compass, Flame, Heart, Maximize2, Minimize2, Radio, RefreshCw, Route, Square, Timer, Zap, Trophy } from 'lucide-react';
+import { Activity, Bike, Compass, Flame, FlaskConical, Heart, Maximize2, Minimize2, Radio, RefreshCw, Route, Square, Timer, Zap, Trophy } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useMemo, useState } from 'react';
 import { getActiveHrZoneIndex, HR_ZONES } from '@/lib/constants';
 import { calculateEdwardsTrimp } from '@/lib/training-load';
@@ -319,6 +319,7 @@ export const RecordingCockpit = ({
   const planVariations = useResistancePlanStore(s => s.variations);
   const hrvRmssd = useBluetoothStore(s => s.hrvRmssd);
   const hrvReadiness = useBluetoothStore(s => s.hrvReadiness);
+  const isSimulating = useBluetoothStore(s => s.isSimulating);
   const hrvColor = hrvReadiness ? HRV_READINESS_COLORS[hrvReadiness] : 'text-vp-muted';
   const hrvLabel = hrvReadiness ? HRV_READINESS_LABELS[hrvReadiness] : null;
 
@@ -351,6 +352,17 @@ export const RecordingCockpit = ({
 
         {/* Center: Device & Metric Badges */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Mode demo: telemetri sintetis dari simulator, bukan perangkat BLE */}
+          {isSimulating && (
+            <div
+              title={t('Simulated telemetry — not a real device')}
+              className="flex items-center gap-1.5 rounded-lg border border-vp-warning/35 bg-vp-warning/10 px-2.5 py-1 text-xs font-mono text-vp-warning"
+            >
+              <FlaskConical size={12} />
+              <span className="font-bold tracking-wider uppercase">{t('Demo')}</span>
+            </div>
+          )}
+
           {/* HR Strap Status + Reconnect */}
           <button
             type="button"

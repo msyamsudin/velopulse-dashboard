@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeLegacySessionDuration } from './session-utils';
+import { isSupabaseSyncPending, sanitizeLegacySessionDuration } from './session-utils';
 import type { WorkoutSession } from './types';
 
 const makeHistory = (pointCount: number, finalDistanceMeters: number, maxSpeed: number) => {
@@ -88,5 +88,22 @@ describe('sanitizeLegacySessionDuration', () => {
     });
 
     expect(sanitizeLegacySessionDuration(session)).toBe(session);
+  });
+});
+
+describe('isSupabaseSyncPending', () => {
+  it('treats an unsynced real session as pending', () => {
+    expect(isSupabaseSyncPending({ synced_to_supabase: false })).toBe(true);
+    expect(isSupabaseSyncPending({})).toBe(true);
+  });
+
+  it('never counts a synced session as pending', () => {
+    expect(isSupabaseSyncPending({ synced_to_supabase: true })).toBe(false);
+  });
+
+  it('excludes demo sessions even though they are not in the cloud', () => {
+    // Data demo hidup hanya di perangkat ini: kalau ikut terhitung, setiap
+    // auto-sync akan mencoba mengirimnya dan melaporkan kegagalan.
+    expect(isSupabaseSyncPending({ simulated: true, synced_to_supabase: false })).toBe(false);
   });
 });

@@ -31,6 +31,7 @@ import {
   getSessionKey,
   getWorkoutDateISOString,
   isPotentialDuplicateSession,
+  isSupabaseSyncPending,
   mergeSessionHistories,
   sanitizeLegacySessionDuration,
 } from './session-utils';
@@ -65,6 +66,9 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         // Readiness is a pre-ride reading: capture it now, because HRV measured
         // after the ride reflects the effort, not the state it started from.
         const sHrv = useBluetoothStore.getState();
+        // Origin of the data is frozen at start: stopping the demo mid-ride must
+        // not turn a simulated session into a syncable one.
+        const simulated = sHrv.isSimulating;
         set({
           history: [],
           elapsed: 0,
@@ -80,6 +84,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           hrrClassification: null,
           sessionHrvRmssd: sHrv.hrvRmssd,
           sessionHrvReadiness: sHrv.hrvReadiness,
+          isSimulatedSession: simulated,
           isRecording: true,
         });
         persistActiveSession({
@@ -91,7 +96,8 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           calorieAccumulator: 0,
           hasPowerSource: false,
           lastHistoryPointTs: null,
-          history: []
+          history: [],
+          simulated
         }, { immediate: true });
       } else {
         set({ isRecording: false });
@@ -264,6 +270,9 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           duration: elapsed,
           stats,
           history,
+          // Only true sessions carry the flag; a real ride keeps the stored
+          // shape identical to before (no `simulated: false` noise).
+          simulated: get().isSimulatedSession || undefined,
           synced_to_google: false,
           synced_to_supabase: false
         };
@@ -276,8 +285,10 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
 
         // Save to Supabase (Background). This is the slowest step (config
         // fetch + row lookup + insert of the full history payload), so the
-        // bar holds at 40% with an animated shimmer until it settles.
-        reportProgress(40, 'sync');
+        // bar holds at 40% with an animated shimmer until it settles. A demo
+        // session is local-only, so the bar skips the cloud stage instead of
+        // announcing a synchronization that never happens.
+        reportProgress(newSession.simulated ? 80 : 40, newSession.simulated ? 'finalizing' : 'sync');
         const syncedSession = await syncSessionToSupabase(newSession);
         if (!syncedSession.synced_to_supabase && syncedSession.supabase_sync_error) {
           console.warn('[Supabase] Workout sync pending:', syncedSession.supabase_sync_error, buildLogTag());
@@ -310,7 +321,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
     },
 
     syncPendingSupabaseSessions: async () => {
-      const pendingSessions = get().sessionHistory.filter(session => !session.synced_to_supabase);
+      const pendingSessions = get().sessionHistory.filter(isSupabaseSyncPending);
       if (pendingSessions.length === 0) return;
 
       let nextHistory = get().sessionHistory;
@@ -330,7 +341,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
       }
 
       const firstFailure = nextHistory.find(session =>
-        !session.synced_to_supabase && session.supabase_sync_error_code
+        isSupabaseSyncPending(session) && session.supabase_sync_error_code
       );
       if (firstFailure?.supabase_sync_error_code) {
         const info = classifySupabaseError({
@@ -499,6 +510,7 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
         hrrClassification: null,
         sessionHrvRmssd: null,
         sessionHrvReadiness: null,
+        isSimulatedSession: false,
         liveStats: EMPTY_LIVE_STATS,
         liveStatsTotals: EMPTY_LIVE_TOTALS
       });
@@ -566,6 +578,8 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
             : restoredHistory.some(point => point.power > 0),
           lastHistoryPointTs,
           history: restoredHistory,
+          // Legacy snapshots carry no flag: a restored session counts as real.
+          isSimulatedSession: activeSession.simulated === true,
           liveStats: restoredLiveStats.stats,
           liveStatsTotals: restoredLiveStats.totals
         });

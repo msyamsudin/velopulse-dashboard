@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Activity, Check, ChevronRight, Download, Heart, Loader2, Save, Timer, Trash2, Zap } from 'lucide-react';
+import { Activity, Check, ChevronRight, Download, FlaskConical, Heart, Loader2, Save, Timer, Trash2, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { downloadTCX } from '../lib/export-service';
 import { calculateEdwardsTrimp } from '../lib/training-load';
@@ -30,6 +30,11 @@ interface SessionSummaryModalProps {
   maxHr: number;
   history?: HistoryData[];
   sessionStartTime?: number;
+  /**
+   * True when the ride came from the demo simulator. Such a session is kept on
+   * this device only and is never uploaded, so the modal says so before saving.
+   */
+  simulated?: boolean;
   /** True while saveSession() is running; drives the progress bar. */
   isSaving?: boolean;
   /** 0–100 save progress reported by the workout store. */
@@ -80,6 +85,7 @@ export const SessionSummaryModal = ({
   maxHr,
   history,
   sessionStartTime,
+  simulated = false,
   isSaving = false,
   saveProgress = 0,
   savePhase = 'idle',
@@ -99,6 +105,7 @@ export const SessionSummaryModal = ({
     maxHr,
     history,
     sessionStartTime,
+    simulated,
   }));
   const canExport = Boolean(snapshot.history && snapshot.sessionStartTime);
   // Subjective effort is optional and lives only in this modal: the store keeps
@@ -170,6 +177,15 @@ export const SessionSummaryModal = ({
             </div>
             <StatusPill label={`${snapshot.history?.length || 0} ${t('points')}`} tone={snapshot.history?.length ? 'ready' : 'neutral'} />
           </div>
+
+          {snapshot.simulated && (
+            <div className="flex items-start gap-3 rounded-lg border border-vp-warning/30 bg-vp-warning/10 p-4">
+              <FlaskConical size={16} className="mt-0.5 shrink-0 text-vp-warning" />
+              <p className="text-xs leading-5 text-vp-text/85">
+                {t('Demo session: saved on this device only and never uploaded to Supabase.')}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <ResultMetric icon={<Timer size={15} />} label={t('Duration')} value={snapshot.duration} tone="text-vp-speed" />

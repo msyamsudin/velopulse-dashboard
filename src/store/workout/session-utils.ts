@@ -27,6 +27,15 @@ export const isPotentialDuplicateSession = (a: WorkoutSession, b: WorkoutSession
   return startDiffSeconds <= 60 && durationDiffSeconds <= 10 && distanceDiffMeters <= 50;
 };
 
+/**
+ * Sesi yang benar-benar menunggu sinkronisasi Supabase. Sesi demo adalah data
+ * verifikasi lokal, jadi ia tidak pernah masuk antrean tertunda — tanpa ini
+ * setiap auto-sync akan mencoba mengirimnya dan melaporkan kegagalan.
+ */
+export const isSupabaseSyncPending = (
+  session: Pick<WorkoutSession, 'simulated' | 'synced_to_supabase'>
+) => !session.simulated && !session.synced_to_supabase;
+
 export const sortSessions = (sessions: WorkoutSession[]) =>
   [...sessions].sort((a, b) => getSessionStartTimestamp(b) - getSessionStartTimestamp(a));
 

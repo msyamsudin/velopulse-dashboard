@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWorkoutStore } from '../store/useWorkoutStore';
+import { isSupabaseSyncPending } from '../store/workout/session-utils';
 import type { CloudStatus } from './useConnectionStatus';
 
 export interface AutoSyncNotice {
@@ -48,7 +49,7 @@ export const useAutoSync = (status: CloudStatus | null) => {
 
   const runAutoSync = useCallback(async () => {
     const state = useWorkoutStore.getState();
-    const pendingBefore = state.sessionHistory.filter(session => !session.synced_to_supabase);
+    const pendingBefore = state.sessionHistory.filter(isSupabaseSyncPending);
     if (pendingBefore.length === 0) return;
     if (syncing.current) return;
 
@@ -57,7 +58,7 @@ export const useAutoSync = (status: CloudStatus | null) => {
       await syncPendingSupabaseSessions();
 
       const after = useWorkoutStore.getState().sessionHistory;
-      const stillPending = after.filter(session => !session.synced_to_supabase);
+      const stillPending = after.filter(isSupabaseSyncPending);
       const syncedCount = pendingBefore.length - stillPending.length;
 
       if (syncedCount > 0) {
