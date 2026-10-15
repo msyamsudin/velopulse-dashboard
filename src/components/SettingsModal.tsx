@@ -6,6 +6,7 @@ import { resetSupabaseClientCache } from '@/lib/supabase';
 import { DEFAULT_PROFILE } from '@/lib/constants';
 import { getLatestRestingHr } from '@/lib/body-history';
 import { validateSupabaseConfig } from '@/lib/config-validator';
+import { fetchProfileApi } from '@/lib/profile-api';
 
 // Components
 import { ProfileTab } from './settings/ProfileTab';
@@ -50,7 +51,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
 
   useEffect(() => {
     // Load profile from server
-    fetch('/api/profile')
+    fetchProfileApi('/api/profile')
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
@@ -78,7 +79,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     setSaveStatus('saving');
     setSaveErrorMessage('');
     try {
-      const res = await fetch('/api/profile', {
+      const res = await fetchProfileApi('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile)

@@ -9,6 +9,7 @@ import {
 } from '@/lib/body-history';
 import { useBluetoothStore } from '../store/useBluetoothStore';
 import { useWorkoutStore } from '../store/useWorkoutStore';
+import { fetchProfileApi } from '@/lib/profile-api';
 
 export interface ProfileLoadError {
   code: string;
@@ -44,7 +45,7 @@ export const useAppInitialization = () => {
   const loadProfile = useCallback(() => {
     setIsLoadingProfile(true);
     setProfileError(null);
-    fetch('/api/profile')
+    fetchProfileApi('/api/profile')
       .then(async res => {
         if (!res.ok) {
           let errorMsg = 'Fetch failed';

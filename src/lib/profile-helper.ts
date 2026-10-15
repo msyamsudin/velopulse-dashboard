@@ -5,17 +5,21 @@ const CONFIG_DIR = path.join(process.cwd(), '.app-data');
 const PROFILE_PATH = path.join(CONFIG_DIR, 'profile.json');
 
 export interface UserProfile {
+  age: number;
   maxHr: number;
   ftp: number;
   weight: number;
+  restingHr: number;
   displayName?: string;
 }
 
 // Must stay in sync with DEFAULT_PROFILE in @/lib/constants.ts
 const DEFAULT_PROFILE: UserProfile = {
+  age: 0,
   maxHr: 190,
   ftp: 0,
-  weight: 0
+  weight: 0,
+  restingHr: 0,
 };
 
 export function getUserProfile(): UserProfile {
