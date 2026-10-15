@@ -12,7 +12,7 @@ export async function GET() {
     MASTER_PASSWORD: '●●●●●●●●●'
   };
 
-  return NextResponse.json(maskedConfig);
+  return NextResponse.json({ ...maskedConfig, setupRequired: !config.MASTER_PASSWORD });
 }
 
 // POST: Saves new config
@@ -22,6 +22,22 @@ export async function POST(request: NextRequest) {
     const { password, ...newConfig } = body;
 
     const currentConfig = getAppConfig();
+
+    // Setup awal hanya boleh menyimpan password master; konfigurasi sensitif
+    // baru bisa diubah setelah password itu dibuat.
+    if (!currentConfig.MASTER_PASSWORD) {
+      const keys = Object.keys(newConfig);
+      if (keys.length !== 1 || keys[0] !== 'MASTER_PASSWORD') {
+        return NextResponse.json({ error: 'Set a master password before configuring sensitive settings' }, { status: 428 });
+      }
+      if (typeof newConfig.MASTER_PASSWORD !== 'string' || newConfig.MASTER_PASSWORD.length < 12) {
+        return NextResponse.json({ error: 'Master password must be at least 12 characters' }, { status: 400 });
+      }
+      const success = saveAppConfig(newConfig);
+      return success
+        ? NextResponse.json({ success: true })
+        : NextResponse.json({ error: 'Failed to save configuration' }, { status: 500 });
+    }
 
     // Verify master password
     if (!password || !verifyPassword(password, currentConfig.MASTER_PASSWORD || '')) {

@@ -8,9 +8,10 @@ interface MasterLockProps {
   onUnlock: () => void;
   error?: string;
   isUnlocking?: boolean;
+  setupRequired?: boolean;
 }
 
-export const MasterLock = ({ password, setPassword, onUnlock, error, isUnlocking }: MasterLockProps) => {
+export const MasterLock = ({ password, setPassword, onUnlock, error, isUnlocking, setupRequired = false }: MasterLockProps) => {
   const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -20,15 +21,15 @@ export const MasterLock = ({ password, setPassword, onUnlock, error, isUnlocking
         <Lock size={28} />
       </div>
       <div>
-        <h3 className="text-lg font-semibold text-vp-text">{t('Restricted access')}</h3>
-        <p className="mt-1 text-sm text-vp-muted">{t('Enter the master password to modify system settings.')}</p>
+        <h3 className="text-lg font-semibold text-vp-text">{setupRequired ? t('Set a master password') : t('Restricted access')}</h3>
+        <p className="mt-1 text-sm text-vp-muted">{setupRequired ? t('Create a master password before configuring sensitive settings. Use at least 12 characters.') : t('Enter the master password to modify system settings.')}</p>
       </div>
       <div className="w-full max-w-sm space-y-3">
         <div className="relative">
           <input
             key={showPassword ? 'text' : 'password'}
             type={showPassword ? 'text' : 'password'}
-            placeholder={t('Master password')}
+            placeholder={setupRequired ? t('Enter new master password') : t('Master password')}
             value={password}
             autoComplete="new-password"
             onChange={(e) => setPassword(e.target.value)}
@@ -51,7 +52,7 @@ export const MasterLock = ({ password, setPassword, onUnlock, error, isUnlocking
           className="vp-button vp-focus-ring min-h-11 w-full"
         >
           {isUnlocking ? <Loader2 size={13} className="animate-spin" /> : null}
-          {isUnlocking ? 'Verifying...' : t('Unlock')}
+          {isUnlocking ? 'Verifying...' : setupRequired ? t('Set password') : t('Unlock')}
         </button>
       </div>
     </div>

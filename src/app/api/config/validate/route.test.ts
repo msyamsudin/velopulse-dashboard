@@ -60,4 +60,14 @@ describe('POST /api/config/validate Supabase URL', () => {
     expect(response.status).toBe(400);
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it('does not authorize requests when no master password is configured', async () => {
+    mocks.getAppConfig.mockReturnValue({});
+    mocks.verifyPassword.mockReturnValue(false);
+
+    const response = await sendValidation('https://my-project.supabase.co/');
+
+    expect(response.status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });

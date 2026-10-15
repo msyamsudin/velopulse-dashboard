@@ -45,7 +45,7 @@ export function getAppConfig(): AppConfig {
     console.error('Failed to read config file:', err);
   }
 
-  const masterPassword = fileConfig.MASTER_PASSWORD || 'admin';
+  const masterPassword = fileConfig.MASTER_PASSWORD || process.env.MASTER_PASSWORD;
 
   return {
     NEXT_PUBLIC_SUPABASE_URL: fileConfig.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,

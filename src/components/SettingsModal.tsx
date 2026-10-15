@@ -42,6 +42,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
     MASTER_PASSWORD: ''
   });
+  const [setupRequired, setSetupRequired] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveErrorMessage, setSaveErrorMessage] = useState('');
@@ -71,7 +72,10 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     // Fetch masked sys config
     fetch('/api/config')
       .then(res => res.json())
-      .then(data => setSysConfig(data))
+      .then(data => {
+        setSysConfig(data);
+        setSetupRequired(Boolean(data.setupRequired));
+      })
       .catch(err => console.error('Failed to load system config:', err));
   }, []);
 
@@ -187,6 +191,21 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     setIsUnlocking(true);
     setUnlockError('');
     try {
+      if (setupRequired) {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ MASTER_PASSWORD: password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setUnlockError(data.error || 'Could not set master password');
+          return;
+        }
+        setSetupRequired(false);
+        setIsUnlocked(true);
+        return;
+      }
       const res = await fetch('/api/config/validate', {
         method: 'POST',
         headers: {
@@ -279,6 +298,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 onUnlock={handleUnlock}
                 error={unlockError}
                 isUnlocking={isUnlocking}
+                setupRequired={setupRequired}
               />
             ) : (
               <SystemTab 

@@ -32,7 +32,8 @@ VeloPulse adalah dashboard fitness untuk memvisualisasikan data saat latihan.
     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
     # Pengaturan Aplikasi
-    MASTER_PASSWORD=admin
+    # Opsional: jika diisi, gunakan password yang kuat.
+    # Jika tidak diisi, aplikasi meminta Anda membuat password saat setup.
     ```
 
 ### Panduan Setup
@@ -100,10 +101,10 @@ pnpm run schema:check                        # pastikan schema.sql sinkron denga
 
 ## Akses Administratif
 
-- **Master Password**: Default `admin`, bisa diubah di Settings > System.
+- **Master Password**: Tidak ada password bawaan. Saat pertama kali membuka Settings > System, buat password minimal 12 karakter sebelum mengubah konfigurasi sensitif.
 - Setelah login pertama, konfigurasi disimpan di `.app-data/config.json`.
 - **Keamanan**: Master password di-hash dengan **bcrypt** (salt 10 rounds) sebelum disimpan. Password lama (plaintext) tetap diverifikasi dengan fallback komparasi langsung sampai diubah.
-- Environment variable `MASTER_PASSWORD` hanya dipakai sebagai cadangan (`fallback`) jika file `.app-data/config.json` belum ada atau belum memiliki master password.
+- Environment variable `MASTER_PASSWORD` opsional dan tetap didukung sebagai cadangan jika file `.app-data/config.json` belum menyimpan master password. Konfigurasi lama yang sudah memiliki password tetap dapat digunakan.
 
 ## Backup & Restore
 

@@ -173,7 +173,7 @@ export const SystemTab = ({
               </button>
             </div>
             <p className="text-[8px] text-vp-muted uppercase font-mono leading-tight">
-              {t('Used to unlock settings and protect configuration backups. Default is "admin".')}
+              {t('Used to unlock settings and protect configuration backups. Choose a strong password.')}
             </p>
           </div>
 
