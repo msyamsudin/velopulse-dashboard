@@ -176,6 +176,8 @@ const id: Record<string, string> = {
   'Import Configuration': 'Impor Konfigurasi',
   'Encryption Password': 'Kata Sandi Enkripsi',
   'Decryption Password': 'Kata Sandi Dekripsi',
+  'Device Master Password': 'Kata Sandi Utama Perangkat',
+  'Enter device master password': 'Masukkan kata sandi utama perangkat',
   'Enter encryption password': 'Masukkan kata sandi enkripsi',
   'Enter decryption password': 'Masukkan kata sandi dekripsi',
   'Copy Token': 'Salin Token',

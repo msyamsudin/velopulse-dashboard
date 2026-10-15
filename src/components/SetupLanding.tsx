@@ -33,7 +33,9 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
   const [isRestoreOpen, setIsRestoreOpen] = useState(false);
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
+  const [masterPassword, setMasterPassword] = useState('');
   const [showDecryptionPassword, setShowDecryptionPassword] = useState(false);
+  const [showMasterPassword, setShowMasterPassword] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -49,7 +51,8 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
         body: JSON.stringify({
           action: 'import',
           token,
-          decryptionPassword: password
+          decryptionPassword: password,
+          masterPassword
         })
       });
 
@@ -202,9 +205,31 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                             </button>
                           </div>
                         </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-mono uppercase tracking-widest text-hw-muted">{t('Device Master Password')}</label>
+                          <div className="relative">
+                            <input
+                              key={showMasterPassword ? 'mp-text' : 'mp-pass'}
+                              type={showMasterPassword ? 'text' : 'password'}
+                              value={masterPassword}
+                              onChange={(e) => setMasterPassword(e.target.value)}
+                              placeholder={t('Enter device master password')}
+                              autoComplete="current-password"
+                              className="w-full rounded-xl border border-white/10 bg-white/5 p-3 pr-12 font-mono text-[9px] text-hw-text outline-none focus:border-hw-accent/30"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowMasterPassword(!showMasterPassword)}
+                              aria-label={showMasterPassword ? t('Hide password') : t('Show password')}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-hw-accent/60 hover:text-hw-accent transition-colors"
+                            >
+                              {showMasterPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
+                        </div>
                         <button
                           onClick={handleRestore}
-                          disabled={!token || !password || isRestoring}
+                          disabled={!token || !password || !masterPassword || isRestoring}
                           className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-mono uppercase tracking-widest text-[10px] rounded-xl transition-all disabled:opacity-50"
                         >
                           {isRestoring ? <Loader2 size={12} className="animate-spin" /> : <Server size={12} />}

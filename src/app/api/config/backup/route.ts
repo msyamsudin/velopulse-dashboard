@@ -34,7 +34,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'import') {
-      const { token, decryptionPassword } = body;
+      const { token, decryptionPassword, masterPassword } = body;
+
+      // Autentikasi perangkat dilakukan sebelum backup didekripsi atau disimpan.
+      if (!masterPassword || !verifyPassword(masterPassword, currentConfig.MASTER_PASSWORD || '')) {
+        return NextResponse.json({ error: 'Invalid master password' }, { status: 401 });
+      }
 
       if (!token) {
         return NextResponse.json({ error: 'Token is required' }, { status: 400 });

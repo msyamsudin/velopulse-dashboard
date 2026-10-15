@@ -15,7 +15,7 @@ interface SystemTabProps {
   supabaseValidStatus: { valid: boolean; msg: string } | null;
   password?: string;
   onExport: (encryptionPassword: string) => Promise<string>;
-  onImport: (token: string, decryptionPassword: string) => Promise<boolean>;
+  onImport: (token: string, decryptionPassword: string, masterPassword: string) => Promise<boolean>;
 }
 
 export const SystemTab = ({
@@ -35,6 +35,7 @@ export const SystemTab = ({
   const [showMasterPassword, setShowMasterPassword] = useState(false);
   const [showExportPassword, setShowExportPassword] = useState(false);
   const [showImportPassword, setShowImportPassword] = useState(false);
+  const [showImportMasterPassword, setShowImportMasterPassword] = useState(false);
   const [localMasterPassword, setLocalMasterPassword] = useState('');
 
   // Export state
@@ -47,6 +48,7 @@ export const SystemTab = ({
   // Import state
   const [importToken, setImportToken] = useState('');
   const [importPassword, setImportPassword] = useState('');
+  const [importMasterPassword, setImportMasterPassword] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [importError, setImportError] = useState('');
@@ -78,7 +80,7 @@ export const SystemTab = ({
     setImportError('');
     setImportSuccess(false);
     try {
-      const success = await onImport(importToken, importPassword);
+      const success = await onImport(importToken, importPassword, importMasterPassword);
       if (success) {
         setImportSuccess(true);
         setTimeout(() => {
@@ -278,9 +280,31 @@ export const SystemTab = ({
                     </button>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <label className="vp-label text-[9px]">{t('Device Master Password')}</label>
+                  <div className="relative">
+                    <input
+                      key={showImportMasterPassword ? 'imp-text' : 'imp-pass'}
+                      type={showImportMasterPassword ? 'text' : 'password'}
+                      value={importMasterPassword}
+                      onChange={(e) => setImportMasterPassword(e.target.value)}
+                      placeholder={t('Enter device master password')}
+                      autoComplete="current-password"
+                      className="w-full rounded border border-vp-border bg-white/[0.02] p-2 pr-8 font-mono text-[9px] text-vp-text outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowImportMasterPassword(!showImportMasterPassword)}
+                      aria-label={showImportMasterPassword ? t('Hide password') : t('Show password')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-vp-muted hover:text-vp-text transition-colors"
+                    >
+                      {showImportMasterPassword ? <EyeOff size={11} /> : <Eye size={11} />}
+                    </button>
+                  </div>
+                </div>
                 <button 
                   onClick={handleImportClick}
-                  disabled={!importToken || !importPassword || isImporting}
+                  disabled={!importToken || !importPassword || !importMasterPassword || isImporting}
                   className="rounded bg-vp-accent px-3 py-1.5 text-[10px] font-mono text-vp-bg font-bold transition-colors hover:bg-vp-accent/90 disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isImporting ? <Loader2 size={10} className="animate-spin" /> : <Server size={10} />}

@@ -159,14 +159,15 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
     return data.token;
   };
 
-  const handleImport = async (token: string, decryptionPassword: string): Promise<boolean> => {
+  const handleImport = async (token: string, decryptionPassword: string, masterPassword: string): Promise<boolean> => {
     const res = await fetch('/api/config/backup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'import',
         token,
-        decryptionPassword
+        decryptionPassword,
+        masterPassword
       })
     });
 
