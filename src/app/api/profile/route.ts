@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       return NextResponse.json(getUserProfile());
     }
     const { supabase, userId } = auth;
-    const { data, error } = await supabase
+    const { data: ownedProfile, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('user_id', userId)
@@ -70,7 +70,36 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    return NextResponse.json(data || EMPTY_PROFILE);
+    let profile = ownedProfile;
+    if (!profile) {
+      const { data: claimedProfiles, error: claimError } = await supabase.rpc('claim_my_orphan_profile');
+      if (claimError) throw claimError;
+      profile = Array.isArray(claimedProfiles) ? claimedProfiles[0] || null : claimedProfiles;
+    }
+
+    // Jika profil cloud belum berisi nilai wajib, pulihkan profil lokal yang
+    // pernah disimpan sebelum login lalu tautkan ke akun ini.
+    const cloudProfileReady = profile?.age > 0 && profile?.max_hr > 0;
+    const localProfile = getUserProfile();
+    const localProfileReady = localProfile.age > 0 && localProfile.maxHr > 0;
+    if (!cloudProfileReady && localProfileReady) {
+      const { data: savedProfile, error: saveError } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: userId,
+          age: localProfile.age,
+          max_hr: localProfile.maxHr,
+          ftp: localProfile.ftp,
+          weight: localProfile.weight,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        .select('*')
+        .single();
+      if (saveError) throw saveError;
+      profile = savedProfile;
+    }
+
+    return NextResponse.json(profile || EMPTY_PROFILE);
   } catch (err) {
     return errorResponse(err);
   }

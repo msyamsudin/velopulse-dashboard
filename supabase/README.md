@@ -54,6 +54,7 @@ supabase db push
 | --- | --- |
 | `20260524000000_baseline_workouts.sql` | Baseline `workouts` table, reconstructed from the app code |
 | `20260818131159_workouts_user_scoping.sql` | Per-user ownership: `user_id`, RLS policies, orphan-row claiming |
+| `20261016000000_profiles_claim_orphan.sql` | Klaim profil lama dan pulihkan profil lokal saat pengguna masuk |
 
 ## A note on the baseline
 
