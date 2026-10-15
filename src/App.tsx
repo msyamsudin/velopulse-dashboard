@@ -63,6 +63,7 @@ export default function App() {
   const { t } = useI18n();
   const authSession = useAuthStore(state => state.session);
   const authLoading = useAuthStore(state => state.loading);
+  const signOut = useAuthStore(state => state.signOut);
   const hrr = useHeartRateRecovery();
   const isRecording = useWorkoutStore(state => state.isRecording);
   const { status: cloudStatus } = useConnectionStatus();
@@ -265,6 +266,7 @@ export default function App() {
     }
     setSkipAuth(false);
     setForceAuthFlow(true);
+    if (authSession) void signOut();
   };
 
   if (authConfigured && !authLoading && !authSession && (forceAuthFlow || (authRequired && !skipAuth))) {
