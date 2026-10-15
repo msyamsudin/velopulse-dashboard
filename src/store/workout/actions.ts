@@ -538,8 +538,13 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
           };
         });
 
-        set({ sessionHistory: normalizedSessions });
-        return normalizedSessions;
+        // IndexedDB can finish loading after the cloud request. Merge the
+        // device cache with current state so a late local read cannot restore
+        // a duplicate that the cloud response already reconciled.
+        const mergedSessions = mergeSessionHistories(normalizedSessions, get().sessionHistory);
+        set({ sessionHistory: mergedSessions });
+        persistSessionHistory(mergedSessions);
+        return mergedSessions;
       };
 
       const applyActiveSession = (activeSession: ActiveSessionSnapshot) => {

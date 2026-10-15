@@ -55,7 +55,9 @@ export const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSes
   for (const session of localSessions) {
     const key = getSessionKey(session);
     const remoteEntry = Array.from(merged.entries()).find(([remoteKey, candidate]) =>
-      remoteKey === key || isLegacyCloudCopy(session, candidate)
+      remoteKey === key ||
+      Boolean(session.supabase_id && candidate.supabase_id === session.supabase_id) ||
+      isLegacyCloudCopy(session, candidate)
     );
     const remote = remoteEntry?.[1];
     if (!remote) {
@@ -63,9 +65,9 @@ export const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSes
       continue;
     }
 
-    if (remoteEntry[0] !== key) merged.delete(remoteEntry[0]);
+    if (remoteEntry[0] !== key) merged.delete(key);
 
-    merged.set(key, {
+    merged.set(remoteEntry[0], {
       ...session,
       ...remote,
       synced_to_google: session.synced_to_google || remote.synced_to_google,

@@ -128,4 +128,21 @@ describe('getSessionKey', () => {
       duration: localCopy.duration + 1, supabase_id: 'another-session',
     })])).toHaveLength(2);
   });
+
+  it('membuang salinan lokal saat baris cloud dengan ID yang sama telah dimuat', () => {
+    const cloudSession = makeSession({ id: 'cloud-source-id', supabase_id: 'cloud-row-id' });
+    const localCopy = makeSession({
+      id: 'session_1792060701828',
+      supabase_id: 'cloud-row-id',
+      // Isi lokal bisa berbeda karena riwayat lama dikompaksi di localStorage.
+      history: makeHistory(20, 2000, 35),
+    });
+
+    const merged = mergeSessionHistories([localCopy], [cloudSession]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].id).toBe('cloud-source-id');
+    expect(merged[0].supabase_id).toBe('cloud-row-id');
+    expect(merged[0].history).toBe(cloudSession.history);
+  });
 });
