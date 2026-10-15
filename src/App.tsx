@@ -122,12 +122,14 @@ export default function App() {
     if (typeof window === 'undefined') return false;
     return window.sessionStorage.getItem('velopulse-skip-auth') === '1';
   });
+  const [forceAuthFlow, setForceAuthFlow] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
   const [wasRecording, setWasRecording] = useState(false);
   const [hasRequestedRemoteHistory, setHasRequestedRemoteHistory] = useState(false);
   const chartAvailable = workoutHistory.length > 0;
   const cloudUnavailable = cloudStatus?.state === 'offline' || cloudStatus?.state === 'unreachable';
-  const authRequired = Boolean(sysConfigCheck?.configured) && !cloudUnavailable;
+  const authConfigured = Boolean(sysConfigCheck?.configured);
+  const authRequired = authConfigured && !cloudUnavailable;
   const requiresSetup = (sysConfigCheck && !sysConfigCheck.configured) || profileStatus === 'new';
   const primarySurface: PrimarySurface = viewMode === 'telemetry'
     ? 'telemetry'
@@ -253,6 +255,7 @@ export default function App() {
       // Session storage unavailable (private mode); the skip lasts this render.
     }
     setSkipAuth(true);
+    setForceAuthFlow(false);
   };
   const handleSignIn = () => {
     try {
@@ -261,9 +264,10 @@ export default function App() {
       // Ignore storage failures; the in-memory flag is enough.
     }
     setSkipAuth(false);
+    setForceAuthFlow(true);
   };
 
-  if (authRequired && !authLoading && !authSession && !skipAuth) {
+  if (authConfigured && !authLoading && !authSession && (forceAuthFlow || (authRequired && !skipAuth))) {
     return <AuthScreen onContinueLocal={handleContinueLocal} />;
   }
 
@@ -276,7 +280,7 @@ export default function App() {
           isProfileMissing={profileStatus === 'new'}
           connectionError={profileError}
           onRetryConnection={retryProfile}
-          onBackToSignIn={authRequired && skipAuth ? handleSignIn : undefined}
+          onBackToSignIn={authConfigured && skipAuth ? handleSignIn : undefined}
         />
         <AnimatePresence>
           {showSettings && (
