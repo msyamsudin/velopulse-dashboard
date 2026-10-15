@@ -476,6 +476,7 @@ const id: Record<string, string> = {
   'No account? Create one': 'Belum punya akun? Buat sekarang',
   'Already have an account? Sign in': 'Sudah punya akun? Masuk',
   'Continue without account': 'Lanjutkan tanpa akun',
+  'Return to sign in': 'Kembali ke halaman masuk',
   'Check your email to confirm your account.': 'Periksa email Anda untuk mengonfirmasi akun.',
 
   // Summary — range totals block (Fase 5) & empty state

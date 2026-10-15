@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ArrowRight, Settings, Activity, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, ArrowRight, LogIn, Settings, Activity, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 export interface ConnectionError {
@@ -16,6 +16,7 @@ interface SetupLandingProps {
   isProfileMissing?: boolean;
   connectionError?: ConnectionError | null;
   onRetryConnection?: () => void;
+  onBackToSignIn?: () => void;
 }
 
 const ERROR_TITLE: Record<string, string> = {
@@ -26,7 +27,7 @@ const ERROR_TITLE: Record<string, string> = {
   UNKNOWN: 'Cloud database error',
 };
 
-export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, connectionError, onRetryConnection }: SetupLandingProps) => {
+export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, connectionError, onRetryConnection, onBackToSignIn }: SetupLandingProps) => {
   const { t } = useI18n();
 
   // Restore states
@@ -156,6 +157,16 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                   </span>
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                 </button>
+
+                {onBackToSignIn && (
+                  <button
+                    onClick={onBackToSignIn}
+                    className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-[10px] font-mono uppercase tracking-widest text-hw-text/75 transition-colors hover:border-hw-accent/50 hover:text-hw-accent"
+                  >
+                    <LogIn size={14} />
+                    {t('Return to sign in')}
+                  </button>
+                )}
 
                 <div className="pt-4 border-t border-white/5 w-full">
                   <button
