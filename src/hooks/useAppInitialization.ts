@@ -9,6 +9,7 @@ import {
 } from '@/lib/body-history';
 import { useBluetoothStore } from '../store/useBluetoothStore';
 import { useWorkoutStore } from '../store/useWorkoutStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { fetchProfileApi } from '@/lib/profile-api';
 
 export interface ProfileLoadError {
@@ -21,6 +22,7 @@ export interface ProfileLoadError {
 export const useAppInitialization = () => {
   const clearStaleData = useBluetoothStore(state => state.clearStaleData);
   const loadHistory = useWorkoutStore(state => state.loadHistory);
+  const authUserId = useAuthStore(state => state.session?.user.id ?? null);
 
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [userProfile, setUserProfileState] = useState(DEFAULT_PROFILE);
@@ -108,7 +110,7 @@ export const useAppInitialization = () => {
 
   useEffect(() => {
     loadProfile();
-  }, [loadProfile]);
+  }, [loadProfile, authUserId]);
 
   // The setup gate asks a different question than the metric gates: it only
   // needs the values the app cannot work without (age → maxHr). FTP and weight

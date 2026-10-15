@@ -126,6 +126,8 @@ export default function App() {
   const [wasRecording, setWasRecording] = useState(false);
   const [hasRequestedRemoteHistory, setHasRequestedRemoteHistory] = useState(false);
   const chartAvailable = workoutHistory.length > 0;
+  const cloudUnavailable = cloudStatus?.state === 'offline' || cloudStatus?.state === 'unreachable';
+  const authRequired = Boolean(sysConfigCheck?.configured) && !cloudUnavailable;
   const requiresSetup = (sysConfigCheck && !sysConfigCheck.configured) || profileStatus === 'new';
   const primarySurface: PrimarySurface = viewMode === 'telemetry'
     ? 'telemetry'
@@ -242,6 +244,29 @@ export default function App() {
 
   const hrZone = getHrZone(currentData.hr);
 
+  // Supabase login comes before profile setup so the user can attach cloud
+  // history and profile data to the correct account from the start.
+  const handleContinueLocal = () => {
+    try {
+      window.sessionStorage.setItem('velopulse-skip-auth', '1');
+    } catch {
+      // Session storage unavailable (private mode); the skip lasts this render.
+    }
+    setSkipAuth(true);
+  };
+  const handleSignIn = () => {
+    try {
+      window.sessionStorage.removeItem('velopulse-skip-auth');
+    } catch {
+      // Ignore storage failures; the in-memory flag is enough.
+    }
+    setSkipAuth(false);
+  };
+
+  if (authRequired && !authLoading && !authSession && !skipAuth) {
+    return <AuthScreen onContinueLocal={handleContinueLocal} />;
+  }
+
   if (requiresSetup) {
     return (
       <>
@@ -264,36 +289,6 @@ export default function App() {
           )}
         </AnimatePresence>
       </>
-    );
-  }
-
-  // Supabase Auth gate: when the cloud is configured and reachable but the
-  // user is not signed in, ask for login before showing the dashboard. Users
-  // can continue locally (data stays on this device and syncs later).
-  const cloudUnavailable = cloudStatus?.state === 'offline' || cloudStatus?.state === 'unreachable';
-  const authRequired = Boolean(sysConfigCheck?.configured) && !cloudUnavailable;
-  const handleContinueLocal = () => {
-    try {
-      window.sessionStorage.setItem('velopulse-skip-auth', '1');
-    } catch {
-      // Session storage unavailable (private mode); the skip lasts this render.
-    }
-    setSkipAuth(true);
-  };
-  const handleSignIn = () => {
-    try {
-      window.sessionStorage.removeItem('velopulse-skip-auth');
-    } catch {
-      // Ignore storage failures; the in-memory flag is enough.
-    }
-    setSkipAuth(false);
-  };
-
-  if (authRequired && !authLoading && !authSession && !skipAuth) {
-    return (
-      <AuthScreen
-        onContinueLocal={handleContinueLocal}
-      />
     );
   }
 
