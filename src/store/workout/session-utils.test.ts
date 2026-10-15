@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSupabaseSyncPending, sanitizeLegacySessionDuration } from './session-utils';
+import { getSessionKey, isSupabaseSyncPending, mergeSessionHistories, sanitizeLegacySessionDuration } from './session-utils';
 import type { WorkoutSession } from './types';
 
 const makeHistory = (pointCount: number, finalDistanceMeters: number, maxSpeed: number) => {
@@ -105,5 +105,27 @@ describe('isSupabaseSyncPending', () => {
     // Data demo hidup hanya di perangkat ini: kalau ikut terhitung, setiap
     // auto-sync akan mencoba mengirimnya dan melaporkan kegagalan.
     expect(isSupabaseSyncPending({ simulated: true, synced_to_supabase: false })).toBe(false);
+  });
+});
+
+describe('getSessionKey', () => {
+  it('mempertahankan sesi berbeda yang memiliki timestamp sama', () => {
+    const first = makeSession({ id: 'session_1' });
+    const second = makeSession({ id: 'imported_1_0' });
+
+    expect(getSessionKey(first)).not.toBe(getSessionKey(second));
+    expect(mergeSessionHistories([first], [second])).toHaveLength(2);
+  });
+
+  it('menggabungkan salinan cloud lama hanya saat isi sesi juga sama', () => {
+    const legacyRemote = makeSession({ id: 'remote-uuid', supabase_id: 'remote-uuid' });
+    const localCopy = makeSession({ id: 'session_1', supabase_id: 'remote-uuid' });
+
+    expect(getSessionKey(legacyRemote)).not.toBe(getSessionKey(localCopy));
+    expect(mergeSessionHistories([localCopy], [legacyRemote])).toHaveLength(1);
+    expect(mergeSessionHistories([localCopy], [makeSession({
+      id: 'another-session', sessionStartTime: localCopy.sessionStartTime,
+      duration: localCopy.duration + 1, supabase_id: 'another-session',
+    })])).toHaveLength(2);
   });
 });

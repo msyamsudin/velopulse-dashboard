@@ -11,13 +11,35 @@ interface SupabaseWorkoutRow {
   stats: WorkoutSession['stats'];
   history: HistoryData[];
   synced_to_google?: boolean;
+  source_session_id?: string | null;
 }
+
+const isSameWorkout = (row: Pick<SupabaseWorkoutRow, 'duration' | 'stats' | 'history'>, session: WorkoutSession) =>
+  row.duration === session.duration &&
+  JSON.stringify(row.stats) === JSON.stringify(session.stats) &&
+  JSON.stringify(row.history) === JSON.stringify(session.history);
+
+const findMatchingRows = async (session: WorkoutSession, existingClient?: Awaited<ReturnType<typeof getSupabaseClient>>) => {
+  const client = existingClient ?? await getSupabaseClient();
+  if (!client) return { rows: [] as SupabaseWorkoutRow[] };
+
+  const { data, error } = await client
+    .from('workouts')
+    .select('*')
+    .eq('session_start_time', session.sessionStartTime);
+
+  if (error) throw error;
+  const rows = (data ?? []) as SupabaseWorkoutRow[];
+  const exactId = rows.find(row => row.source_session_id === session.id);
+  const legacyMatch = rows.find(row => !row.source_session_id && isSameWorkout(row, session));
+  return { rows: exactId ? [exactId] : legacyMatch ? [legacyMatch] : [] };
+};
 
 export const mapSupabaseWorkout = (item: SupabaseWorkoutRow): WorkoutSession => {
   const sessionStartTime = Number(item.session_start_time) || Date.parse(item.created_at) || 0;
 
   return sanitizeLegacySessionDuration({
-    id: item.id,
+    id: item.source_session_id || item.id,
     sessionStartTime,
     date: sessionStartTime > 0 ? new Date(sessionStartTime).toISOString() : item.created_at,
     duration: item.duration,
@@ -32,22 +54,14 @@ export const mapSupabaseWorkout = (item: SupabaseWorkoutRow): WorkoutSession => 
 };
 
 export const findSupabaseDuplicate = async (session: WorkoutSession) => {
-  const client = await getSupabaseClient();
-  if (!client) return null;
-
-  const { data, error } = await client
-    .from('workouts')
-    .select('*')
-    .eq('session_start_time', session.sessionStartTime)
-    .limit(1);
-
-  if (error) throw error;
-  return data?.[0] ? mapSupabaseWorkout(data[0]) : null;
+  const { rows } = await findMatchingRows(session);
+  return rows[0] ? mapSupabaseWorkout(rows[0]) : null;
 };
 
 export const buildSupabasePayload = async (session: WorkoutSession) => {
   const userId = await getSupabaseUserId();
   return {
+    source_session_id: session.id,
     session_start_time: session.sessionStartTime,
     duration: session.duration,
     stats: session.stats,
@@ -74,15 +88,8 @@ export const syncSessionToSupabase = async (session: WorkoutSession): Promise<Wo
 
   try {
     const payload = await buildSupabasePayload(session);
-    const { data: existingRows, error: lookupError } = await client
-      .from('workouts')
-      .select('id, created_at, synced_to_google')
-      .eq('session_start_time', session.sessionStartTime)
-      .limit(1);
-
-    if (lookupError) throw lookupError;
-
-    const existing = existingRows?.[0];
+    const { rows } = await findMatchingRows(session, client);
+    const existing = rows[0];
     if (existing) {
       const updatePayload = {
         ...payload,

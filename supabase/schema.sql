@@ -11,6 +11,7 @@
 --   20260524000000_baseline_workouts.sql
 --   20260818131159_workouts_user_scoping.sql
 --   20261015000000_profiles_user_scoping.sql
+--   20261015000100_workouts_source_session_id.sql
 -- ============================================================================
 
 -- ===== 20260524000000_baseline_workouts.sql ====================================
@@ -153,3 +154,11 @@ create policy "users insert own profile" on profiles for insert to authenticated
   with check (user_id = auth.uid());
 create policy "users update own profile" on profiles for update to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ===== 20261015000100_workouts_source_session_id.sql ===========================
+
+-- ID lokal yang stabil mencegah sesi dengan waktu mulai sama tertukar saat sinkronisasi.
+alter table workouts add column if not exists source_session_id text;
+
+create index if not exists workouts_source_session_id_idx
+  on workouts (source_session_id);

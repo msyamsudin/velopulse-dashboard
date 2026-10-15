@@ -1,7 +1,6 @@
 import type { WorkoutSession } from './types';
 
-export const getSessionKey = (session: Pick<WorkoutSession, 'id' | 'sessionStartTime'>) =>
-  session.sessionStartTime ? `start:${session.sessionStartTime}` : `id:${session.id}`;
+export const getSessionKey = (session: Pick<WorkoutSession, 'id'>) => `id:${session.id}`;
 
 export const getSessionStartTimestamp = (session: Pick<WorkoutSession, 'sessionStartTime' | 'date'>) => {
   if (Number.isFinite(session.sessionStartTime) && session.sessionStartTime > 0) {
@@ -39,6 +38,13 @@ export const isSupabaseSyncPending = (
 export const sortSessions = (sessions: WorkoutSession[]) =>
   [...sessions].sort((a, b) => getSessionStartTimestamp(b) - getSessionStartTimestamp(a));
 
+const isLegacyCloudCopy = (local: WorkoutSession, remote: WorkoutSession) =>
+  Boolean(remote.supabase_id && remote.id === remote.supabase_id) &&
+  local.sessionStartTime === remote.sessionStartTime &&
+  local.duration === remote.duration &&
+  JSON.stringify(local.stats) === JSON.stringify(remote.stats) &&
+  JSON.stringify(local.history) === JSON.stringify(remote.history);
+
 export const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSessions: WorkoutSession[]) => {
   const merged = new Map<string, WorkoutSession>();
 
@@ -48,11 +54,16 @@ export const mergeSessionHistories = (localSessions: WorkoutSession[], remoteSes
 
   for (const session of localSessions) {
     const key = getSessionKey(session);
-    const remote = merged.get(key);
+    const remoteEntry = Array.from(merged.entries()).find(([remoteKey, candidate]) =>
+      remoteKey === key || isLegacyCloudCopy(session, candidate)
+    );
+    const remote = remoteEntry?.[1];
     if (!remote) {
       merged.set(key, session);
       continue;
     }
+
+    if (remoteEntry[0] !== key) merged.delete(remoteEntry[0]);
 
     merged.set(key, {
       ...session,
