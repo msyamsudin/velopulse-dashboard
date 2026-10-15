@@ -280,7 +280,7 @@ export default function App() {
           isProfileMissing={profileStatus === 'new'}
           connectionError={profileError}
           onRetryConnection={retryProfile}
-          onBackToSignIn={authConfigured && skipAuth ? handleSignIn : undefined}
+          onBackToSignIn={authConfigured ? handleSignIn : undefined}
         />
         <AnimatePresence>
           {showSettings && (
