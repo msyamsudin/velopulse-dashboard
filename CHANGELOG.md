@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/msyamsudin/velopulse-dashboard/compare/v0.4.0...v0.4.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **auth:** akhiri sesi saat kembali ke login ([fb0f984](https://github.com/msyamsudin/velopulse-dashboard/commit/fb0f984ab9db7a5590a274ee44c75819430d8754))
+* **auth:** dahulukan login sebelum setup profil ([0668c1b](https://github.com/msyamsudin/velopulse-dashboard/commit/0668c1b84c54c2af016bf0cc421ccecde4f53d98))
+* **auth:** selalu sediakan tombol kembali ke login ([9df9cbd](https://github.com/msyamsudin/velopulse-dashboard/commit/9df9cbdc485d0f9ea35a575b139c059f013a5e4d))
+* **auth:** tambahkan jalan kembali ke halaman masuk ([a3825b3](https://github.com/msyamsudin/velopulse-dashboard/commit/a3825b3c9a64a3df51ccb55bc91d3a86ceaf12e5))
+* **auth:** tampilkan kembali login saat cloud tak terjangkau ([5b896ec](https://github.com/msyamsudin/velopulse-dashboard/commit/5b896ecb739ac78cb614236b58c7ef277508ce9b))
+* **config:** batasi tujuan validasi Supabase ([8cb45fd](https://github.com/msyamsudin/velopulse-dashboard/commit/8cb45fd14a6e77080f394161be93ee6fc2578eb5))
+* **config:** wajibkan autentikasi saat impor backup ([bb73462](https://github.com/msyamsudin/velopulse-dashboard/commit/bb73462487357a42aac0e69266ee90ef3fcc5371))
+* **history:** hapus salinan lokal yang sudah ada di cloud ([dc4c6cd](https://github.com/msyamsudin/velopulse-dashboard/commit/dc4c6cdedd88e89e325d5e0dbce3f33c18cc77c7))
+* **history:** tampilkan ID sesi latihan ([dbb05aa](https://github.com/msyamsudin/velopulse-dashboard/commit/dbb05aa3c22977beb73e6a34c104987ede559fd9))
+* **profile:** pisahkan profil cloud per akun ([894c502](https://github.com/msyamsudin/velopulse-dashboard/commit/894c502baf8eefcb900f15daa9b2dd4d7609d8b4))
+* **profile:** tautkan profil lama setelah login ([1e704c8](https://github.com/msyamsudin/velopulse-dashboard/commit/1e704c88124315d373e629bd0a98ce97292f1cd5))
+* **security:** wajibkan password master saat setup ([0f42683](https://github.com/msyamsudin/velopulse-dashboard/commit/0f42683acf6c0da1d152f9f5f03ecf26b5d4e368))
+* **sync:** bedakan sesi dengan timestamp sama ([db4fe3e](https://github.com/msyamsudin/velopulse-dashboard/commit/db4fe3e26a64f6f6e3a298e87d5114c0452a1d0c))
+
 ## [0.4.0](https://github.com/msyamsudin/velopulse-dashboard/compare/v0.3.3...v0.4.0) (2026-09-17)
 
 
