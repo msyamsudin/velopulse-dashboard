@@ -18,6 +18,8 @@ const id: Record<string, string> = {
   'ses.': 'sesi',
   'pending sync': 'menunggu sinkronisasi',
   'Supabase synced': 'Supabase tersinkron',
+  'Session ID': 'ID sesi',
+  'Cloud row ID': 'ID baris cloud',
   'History view': 'Tampilan riwayat',
   'Sessions': 'Sesi',
   'Summary': 'Ringkasan',

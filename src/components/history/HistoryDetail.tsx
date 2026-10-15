@@ -243,6 +243,12 @@ export const HistoryDetail = ({
                 <span className="w-1 h-1 rounded-full bg-hw-muted/30" />
                 <span className="flex items-center gap-1"><Timer size={12} /> {formatDuration(session.duration)}</span>
               </div>
+              <div className="mt-2 flex flex-col gap-1 text-[10px] font-mono text-hw-muted/70">
+                <div className="break-all"><span className="uppercase tracking-wider">{t('Session ID')}:</span> <code>{session.id}</code></div>
+                {session.supabase_id && (
+                  <div className="break-all"><span className="uppercase tracking-wider">{t('Cloud row ID')}:</span> <code>{session.supabase_id}</code></div>
+                )}
+              </div>
             </div>
           </div>
 
