@@ -5,8 +5,12 @@ import { errorResponse, getAuthenticatedClient } from '@/lib/profile-server';
  * Apakah ada profil lama tanpa pemilik yang bisa ditawarkan untuk ditautkan.
  *
  * Hanya satu bit; isi profil tidak pernah dikirim sebelum pengguna memilih
- * untuk menautkannya. `false` juga jawaban yang benar ketika fungsi migrasi
- * belum diterapkan, sehingga layar setup tidak menawarkan sesuatu yang gagal.
+ * untuk menautkannya.
+ *
+ * Bila fungsi migrasinya belum diterapkan, RPC gagal dan endpoint ini
+ * mengembalikan 500, bukan `false`. Klien membaca respons gagal sebagai
+ * "tidak tersedia", sehingga layar setup tetap tidak menawarkan tautan yang
+ * pasti gagal — tetapi kegagalannya tetap terlihat di log, bukan disembunyikan.
  */
 export async function GET(request: Request) {
   try {
