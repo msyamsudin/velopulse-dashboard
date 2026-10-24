@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { Activity, AlertTriangle, Save, Target, User, Zap } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import {
+  PROFILE_LIMITS,
   calculateMaxHr,
   hasProfileErrors,
   validateProfile,
@@ -30,9 +31,23 @@ interface NumberFieldProps {
   icon: ReactNode;
   readOnly?: boolean;
   suffix?: string;
+  min?: number;
+  max?: number;
+  /** Berat badan memakai satu desimal; field lain bilangan bulat. */
+  decimal?: boolean;
   errorMessage?: string | null;
   onChange?: (value: number) => void;
 }
+
+/** Teks yang diketik tidak pernah memaksa nilai: `0` bukan pengganti kosong. */
+const toDraft = (value: number): string =>
+  Number.isFinite(value) && value !== 0 ? String(value) : '';
+
+const sanitizeDraft = (raw: string, decimal: boolean): string =>
+  decimal
+    // Hanya angka dan satu titik desimal; koma dibuang agar tidak menghasilkan NaN.
+    ? raw.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
+    : raw.replace(/[^0-9]/g, '');
 
 const NumberField = ({
   label,
@@ -40,34 +55,68 @@ const NumberField = ({
   icon,
   readOnly = false,
   suffix,
+  min,
+  max,
+  decimal = false,
   errorMessage,
   onChange,
-}: NumberFieldProps) => (
-  <div className="space-y-2">
-    <label className="vp-label flex items-center gap-2">
-      {icon}
-      {label}
-    </label>
-    <div className="relative">
-      <input
-        type="number"
-        value={value ?? ''}
-        readOnly={readOnly}
-        aria-invalid={Boolean(errorMessage)}
-        onChange={(e) => onChange?.(parseInt(e.target.value) || 0)}
-        className={`vp-focus-ring w-full rounded-lg border bg-white/[0.035] p-3 pr-16 font-mono text-vp-text outline-none transition-colors focus:border-vp-accent/50 ${readOnly ? 'opacity-70' : ''} ${errorMessage ? 'border-vp-danger/50' : 'border-vp-border'}`}
-      />
-      {suffix && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-vp-bg px-1.5 text-[8px] font-mono uppercase tracking-[0.12em] text-vp-muted">
-          {suffix}
-        </div>
+}: NumberFieldProps) => {
+  // Draf teks dipisahkan dari nilai numerik supaya pengguna bisa mengosongkan
+  // field, mengetik "72." setengah jalan, atau mengetik desimal tanpa dipotong
+  // `parseInt`. Draf hanya direset ketika nilai berubah dari luar komponen.
+  const [draft, setDraft] = useState(() => toDraft(value));
+  const [committed, setCommitted] = useState(value);
+
+  if (value !== committed) {
+    setCommitted(value);
+    setDraft(toDraft(value));
+  }
+
+  const handleChange = (raw: string) => {
+    const next = sanitizeDraft(raw, decimal);
+    setDraft(next);
+    const parsed = next === '' ? 0 : Number(next);
+    if (Number.isFinite(parsed)) {
+      setCommitted(parsed);
+      onChange?.(parsed);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="vp-label flex items-center gap-2">
+        {icon}
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode={decimal ? 'decimal' : 'numeric'}
+          autoComplete="off"
+          aria-label={label}
+          value={draft}
+          readOnly={readOnly}
+          aria-invalid={Boolean(errorMessage)}
+          onChange={(e) => handleChange(e.target.value)}
+          className={`vp-focus-ring w-full rounded-lg border bg-white/[0.035] p-3 pr-16 font-mono text-vp-text outline-none transition-colors focus:border-vp-accent/50 ${readOnly ? 'opacity-70' : ''} ${errorMessage ? 'border-vp-danger/50' : 'border-vp-border'}`}
+        />
+        {suffix && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-vp-bg px-1.5 text-[8px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+            {suffix}
+          </div>
+        )}
+      </div>
+      {(min !== undefined || max !== undefined) && (
+        <p className="text-[9px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+          {min ?? 0}–{max ?? '∞'}
+        </p>
+      )}
+      {errorMessage && (
+        <p role="alert" className="text-[10px] leading-4 text-vp-danger">{errorMessage}</p>
       )}
     </div>
-    {errorMessage && (
-      <p role="alert" className="text-[10px] leading-4 text-vp-danger">{errorMessage}</p>
-    )}
-  </div>
-);
+  );
+};
 
 export const ProfileTab = ({
   profile,
@@ -153,6 +202,8 @@ export const ProfileTab = ({
           value={profile.age}
           icon={<User size={12} className="text-vp-accent" />}
           suffix={t('Years')}
+          min={PROFILE_LIMITS.age.min}
+          max={PROFILE_LIMITS.age.max}
           errorMessage={errorFor('age')}
           onChange={(age) => setProfile({ ...profile, age, maxHr: calculateMaxHr(age) })}
         />
@@ -161,6 +212,8 @@ export const ProfileTab = ({
           value={profile.maxHr}
           icon={<Target size={12} className="text-vp-hr" />}
           suffix={t('Auto')}
+          min={PROFILE_LIMITS.maxHr.min}
+          max={PROFILE_LIMITS.maxHr.max}
           errorMessage={errorFor('maxHr')}
           readOnly
         />
@@ -169,6 +222,8 @@ export const ProfileTab = ({
           value={profile.ftp}
           icon={<Zap size={12} className="text-vp-power" />}
           suffix={t('Watts')}
+          min={PROFILE_LIMITS.ftp.min}
+          max={PROFILE_LIMITS.ftp.max}
           errorMessage={errorFor('ftp')}
           onChange={(ftp) => setProfile({ ...profile, ftp })}
         />
@@ -177,6 +232,9 @@ export const ProfileTab = ({
           value={profile.weight}
           icon={<User size={12} className="text-vp-speed" />}
           suffix="KG"
+          decimal
+          min={PROFILE_LIMITS.weight.min}
+          max={PROFILE_LIMITS.weight.max}
           errorMessage={errorFor('weight')}
           onChange={(weight) => setProfile({ ...profile, weight })}
         />
@@ -185,6 +243,8 @@ export const ProfileTab = ({
           value={profile.restingHr}
           icon={<Activity size={12} className="text-vp-hr" />}
           suffix="BPM"
+          min={PROFILE_LIMITS.restingHr.min}
+          max={PROFILE_LIMITS.restingHr.max}
           errorMessage={errorFor('restingHr')}
           onChange={(restingHr) => setProfile({ ...profile, restingHr })}
         />

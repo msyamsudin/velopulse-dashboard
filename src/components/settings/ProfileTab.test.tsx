@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { ProfileTab } from './ProfileTab';
@@ -71,6 +72,42 @@ describe('ProfileTab metric gate', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Age must be a whole number between 10 and 100.'
     );
+  });
+
+  it('keeps the typed text, accepts decimals and lets the rider clear a field', () => {
+    const Stateful = () => {
+      const [profile, setProfile] = useState({ age: 40, maxHr: 178, ftp: 220, weight: 74, restingHr: 52 });
+      return (
+        <ProfileTab
+          profile={profile}
+          setProfile={setProfile}
+          onSave={() => {}}
+          saveStatus="idle"
+        />
+      );
+    };
+
+    render(
+      <I18nProvider>
+        <Stateful />
+      </I18nProvider>
+    );
+
+    const weight = screen.getByLabelText('Weight');
+    fireEvent.change(weight, { target: { value: '72.5' } });
+    expect(weight).toHaveValue('72.5');
+
+    fireEvent.change(weight, { target: { value: '72.55' } });
+    expect(weight).toHaveValue('72.55');
+
+    // Mengosongkan field berarti "belum diisi" (0), bukan dipaksa tampil 0.
+    const age = screen.getByLabelText('Age');
+    fireEvent.change(age, { target: { value: '' } });
+    expect(age).toHaveValue('');
+
+    // Karakter selain angka dibuang sebelum menjadi nilai.
+    fireEvent.change(age, { target: { value: '4a0' } });
+    expect(age).toHaveValue('40');
   });
 
   it('offers a resting-HR field and says where the body history lives', () => {
