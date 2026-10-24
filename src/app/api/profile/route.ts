@@ -4,7 +4,12 @@ import { getAppConfig } from '@/lib/config-helper';
 import { classifySupabaseError } from '@/lib/supabase-errors';
 import { buildLogTag } from '@/lib/version';
 import { getUserProfile, saveUserProfile } from '@/lib/profile-helper';
-import { DEFAULT_PROFILE, normalizeProfile } from '@/lib/profile';
+import {
+  DEFAULT_PROFILE,
+  normalizeProfile,
+  profileErrorFields,
+  validateProfile,
+} from '@/lib/profile';
 
 const SUPABASE_FETCH_TIMEOUT_MS = 10_000;
 
@@ -81,7 +86,11 @@ export async function GET(request: Request) {
     // pernah disimpan sebelum login lalu tautkan ke akun ini.
     const cloudProfileReady = profile?.age > 0 && profile?.max_hr > 0;
     const localProfile = getUserProfile();
-    const localProfileReady = localProfile.age > 0 && localProfile.maxHr > 0;
+    const localProfileReady = localProfile.age > 0
+      && localProfile.maxHr > 0
+      // Profil lokal yang rusak tidak boleh didorong ke cloud: validasi yang
+      // sama dengan POST berlaku sebelum data perangkat menjadi data akun.
+      && profileErrorFields(validateProfile(localProfile)).length === 0;
     if (!cloudProfileReady && localProfileReady) {
       const { data: savedProfile, error: saveError } = await supabase
         .from('profiles')
@@ -112,7 +121,20 @@ export async function POST(request: NextRequest) {
   try {
     const hasAuthorization = Boolean(request.headers.get('authorization'));
     const auth = await getAuthenticatedClient(request);
-    const normalized = normalizeProfile(await request.json());
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const normalized = normalizeProfile(body);
+    const invalidFields = profileErrorFields(validateProfile(normalized));
+    if (invalidFields.length > 0) {
+      return NextResponse.json({ error: 'Invalid profile', fields: invalidFields }, { status: 400 });
+    }
+
     if (!auth) {
       if (hasAuthorization) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
       const saved = saveUserProfile(normalized);

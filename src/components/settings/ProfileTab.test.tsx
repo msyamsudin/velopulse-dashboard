@@ -62,6 +62,17 @@ describe('ProfileTab metric gate', () => {
     expect(screen.queryAllByText(/Add your weight to unlock/)).toHaveLength(0);
   });
 
+  it('blocks saving and explains why when a value is out of range', () => {
+    const onSave = renderTab({ age: 0, maxHr: 190, ftp: 220, weight: 74 });
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Age must be a whole number between 10 and 100.'
+    );
+  });
+
   it('offers a resting-HR field and says where the body history lives', () => {
     renderTab({ age: 40, maxHr: 178, ftp: 220, weight: 74, restingHr: 52 });
 

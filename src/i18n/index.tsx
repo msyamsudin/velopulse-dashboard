@@ -829,6 +829,11 @@ const id: Record<string, string> = {
   'Failed to save profile (HTTP {status})': 'Gagal menyimpan profil (HTTP {status})',
   'Could not reach the server. Check your internet connection.': 'Tidak dapat menghubungi server. Periksa koneksi internet Anda.',
   'Failed to save configuration': 'Gagal menyimpan konfigurasi',
+  'Age must be a whole number between 10 and 100.': 'Usia harus bilangan bulat antara 10 dan 100.',
+  'Max HR must be a whole number between 100 and 230.': 'Detak jantung maks. harus bilangan bulat antara 100 dan 230.',
+  'FTP must be a whole number between 0 and 2000.': 'FTP harus bilangan bulat antara 0 dan 2000.',
+  'Weight must be between 20 and 300 kg, with at most one decimal.': 'Berat harus antara 20 dan 300 kg, maksimal satu angka desimal.',
+  'Resting HR must be between 25 and 120 bpm and below max HR.': 'Detak jantung istirahat harus antara 25 dan 120 bpm serta di bawah detak jantung maks.',
 };
 
 type I18nValue = {

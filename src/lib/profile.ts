@@ -79,3 +79,67 @@ export const normalizeProfile = (
     restingHr: read('restingHr', 'restingHr', 'resting_hr'),
   };
 };
+
+export type ProfileField = keyof UserProfile;
+
+/** Field yang gagal validasi. Pesan untuk pengguna hidup di lapisan UI. */
+export type ProfileErrors = Partial<Record<ProfileField, true>>;
+
+/**
+ * Batas nilai yang dianggap masuk akal untuk seorang pesepeda.
+ *
+ * `ftp`, `weight`, dan `restingHr` menerima 0 sebagai "belum diisi", mengikuti
+ * gate metrik di profile-gate.ts yang memperlakukan 0 sebagai tidak tersedia.
+ */
+export const PROFILE_LIMITS = {
+  age: { min: 10, max: 100 },
+  maxHr: { min: 100, max: 230 },
+  ftp: { min: 0, max: 2000 },
+  weight: { min: 20, max: 300 },
+  restingHr: { min: 25, max: 120 },
+} as const;
+
+const within = (value: number, min: number, max: number): boolean =>
+  Number.isFinite(value) && value >= min && value <= max;
+
+/** Satu desimal: 72,5 lolos, 72,55 ditolak. */
+const hasAtMostOneDecimal = (value: number): boolean => Math.round(value * 10) / 10 === value;
+
+/**
+ * Memeriksa profil sebelum disimpan, baik di klien (pesan inline) maupun di
+ * route API (400 sebelum menyentuh database). Tanpa ini, usia negatif atau
+ * field yang hilang berakhir sebagai error database yang tidak bisa dijelaskan
+ * kepada pengguna.
+ */
+export const validateProfile = (profile: UserProfile): ProfileErrors => {
+  const errors: ProfileErrors = {};
+
+  if (!Number.isInteger(profile.age) || !within(profile.age, PROFILE_LIMITS.age.min, PROFILE_LIMITS.age.max)) {
+    errors.age = true;
+  }
+  if (!Number.isInteger(profile.maxHr) || !within(profile.maxHr, PROFILE_LIMITS.maxHr.min, PROFILE_LIMITS.maxHr.max)) {
+    errors.maxHr = true;
+  }
+  if (!Number.isInteger(profile.ftp) || !within(profile.ftp, PROFILE_LIMITS.ftp.min, PROFILE_LIMITS.ftp.max)) {
+    errors.ftp = true;
+  }
+
+  const weightUsable = profile.weight === 0
+    || (within(profile.weight, PROFILE_LIMITS.weight.min, PROFILE_LIMITS.weight.max)
+      && hasAtMostOneDecimal(profile.weight));
+  if (!weightUsable) errors.weight = true;
+
+  const restingUsable = profile.restingHr === 0
+    || (Number.isInteger(profile.restingHr)
+      && within(profile.restingHr, PROFILE_LIMITS.restingHr.min, PROFILE_LIMITS.restingHr.max)
+      && profile.restingHr < profile.maxHr);
+  if (!restingUsable) errors.restingHr = true;
+
+  return errors;
+};
+
+export const profileErrorFields = (errors: ProfileErrors): ProfileField[] =>
+  (Object.keys(errors) as ProfileField[]);
+
+export const hasProfileErrors = (errors: ProfileErrors): boolean =>
+  profileErrorFields(errors).length > 0;

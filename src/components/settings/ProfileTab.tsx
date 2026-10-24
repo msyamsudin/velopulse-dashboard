@@ -1,7 +1,13 @@
 import { motion } from 'motion/react';
 import { Activity, AlertTriangle, Save, Target, User, Zap } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { calculateMaxHr, type UserProfile } from '@/lib/profile';
+import { useState, type ReactNode } from 'react';
+import {
+  calculateMaxHr,
+  hasProfileErrors,
+  validateProfile,
+  type ProfileField,
+  type UserProfile,
+} from '@/lib/profile';
 import { getProfileGate } from '@/lib/profile-gate';
 import { useI18n } from '@/i18n';
 
@@ -24,10 +30,19 @@ interface NumberFieldProps {
   icon: ReactNode;
   readOnly?: boolean;
   suffix?: string;
+  errorMessage?: string | null;
   onChange?: (value: number) => void;
 }
 
-const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }: NumberFieldProps) => (
+const NumberField = ({
+  label,
+  value,
+  icon,
+  readOnly = false,
+  suffix,
+  errorMessage,
+  onChange,
+}: NumberFieldProps) => (
   <div className="space-y-2">
     <label className="vp-label flex items-center gap-2">
       {icon}
@@ -38,8 +53,9 @@ const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }:
         type="number"
         value={value ?? ''}
         readOnly={readOnly}
+        aria-invalid={Boolean(errorMessage)}
         onChange={(e) => onChange?.(parseInt(e.target.value) || 0)}
-        className={`vp-focus-ring w-full rounded-lg border border-vp-border bg-white/[0.035] p-3 pr-16 font-mono text-vp-text outline-none transition-colors focus:border-vp-accent/50 ${readOnly ? 'opacity-70' : ''}`}
+        className={`vp-focus-ring w-full rounded-lg border bg-white/[0.035] p-3 pr-16 font-mono text-vp-text outline-none transition-colors focus:border-vp-accent/50 ${readOnly ? 'opacity-70' : ''} ${errorMessage ? 'border-vp-danger/50' : 'border-vp-border'}`}
       />
       {suffix && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-vp-bg px-1.5 text-[8px] font-mono uppercase tracking-[0.12em] text-vp-muted">
@@ -47,6 +63,9 @@ const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }:
         </div>
       )}
     </div>
+    {errorMessage && (
+      <p role="alert" className="text-[10px] leading-4 text-vp-danger">{errorMessage}</p>
+    )}
   </div>
 );
 
@@ -65,6 +84,28 @@ export const ProfileTab = ({
   // FTP and weight gate *metrics*, not riding: the notice explains what stays
   // hidden, it never disables anything in this form or on the cockpit.
   const gate = getProfileGate(profile);
+  const errors = validateProfile(profile);
+  // Kesalahan baru ditampilkan setelah pengguna mencoba menyimpan, supaya
+  // formulir onboarding tidak langsung merah sebelum diisi.
+  const [showErrors, setShowErrors] = useState(false);
+  const errorFor = (field: ProfileField): string | null => {
+    if (!showErrors || !errors[field]) return null;
+    const messages: Record<ProfileField, string> = {
+      age: t('Age must be a whole number between 10 and 100.'),
+      maxHr: t('Max HR must be a whole number between 100 and 230.'),
+      ftp: t('FTP must be a whole number between 0 and 2000.'),
+      weight: t('Weight must be between 20 and 300 kg, with at most one decimal.'),
+      restingHr: t('Resting HR must be between 25 and 120 bpm and below max HR.'),
+    };
+    return messages[field];
+  };
+  const handleSave = () => {
+    if (hasProfileErrors(errors)) {
+      setShowErrors(true);
+      return;
+    }
+    onSave();
+  };
   return (
     <motion.div
       key="profile"
@@ -112,6 +153,7 @@ export const ProfileTab = ({
           value={profile.age}
           icon={<User size={12} className="text-vp-accent" />}
           suffix={t('Years')}
+          errorMessage={errorFor('age')}
           onChange={(age) => setProfile({ ...profile, age, maxHr: calculateMaxHr(age) })}
         />
         <NumberField
@@ -119,6 +161,7 @@ export const ProfileTab = ({
           value={profile.maxHr}
           icon={<Target size={12} className="text-vp-hr" />}
           suffix={t('Auto')}
+          errorMessage={errorFor('maxHr')}
           readOnly
         />
         <NumberField
@@ -126,6 +169,7 @@ export const ProfileTab = ({
           value={profile.ftp}
           icon={<Zap size={12} className="text-vp-power" />}
           suffix={t('Watts')}
+          errorMessage={errorFor('ftp')}
           onChange={(ftp) => setProfile({ ...profile, ftp })}
         />
         <NumberField
@@ -133,6 +177,7 @@ export const ProfileTab = ({
           value={profile.weight}
           icon={<User size={12} className="text-vp-speed" />}
           suffix="KG"
+          errorMessage={errorFor('weight')}
           onChange={(weight) => setProfile({ ...profile, weight })}
         />
         <NumberField
@@ -140,6 +185,7 @@ export const ProfileTab = ({
           value={profile.restingHr}
           icon={<Activity size={12} className="text-vp-hr" />}
           suffix="BPM"
+          errorMessage={errorFor('restingHr')}
           onChange={(restingHr) => setProfile({ ...profile, restingHr })}
         />
       </div>
@@ -175,7 +221,7 @@ export const ProfileTab = ({
       )}
 
       <button
-        onClick={onSave}
+        onClick={handleSave}
         disabled={!canSave || saveStatus === 'saving'}
         className="vp-focus-ring flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-50"
       >
