@@ -62,7 +62,7 @@ export const SystemTab = ({
       const token = await onExport(exportPassword);
       setExportedToken(token);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Export failed');
+      setExportError(err instanceof Error ? err.message : t('Export failed'));
     } finally {
       setIsExporting(false);
     }
@@ -88,7 +88,7 @@ export const SystemTab = ({
         }, 1500);
       }
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Import failed');
+      setImportError(err instanceof Error ? err.message : t('Import failed'));
     } finally {
       setIsImporting(false);
     }
@@ -135,7 +135,7 @@ export const SystemTab = ({
               disabled={supabaseValidating}
             >
               {supabaseValidating ? <Loader2 size={12} className="animate-spin" /> : <Target size={12} />}
-              Validasi Supabase
+              {t('Validate Supabase')}
             </button>
             {supabaseValidStatus && (
               <span className={`text-[10px] font-mono flex items-center gap-1 ${supabaseValidStatus.valid ? 'text-vp-accent' : 'text-vp-danger'}`}>
@@ -350,7 +350,7 @@ export const SystemTab = ({
           disabled={saveStatus === 'saving'}
           className="vp-focus-ring mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-50"
         >
-          {saveStatus === 'saving' ? 'SAVING...' : saveStatus === 'success' ? 'SYSTEM UPDATED!' : 'APPLY CONFIGURATION'}
+          {t(saveStatus === 'saving' ? 'SAVING...' : saveStatus === 'success' ? 'SYSTEM UPDATED!' : 'APPLY CONFIGURATION')}
         </button>
       </div>
     </motion.div>

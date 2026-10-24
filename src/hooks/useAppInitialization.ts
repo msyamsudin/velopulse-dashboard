@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DEFAULT_PROFILE } from '@/lib/constants';
+import { DEFAULT_PROFILE, type UserProfile } from '@/lib/profile';
 import {
   getLatestRestingHr,
   readBodyHistory,
@@ -27,6 +27,8 @@ export const useAppInitialization = () => {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [userProfile, setUserProfileState] = useState(DEFAULT_PROFILE);
   const [profileError, setProfileError] = useState<ProfileLoadError | null>(null);
+  // Ada baris profil lama tanpa pemilik yang bisa ditawarkan untuk ditautkan.
+  const [orphanProfileAvailable, setOrphanProfileAvailable] = useState(false);
   // Dated weight / resting-HR entries, kept on this device (lib/body-history).
   const [bodyHistory, setBodyHistory] = useState<BodyHistoryEntry[]>([]);
 
@@ -39,7 +41,7 @@ export const useAppInitialization = () => {
    * read against the weight they were actually ridden at. Saving does not go
    * through the cloud for this (no column exists), so it stays device-local.
    */
-  const setUserProfile = useCallback((profile: typeof DEFAULT_PROFILE) => {
+  const setUserProfile = useCallback((profile: UserProfile) => {
     setUserProfileState(profile);
     setBodyHistory(recordBodyEntry({ weight: profile.weight, restingHr: profile.restingHr }));
   }, []);
@@ -82,9 +84,11 @@ export const useAppInitialization = () => {
           setUserProfileState({
             age: data.age,
             maxHr: data.maxHr ?? data.max_hr,
+            maxHrSource: data.maxHrSource === 'manual' ? 'manual' : 'auto',
             ftp: data.ftp ?? 0,
             weight: data.weight ?? 0,
-            // No cloud column yet: fall back to what this device recorded.
+            // Baris lama belum punya kolom resting HR: pakai yang tercatat di
+            // riwayat perangkat ini.
             restingHr: data.restingHr ?? data.resting_hr ?? getLatestRestingHr() ?? 0,
           });
         }
@@ -112,13 +116,60 @@ export const useAppInitialization = () => {
     loadProfile();
   }, [loadProfile, authUserId]);
 
+  /**
+   * Klaim profil lama hanya ditawarkan, tidak pernah dilakukan otomatis: dulu
+   * GET /api/profile mengambil baris tanpa pemilik saat akun pertama membuka
+   * aplikasi, sehingga profil perangkat lain bisa berpindah akun.
+   */
+  useEffect(() => {
+    if (!authUserId || isLoadingProfile) return undefined;
+    // Hanya relevan saat akun ini belum punya profil sendiri.
+    if (userProfile.age > 0) return undefined;
+    let cancelled = false;
+
+    fetchProfileApi('/api/profile/orphan')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!cancelled) setOrphanProfileAvailable(Boolean(data?.available));
+      })
+      .catch(() => {
+        // Tanpa kepastian, jangan tawarkan sesuatu yang mungkin gagal diklaim.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, isLoadingProfile, userProfile.age]);
+
+  const claimOrphanProfile = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetchProfileApi('/api/profile/claim', { method: 'POST' });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data?.claimed || !data.profile) {
+        setOrphanProfileAvailable(false);
+        return false;
+      }
+      setUserProfile(data.profile as UserProfile);
+      setOrphanProfileAvailable(false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [setUserProfile]);
+
   // The setup gate asks a different question than the metric gates: it only
   // needs the values the app cannot work without (age → maxHr). FTP and weight
   // gate metrics (power zones, W/kg, kcal/kg/h), so they are surfaced as an
   // invitation in Settings and never turn into a locked cockpit. Consumers ask
   // `getProfileGate()` for those, so "complete" has one definition.
+  //
+  // `error` is kept distinct from `new`: a profile that failed to load tells us
+  // nothing about what is stored, so the form must not treat it as empty and
+  // save zeros over a profile that still exists in the cloud.
   const profileStatus = ((): 'loading' | 'ready' | 'error' | 'new' => {
     if (isLoadingProfile) return 'loading';
+    if (profileError) return 'error';
     const isUsable = userProfile.age > 0 && userProfile.maxHr > 0;
     return isUsable ? 'ready' : 'new';
   })();
@@ -146,6 +197,8 @@ export const useAppInitialization = () => {
     bodyHistory,
     profileStatus,
     profileError,
+    orphanProfileAvailable,
+    claimOrphanProfile,
     retryProfile: loadProfile,
     sysConfigCheck,
     refetchSysCheck,

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { writeBodyHistory } from '@/lib/body-history';
 import { ShieldCheck, ArrowRight, LogIn, Settings, Activity, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
@@ -17,6 +18,9 @@ interface SetupLandingProps {
   connectionError?: ConnectionError | null;
   onRetryConnection?: () => void;
   onBackToSignIn?: () => void;
+  /** Ada profil lama tanpa pemilik yang bisa ditautkan ke akun ini. */
+  orphanProfileAvailable?: boolean;
+  onClaimOrphanProfile?: () => Promise<boolean> | void;
 }
 
 const ERROR_TITLE: Record<string, string> = {
@@ -27,7 +31,16 @@ const ERROR_TITLE: Record<string, string> = {
   UNKNOWN: 'Cloud database error',
 };
 
-export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, connectionError, onRetryConnection, onBackToSignIn }: SetupLandingProps) => {
+export const SetupLanding = ({
+  onInitialize,
+  missingFields,
+  isProfileMissing,
+  connectionError,
+  onRetryConnection,
+  onBackToSignIn,
+  orphanProfileAvailable,
+  onClaimOrphanProfile,
+}: SetupLandingProps) => {
   const { t } = useI18n();
 
   // Restore states
@@ -59,15 +72,18 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to restore configuration');
+        throw new Error(data.error || t('Failed to restore configuration'));
       }
+
+      // Token versi baru membawa riwayat berat/resting HR; simpan sebelum reload.
+      if (data.bodyHistory) writeBodyHistory(data.bodyHistory);
 
       setSuccess(true);
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Restore failed');
+      setError(err instanceof Error ? err.message : t('Restore failed'));
     } finally {
       setIsRestoring(false);
     }
@@ -147,6 +163,28 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                 </motion.div>
               )}
 
+              {orphanProfileAvailable && onClaimOrphanProfile && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-hw-accent/30 bg-hw-accent/5 p-4"
+                >
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-hw-accent">
+                    {t('A profile from before sign-in is available')}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-hw-text/80">
+                    {t('Link it to this account to keep the age, weight, and FTP already entered.')}
+                  </p>
+                  <button
+                    onClick={() => { void onClaimOrphanProfile(); }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full border border-hw-accent/50 bg-hw-accent/10 px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg"
+                  >
+                    <User size={12} />
+                    {t('Link the earlier profile')}
+                  </button>
+                </motion.div>
+              )}
+
               <div className="flex flex-col gap-4">
                 <button
                   onClick={onInitialize}
@@ -190,7 +228,7 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                           <textarea
                             value={token}
                             onChange={(e) => setToken(e.target.value)}
-                            placeholder="Paste token here..."
+                            placeholder={t('Paste token here...')}
                             rows={3}
                             className="w-full rounded-xl border border-white/10 bg-white/5 p-3 font-mono text-[9px] text-hw-text outline-none resize-none focus:border-hw-accent/30"
                           />
@@ -251,7 +289,7 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                           <p className="text-[10px] font-mono text-red-400 mt-2">{error}</p>
                         )}
                         {success && (
-                          <p className="text-[10px] font-mono text-hw-accent mt-2">Import success! Reloading...</p>
+                          <p className="text-[10px] font-mono text-hw-accent mt-2">{t('Import success! Reloading...')}</p>
                         )}
                       </motion.div>
                     )}

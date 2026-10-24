@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings, User, X } from 'lucide-react';
 import { AppConfig } from '@/lib/config-helper';
 import { resetSupabaseClientCache } from '@/lib/supabase';
-import { DEFAULT_PROFILE } from '@/lib/constants';
-import { getLatestRestingHr } from '@/lib/body-history';
+import { readBodyHistory, writeBodyHistory } from '@/lib/body-history';
 import { validateSupabaseConfig } from '@/lib/config-validator';
+import type { UserProfile } from '@/lib/profile';
 import { fetchProfileApi } from '@/lib/profile-api';
 
 // Components
@@ -15,20 +15,28 @@ import { MasterLock } from './settings/MasterLock';
 import { IconButton, SegmentedControl } from './ui';
 import { useI18n } from '@/i18n';
 
-interface UserProfile {
-  age: number;
-  maxHr: number;
-  ftp: number;
-  weight: number;
-  restingHr: number;
-}
-
 interface SettingsModalProps {
   onClose: () => void;
   onSave: (profile: UserProfile) => void;
+  /** Profil yang sudah dimuat induk. Modal tidak mengambil ulang sendiri. */
+  profile: UserProfile;
+  profileStatus: 'loading' | 'ready' | 'new' | 'error';
+  profileError?: { userMessage: string } | null;
+  onRetryProfile?: () => void;
 }
 
-export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
+type SaveState = { status: 'idle' | 'saving' | 'success' | 'error'; message: string };
+
+const IDLE_SAVE: SaveState = { status: 'idle', message: '' };
+
+export const SettingsModal = ({
+  onClose,
+  onSave,
+  profile: loadedProfile,
+  profileStatus,
+  profileError,
+  onRetryProfile,
+}: SettingsModalProps) => {
   const { locale, setLocale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<'profile' | 'system'>('profile');
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -36,7 +44,12 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
   const [password, setPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
   
-  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  // Draf hanya ada setelah pengguna menyunting. Selama `null`, formulir membaca
+  // langsung profil yang dimuat induk, sehingga profil yang tiba belakangan
+  // (retry berhasil) langsung terpakai tanpa efek sinkronisasi.
+  const [draft, setDraft] = useState<UserProfile | null>(null);
+  const profile = draft ?? loadedProfile;
+  const setProfile = (next: UserProfile) => setDraft(next);
   const [sysConfig, setSysConfig] = useState<Partial<AppConfig>>({
     NEXT_PUBLIC_SUPABASE_URL: '',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
@@ -44,31 +57,13 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
   });
   const [setupRequired, setSetupRequired] = useState(false);
 
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-  const [saveErrorMessage, setSaveErrorMessage] = useState('');
+  const [profileSave, setProfileSave] = useState<SaveState>(IDLE_SAVE);
+  const [systemSave, setSystemSave] = useState<SaveState>(IDLE_SAVE);
 
   const [supabaseValidating, setSupabaseValidating] = useState(false);
   const [supabaseValidStatus, setSupabaseValidStatus] = useState<{valid: boolean, msg: string} | null>(null);
 
   useEffect(() => {
-    // Load profile from server
-    fetchProfileApi('/api/profile')
-      .then(res => res.json())
-      .then(data => {
-        if (data && !data.error) {
-          setProfile({
-            age: data.age ?? DEFAULT_PROFILE.age,
-            maxHr: data.maxHr ?? data.max_hr ?? DEFAULT_PROFILE.maxHr,
-            ftp: data.ftp ?? DEFAULT_PROFILE.ftp,
-            weight: data.weight ?? DEFAULT_PROFILE.weight,
-            // No cloud column yet: the server value is used when it exists,
-            // otherwise the device-local history fills it in.
-            restingHr: data.restingHr ?? data.resting_hr ?? getLatestRestingHr() ?? DEFAULT_PROFILE.restingHr,
-          });
-        }
-      })
-      .catch(err => console.error('Failed to load profile:', err));
-
     // Fetch masked sys config
     fetch('/api/config')
       .then(res => res.json())
@@ -79,9 +74,14 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
       .catch(err => console.error('Failed to load system config:', err));
   }, []);
 
+  // Sebuah profil hanya boleh disimpan bila nilainya diketahui. `error` berarti
+  // pemuatan gagal dan isi formulir hanyalah nilai default, jadi menyimpannya
+  // akan menimpa profil sebenarnya dengan nol.
+  const profileEditable = profileStatus === 'ready' || profileStatus === 'new';
+
   const handleSaveProfile = async () => {
-    setSaveStatus('saving');
-    setSaveErrorMessage('');
+    if (!profileEditable || profileSave.status === 'saving') return;
+    setProfileSave({ status: 'saving', message: '' });
     try {
       const res = await fetchProfileApi('/api/profile', {
         method: 'POST',
@@ -90,31 +90,30 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
       });
       
       if (res.ok) {
-        setSaveStatus('success');
+        setProfileSave({ status: 'success', message: '' });
         onSave(profile);
+        setDraft(null);
         setTimeout(() => {
-          setSaveStatus('idle');
+          setProfileSave(IDLE_SAVE);
           onClose();
         }, 1000);
       } else {
-        let errorMsg = 'Failed to save profile';
+        let errorMsg = t('Failed to save profile');
         try {
           const data = await res.json();
           errorMsg = data.userMessage || data.error || errorMsg;
         } catch {
-          errorMsg = `Failed to save profile (HTTP ${res.status})`;
+          errorMsg = t('Failed to save profile (HTTP {status})', { status: res.status });
         }
-        setSaveErrorMessage(errorMsg);
-        setSaveStatus('error');
+        setProfileSave({ status: 'error', message: errorMsg });
       }
     } catch {
-      setSaveErrorMessage('Could not reach the server. Check your internet connection.');
-      setSaveStatus('error');
+      setProfileSave({ status: 'error', message: t('Could not reach the server. Check your internet connection.') });
     }
   };
 
   const handleSaveSystem = async () => {
-    setSaveStatus('saving');
+    setSystemSave({ status: 'saving', message: '' });
     try {
       const res = await fetch('/api/config', {
         method: 'POST',
@@ -124,7 +123,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
       
       if (res.ok) {
         resetSupabaseClientCache();
-        setSaveStatus('success');
+        setSystemSave({ status: 'success', message: '' });
         
         // If master password was changed, update local password state so validation/saving continues to work
         if (sysConfig.MASTER_PASSWORD && sysConfig.MASTER_PASSWORD !== '●●●●●●●●●') {
@@ -135,14 +134,14 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
           }));
         }
 
-        setTimeout(() => setSaveStatus('idle'), 2000);
+        setTimeout(() => setSystemSave(IDLE_SAVE), 2000);
       } else {
         const data = await res.json();
-        setUnlockError(data.error || 'Failed to save');
-        setSaveStatus('error');
+        setUnlockError(data.error || t('Failed to save configuration'));
+        setSystemSave({ status: 'error', message: '' });
       }
     } catch {
-      setSaveStatus('error');
+      setSystemSave({ status: 'error', message: '' });
     }
   };
 
@@ -153,13 +152,15 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
       body: JSON.stringify({
         action: 'export',
         password, // current master password to authorize
-        encryptionPassword
+        encryptionPassword,
+        // Riwayat tubuh hanya ada di perangkat ini, jadi klien yang mengirimnya.
+        bodyHistory: readBodyHistory(),
       })
     });
     
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to export configuration');
+      throw new Error(data.error || t('Failed to export configuration'));
     }
     return data.token;
   };
@@ -178,14 +179,15 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to import configuration');
+      throw new Error(data.error || t('Failed to import configuration'));
     }
+    if (data.bodyHistory) writeBodyHistory(data.bodyHistory);
     return data.success || false;
   };
 
   const handleUnlock = async () => {
     if (!password) {
-      setUnlockError('Password required');
+      setUnlockError(t('Password required'));
       return;
     }
     setIsUnlocking(true);
@@ -199,7 +201,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
         });
         const data = await res.json();
         if (!res.ok) {
-          setUnlockError(data.error || 'Could not set master password');
+          setUnlockError(data.error || t('Could not set master password'));
           return;
         }
         setSetupRequired(false);
@@ -219,10 +221,10 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
         setIsUnlocked(true);
         setUnlockError('');
       } else {
-        setUnlockError(data.error || 'Incorrect master password');
+        setUnlockError(data.error || t('Incorrect master password'));
       }
     } catch {
-      setUnlockError('Could not verify password. Check connection.');
+      setUnlockError(t('Could not verify password. Check connection.'));
     } finally {
       setIsUnlocking(false);
     }
@@ -288,8 +290,12 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 profile={profile}
                 setProfile={setProfile}
                 onSave={handleSaveProfile}
-                saveStatus={saveStatus}
-                saveError={saveErrorMessage}
+                saveStatus={profileSave.status}
+                saveError={profileSave.message}
+                canSave={profileEditable}
+                loadStatus={profileStatus}
+                loadError={profileError?.userMessage ?? null}
+                onRetryLoad={onRetryProfile}
               />
             ) : !isUnlocked ? (
               <MasterLock 
@@ -305,7 +311,7 @@ export const SettingsModal = ({ onClose, onSave }: SettingsModalProps) => {
                 sysConfig={sysConfig}
                 setSysConfig={setSysConfig}
                 onSave={handleSaveSystem}
-                saveStatus={saveStatus}
+                saveStatus={systemSave.status}
                 onValidateSupabase={handleValidateSupabase}
                 supabaseValidating={supabaseValidating}
                 supabaseValidStatus={supabaseValidStatus}
