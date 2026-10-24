@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
+import type { UserProfile } from '@/lib/profile';
 import { ProfileTab } from './ProfileTab';
 
 // Pin the locale so the assertions below do not depend on the machine language.
@@ -14,13 +15,13 @@ beforeEach(() => {
 });
 
 const renderTab = (
-  profile: { age: number; maxHr: number; ftp: number; weight: number; restingHr?: number },
+  profile: Partial<UserProfile> & Pick<UserProfile, 'age' | 'maxHr' | 'ftp' | 'weight'>,
   onSave = vi.fn()
 ) => {
   render(
     <I18nProvider>
       <ProfileTab
-        profile={{ restingHr: 0, ...profile }}
+        profile={{ restingHr: 0, maxHrSource: 'auto', ...profile }}
         setProfile={() => {}}
         onSave={onSave}
         saveStatus="idle"
@@ -76,7 +77,9 @@ describe('ProfileTab metric gate', () => {
 
   it('keeps the typed text, accepts decimals and lets the rider clear a field', () => {
     const Stateful = () => {
-      const [profile, setProfile] = useState({ age: 40, maxHr: 178, ftp: 220, weight: 74, restingHr: 52 });
+      const [profile, setProfile] = useState<UserProfile>({
+        age: 40, maxHr: 178, maxHrSource: 'auto', ftp: 220, weight: 74, restingHr: 52,
+      });
       return (
         <ProfileTab
           profile={profile}
@@ -108,6 +111,42 @@ describe('ProfileTab metric gate', () => {
     // Karakter selain angka dibuang sebelum menjadi nilai.
     fireEvent.change(age, { target: { value: '4a0' } });
     expect(age).toHaveValue('40');
+  });
+
+  it('keeps a measured max HR across age edits and re-derives it on Auto', () => {
+    const Stateful = () => {
+      const [profile, setProfile] = useState<UserProfile>({
+        age: 40, maxHr: 178, maxHrSource: 'auto', ftp: 220, weight: 74, restingHr: 52,
+      });
+      return (
+        <ProfileTab
+          profile={profile}
+          setProfile={setProfile}
+          onSave={() => {}}
+          saveStatus="idle"
+        />
+      );
+    };
+
+    render(
+      <I18nProvider>
+        <Stateful />
+      </I18nProvider>
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Manual' }));
+    const maxHr = screen.getByLabelText('Max Heart Rate');
+    expect(maxHr).not.toHaveAttribute('readonly');
+
+    fireEvent.change(maxHr, { target: { value: '184' } });
+    fireEvent.change(screen.getByLabelText('Age'), { target: { value: '50' } });
+
+    expect(maxHr).toHaveValue('184');
+
+    // Kembali ke Auto memakai rumus dari usia saat ini.
+    fireEvent.click(screen.getByRole('radio', { name: 'Auto' }));
+    expect(maxHr).toHaveValue('172');
+    expect(maxHr).toHaveAttribute('readonly');
   });
 
   it('offers a resting-HR field and says where the body history lives', () => {

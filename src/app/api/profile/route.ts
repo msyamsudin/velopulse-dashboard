@@ -9,6 +9,7 @@ import {
   normalizeProfile,
   profileErrorFields,
   validateProfile,
+  withResolvedMaxHr,
 } from '@/lib/profile';
 
 const SUPABASE_FETCH_TIMEOUT_MS = 10_000;
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     const auth = await getAuthenticatedClient(request);
     if (!auth) {
       if (hasAuthorization) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-      return NextResponse.json(getUserProfile());
+      return NextResponse.json(withResolvedMaxHr(getUserProfile()));
     }
     const { supabase, userId } = auth;
     const { data: ownedProfile, error } = await supabase
@@ -101,6 +102,7 @@ export async function GET(request: Request) {
           ftp: localProfile.ftp,
           weight: localProfile.weight,
           resting_hr: localProfile.restingHr,
+          max_hr_source: localProfile.maxHrSource,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .select('*')
@@ -111,7 +113,9 @@ export async function GET(request: Request) {
 
     // Kontrak API memakai camelCase; baris Supabase memakai snake_case dan
     // dinormalkan di satu tempat agar klien tidak perlu menebak bentuknya.
-    return NextResponse.json(profile ? normalizeProfile(profile) : DEFAULT_PROFILE);
+    return NextResponse.json(
+      profile ? withResolvedMaxHr(normalizeProfile(profile)) : DEFAULT_PROFILE
+    );
   } catch (err) {
     return errorResponse(err);
   }
@@ -130,7 +134,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    const normalized = normalizeProfile(body);
+    // Saat mode Auto, nilai maxHr ditentukan server dari usia: klien tidak bisa
+    // menyelipkan angka yang tidak sesuai dengan rumus.
+    const normalized = withResolvedMaxHr(normalizeProfile(body));
     const invalidFields = profileErrorFields(validateProfile(normalized));
     if (invalidFields.length > 0) {
       return NextResponse.json({ error: 'Invalid profile', fields: invalidFields }, { status: 400 });
@@ -154,6 +160,7 @@ export async function POST(request: NextRequest) {
         ftp: normalized.ftp,
         weight: normalized.weight,
         resting_hr: normalized.restingHr,
+        max_hr_source: normalized.maxHrSource,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
 

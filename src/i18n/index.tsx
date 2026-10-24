@@ -834,6 +834,9 @@ const id: Record<string, string> = {
   'FTP must be a whole number between 0 and 2000.': 'FTP harus bilangan bulat antara 0 dan 2000.',
   'Weight must be between 20 and 300 kg, with at most one decimal.': 'Berat harus antara 20 dan 300 kg, maksimal satu angka desimal.',
   'Resting HR must be between 25 and 120 bpm and below max HR.': 'Detak jantung istirahat harus antara 25 dan 120 bpm serta di bawah detak jantung maks.',
+  'Max HR source': 'Sumber detak jantung maks.',
+  'Automatic follows the age formula. Manual keeps a measured value.': 'Otomatis mengikuti rumus usia. Manual memakai nilai hasil pengukuran.',
+  'Manual': 'Manual',
 };
 
 type I18nValue = {

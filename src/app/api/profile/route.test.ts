@@ -33,6 +33,7 @@ const realProfile = {
   id: 'profile-1',
   age: 41,
   max_hr: 177,
+  max_hr_source: 'manual',
   ftp: 240,
   weight: 72.5,
   updated_at: '2026-10-01T00:00:00Z',
@@ -74,7 +75,7 @@ describe('POST /api/profile', () => {
     const response = await post(validProfile);
 
     expect(response.status).toBe(200);
-    expect(mocks.saveUserProfile).toHaveBeenCalledWith(validProfile);
+    expect(mocks.saveUserProfile).toHaveBeenCalledWith({ ...validProfile, maxHrSource: 'auto' });
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
@@ -83,7 +84,7 @@ describe('POST /api/profile', () => {
 
     expect(response.status).toBe(200);
     expect(mocks.saveUserProfile).toHaveBeenCalledWith({
-      age: 40, maxHr: 178, ftp: 220, weight: 74, restingHr: 0,
+      age: 40, maxHr: 178, maxHrSource: 'auto', ftp: 220, weight: 74, restingHr: 0,
     });
   });
 
@@ -125,14 +126,27 @@ describe('POST /api/profile', () => {
         ftp: 220,
         weight: 74,
         resting_hr: 52,
+        max_hr_source: 'auto',
       }),
       { onConflict: 'user_id' }
     );
-    // max_hr tetap nilai dari klien pada langkah ini; server baru menurunkannya
-    // sendiri saat mode Auto diperkenalkan.
-    expect(mocks.upsert.mock.calls[0][0].max_hr).toBe(190);
+    // Klien mengirim 190, tetapi mode Auto berarti server yang menghitung dari usia.
+    expect(mocks.upsert.mock.calls[0][0].max_hr).toBe(178);
     // Cache perangkat mengikuti penyimpanan terakhir, termasuk saat login.
-    expect(mocks.saveUserProfile).toHaveBeenCalledWith({ ...validProfile, maxHr: 190 });
+    expect(mocks.saveUserProfile).toHaveBeenCalledWith({
+      ...validProfile, maxHr: 178, maxHrSource: 'auto',
+    });
+  });
+
+  it('keeps a measured max HR when the source is manual', async () => {
+    const response = await post(
+      { ...validProfile, maxHr: 184, maxHrSource: 'manual' },
+      { Authorization: 'Bearer token' }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.upsert.mock.calls[0][0].max_hr).toBe(184);
+    expect(mocks.upsert.mock.calls[0][0].max_hr_source).toBe('manual');
   });
 
   it('keeps the cloud save successful when the local cache cannot be written', async () => {
@@ -169,6 +183,13 @@ describe('GET /api/profile', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ age: 41, maxHr: 177, ftp: 240, weight: 72.5, restingHr: 0 });
+    expect(body).toEqual({
+      age: 41,
+      maxHr: 177,
+      maxHrSource: 'manual',
+      ftp: 240,
+      weight: 72.5,
+      restingHr: 0,
+    });
   });
 });

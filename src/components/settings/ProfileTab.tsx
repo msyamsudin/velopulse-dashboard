@@ -6,10 +6,12 @@ import {
   calculateMaxHr,
   hasProfileErrors,
   validateProfile,
+  type MaxHrSource,
   type ProfileField,
   type UserProfile,
 } from '@/lib/profile';
 import { getProfileGate } from '@/lib/profile-gate';
+import { SegmentedControl } from '@/components/ui';
 import { useI18n } from '@/i18n';
 
 interface ProfileTabProps {
@@ -155,6 +157,14 @@ export const ProfileTab = ({
     }
     onSave();
   };
+
+  // Berpindah ke Auto memakai rumus sebagai titik awal; berpindah ke Manual
+  // mempertahankan nilai yang sedang terlihat agar bisa langsung disunting.
+  const setMaxHrSource = (source: MaxHrSource) => setProfile({
+    ...profile,
+    maxHrSource: source,
+    maxHr: source === 'auto' ? calculateMaxHr(profile.age) : profile.maxHr,
+  });
   return (
     <motion.div
       key="profile"
@@ -196,6 +206,24 @@ export const ProfileTab = ({
         </div>
       )}
 
+      <div className="flex flex-col gap-3 rounded-lg border border-vp-border bg-white/[0.025] p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="vp-label">{t('Max HR source')}</div>
+          <p className="mt-1 text-[10px] leading-4 text-vp-muted">
+            {t('Automatic follows the age formula. Manual keeps a measured value.')}
+          </p>
+        </div>
+        <SegmentedControl
+          ariaLabel={t('Max HR source')}
+          value={profile.maxHrSource}
+          options={[
+            { label: t('Auto'), value: 'auto' },
+            { label: t('Manual'), value: 'manual' },
+          ]}
+          onChange={setMaxHrSource}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField
           label={t('Age')}
@@ -205,17 +233,23 @@ export const ProfileTab = ({
           min={PROFILE_LIMITS.age.min}
           max={PROFILE_LIMITS.age.max}
           errorMessage={errorFor('age')}
-          onChange={(age) => setProfile({ ...profile, age, maxHr: calculateMaxHr(age) })}
+          onChange={(age) => setProfile({
+            ...profile,
+            age,
+            // Nilai terukur tidak boleh dihitung ulang hanya karena usia berubah.
+            maxHr: profile.maxHrSource === 'auto' ? calculateMaxHr(age) : profile.maxHr,
+          })}
         />
         <NumberField
           label={t('Max Heart Rate')}
           value={profile.maxHr}
           icon={<Target size={12} className="text-vp-hr" />}
-          suffix={t('Auto')}
+          suffix={profile.maxHrSource === 'auto' ? t('Auto') : 'BPM'}
           min={PROFILE_LIMITS.maxHr.min}
           max={PROFILE_LIMITS.maxHr.max}
           errorMessage={errorFor('maxHr')}
-          readOnly
+          readOnly={profile.maxHrSource === 'auto'}
+          onChange={(maxHr) => setProfile({ ...profile, maxHr })}
         />
         <NumberField
           label="FTP"

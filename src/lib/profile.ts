@@ -12,11 +12,18 @@
  * API, dan tes dengan cara yang sama.
  */
 
+export type MaxHrSource = 'auto' | 'manual';
+
 export interface UserProfile {
   /** Usia dalam tahun; 0 berarti belum diisi. */
   age: number;
   /** Detak jantung maksimum (bpm); diturunkan dari usia atau diukur manual. */
   maxHr: number;
+  /**
+   * `auto` menurunkan `maxHr` dari usia setiap kali profil dibaca; `manual`
+   * memakai nilai terukur dan tidak menyentuhnya saat usia berubah.
+   */
+  maxHrSource: MaxHrSource;
   /** FTP dalam watt; 0 berarti belum diisi dan mematikan zona daya. */
   ftp: number;
   /** Berat badan dalam kg; 0 berarti belum diisi dan mematikan metrik W/kg. */
@@ -28,6 +35,7 @@ export interface UserProfile {
 export const DEFAULT_PROFILE: UserProfile = {
   age: 0,
   maxHr: 190, // Aman untuk pembagian; age = 0 tetap memicu onboarding
+  maxHrSource: 'auto',
   ftp: 0,
   weight: 0,
   restingHr: 0,
@@ -41,6 +49,17 @@ export const calculateMaxHr = (age: number): number => {
   if (age <= 0) return DEFAULT_PROFILE.maxHr;
   return Math.round(205.8 - (0.685 * age));
 };
+
+/** Nilai efektif: rumus saat `auto`, nilai terukur saat `manual`. */
+export const resolveMaxHr = (
+  profile: Pick<UserProfile, 'age' | 'maxHr' | 'maxHrSource'>
+): number => (profile.maxHrSource === 'manual' ? profile.maxHr : calculateMaxHr(profile.age));
+
+/** Profil dengan `maxHr` yang sudah konsisten dengan sumbernya. */
+export const withResolvedMaxHr = (profile: UserProfile): UserProfile => ({
+  ...profile,
+  maxHr: resolveMaxHr(profile),
+});
 
 /** Angka dari JSON, angka dari string formulir, atau NaN bila tidak terbaca. */
 const toNumber = (value: unknown): number => {
@@ -64,23 +83,31 @@ export const normalizeProfile = (
 ): UserProfile => {
   const source = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
 
-  const read = (field: keyof UserProfile, ...keys: string[]): number => {
+  const read = (field: ProfileField, ...keys: string[]): number => {
     for (const key of keys) {
       if (key in source) return toNumber(source[key]);
     }
     return fallback[field];
   };
 
+  const rawSource = 'maxHrSource' in source
+    ? source.maxHrSource
+    : 'max_hr_source' in source
+      ? source.max_hr_source
+      : fallback.maxHrSource;
+  const maxHrSource: MaxHrSource = rawSource === 'manual' ? 'manual' : 'auto';
+
   return {
     age: read('age', 'age'),
     maxHr: read('maxHr', 'maxHr', 'max_hr'),
+    maxHrSource,
     ftp: read('ftp', 'ftp'),
     weight: read('weight', 'weight'),
     restingHr: read('restingHr', 'restingHr', 'resting_hr'),
   };
 };
 
-export type ProfileField = keyof UserProfile;
+export type ProfileField = 'age' | 'maxHr' | 'ftp' | 'weight' | 'restingHr';
 
 /** Field yang gagal validasi. Pesan untuk pengguna hidup di lapisan UI. */
 export type ProfileErrors = Partial<Record<ProfileField, true>>;

@@ -1,9 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
+import type { UserProfile } from '@/lib/profile';
 import { SettingsModal } from './SettingsModal';
 
-const profile = { age: 40, maxHr: 178, ftp: 220, weight: 74, restingHr: 50 };
+const profile: UserProfile = {
+  age: 40, maxHr: 178, maxHrSource: 'auto', ftp: 220, weight: 74, restingHr: 50,
+};
 
 beforeEach(() => {
   try {

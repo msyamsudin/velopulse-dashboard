@@ -5,7 +5,9 @@ import {
   hasProfileErrors,
   normalizeProfile,
   profileErrorFields,
+  resolveMaxHr,
   validateProfile,
+  withResolvedMaxHr,
   type UserProfile,
 } from './profile';
 
@@ -36,12 +38,26 @@ describe('normalizeProfile', () => {
     const normalized = normalizeProfile({
       age: 41,
       max_hr: 177,
+      max_hr_source: 'manual',
       ftp: 240,
       weight: 72.5,
       resting_hr: 48,
     });
 
-    expect(normalized).toEqual({ age: 41, maxHr: 177, ftp: 240, weight: 72.5, restingHr: 48 });
+    expect(normalized).toEqual({
+      age: 41,
+      maxHr: 177,
+      maxHrSource: 'manual',
+      ftp: 240,
+      weight: 72.5,
+      restingHr: 48,
+    });
+  });
+
+  it('defaults an unknown or missing max-HR source to automatic', () => {
+    expect(normalizeProfile({ age: 30 }).maxHrSource).toBe('auto');
+    expect(normalizeProfile({ age: 30, maxHrSource: 'guess' }).maxHrSource).toBe('auto');
+    expect(normalizeProfile({}).maxHrSource).toBe(DEFAULT_PROFILE.maxHrSource);
   });
 
   it('fills absent fields from the fallback instead of leaving undefined', () => {
@@ -55,6 +71,24 @@ describe('normalizeProfile', () => {
     expect(Number.isNaN(normalized.age)).toBe(true);
     expect(Number.isNaN(normalized.weight)).toBe(true);
     expect(normalizeProfile({ age: '39' }).age).toBe(39);
+  });
+});
+
+describe('resolveMaxHr', () => {
+  it('derives the value from age while the source is automatic', () => {
+    expect(resolveMaxHr({ age: 40, maxHr: 190, maxHrSource: 'auto' })).toBe(178);
+  });
+
+  it('keeps a measured value untouched', () => {
+    expect(resolveMaxHr({ age: 40, maxHr: 184, maxHrSource: 'manual' })).toBe(184);
+  });
+
+  it('rewrites only maxHr when resolving a whole profile', () => {
+    const resolved = withResolvedMaxHr(profile({ age: 50, maxHr: 190, maxHrSource: 'auto' }));
+
+    expect(resolved.maxHr).toBe(calculateMaxHr(50));
+    expect(resolved.ftp).toBe(220);
+    expect(resolved.maxHrSource).toBe('auto');
   });
 });
 
@@ -97,6 +131,7 @@ describe('validateProfile', () => {
     const fields = profileErrorFields(validateProfile({
       age: 0,
       maxHr: 0,
+      maxHrSource: 'auto',
       ftp: -2,
       weight: -1,
       restingHr: 200,

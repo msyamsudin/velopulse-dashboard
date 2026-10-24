@@ -21,7 +21,7 @@ const renderCockpit = () =>
           hrrScore: null,
           hrrClassification: null,
         }}
-        userProfile={{ age: 30, maxHr: 190, ftp: 200, weight: 75, restingHr: 55 }}
+        userProfile={{ age: 30, maxHr: 190, maxHrSource: 'auto', ftp: 200, weight: 75, restingHr: 55 }}
         workout={{ history: [], elapsed: 60, formatTime: (seconds: number) => `${seconds}s` }}
         hrConnected
         bikeConnected

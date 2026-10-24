@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { PreRideCockpit } from './PreRideCockpit';
 
-const PROFILE = { age: 30, maxHr: 190, ftp: 200, weight: 75, restingHr: 55 };
+const PROFILE = { age: 30, maxHr: 190, maxHrSource: 'auto' as const, ftp: 200, weight: 75, restingHr: 55 };
 
 const DATA = { hr: 0, cadence: 0, power: 0, speed: 0, distance: 0, resistance: 0, calories: 0 };
 

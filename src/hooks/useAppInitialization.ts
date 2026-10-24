@@ -82,9 +82,11 @@ export const useAppInitialization = () => {
           setUserProfileState({
             age: data.age,
             maxHr: data.maxHr ?? data.max_hr,
+            maxHrSource: data.maxHrSource === 'manual' ? 'manual' : 'auto',
             ftp: data.ftp ?? 0,
             weight: data.weight ?? 0,
-            // No cloud column yet: fall back to what this device recorded.
+            // Baris lama belum punya kolom resting HR: pakai yang tercatat di
+            // riwayat perangkat ini.
             restingHr: data.restingHr ?? data.resting_hr ?? getLatestRestingHr() ?? 0,
           });
         }
