@@ -52,7 +52,7 @@ export const MasterLock = ({ password, setPassword, onUnlock, error, isUnlocking
           className="vp-button vp-focus-ring min-h-11 w-full"
         >
           {isUnlocking ? <Loader2 size={13} className="animate-spin" /> : null}
-          {isUnlocking ? 'Verifying...' : setupRequired ? t('Set password') : t('Unlock')}
+          {isUnlocking ? t('Verifying...') : setupRequired ? t('Set password') : t('Unlock')}
         </button>
       </div>
     </div>

@@ -160,7 +160,7 @@ export const SettingsModal = ({
     
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to export configuration');
+      throw new Error(data.error || t('Failed to export configuration'));
     }
     return data.token;
   };
@@ -179,7 +179,7 @@ export const SettingsModal = ({
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to import configuration');
+      throw new Error(data.error || t('Failed to import configuration'));
     }
     if (data.bodyHistory) writeBodyHistory(data.bodyHistory);
     return data.success || false;
@@ -187,7 +187,7 @@ export const SettingsModal = ({
 
   const handleUnlock = async () => {
     if (!password) {
-      setUnlockError('Password required');
+      setUnlockError(t('Password required'));
       return;
     }
     setIsUnlocking(true);
@@ -201,7 +201,7 @@ export const SettingsModal = ({
         });
         const data = await res.json();
         if (!res.ok) {
-          setUnlockError(data.error || 'Could not set master password');
+          setUnlockError(data.error || t('Could not set master password'));
           return;
         }
         setSetupRequired(false);
@@ -221,10 +221,10 @@ export const SettingsModal = ({
         setIsUnlocked(true);
         setUnlockError('');
       } else {
-        setUnlockError(data.error || 'Incorrect master password');
+        setUnlockError(data.error || t('Incorrect master password'));
       }
     } catch {
-      setUnlockError('Could not verify password. Check connection.');
+      setUnlockError(t('Could not verify password. Check connection.'));
     } finally {
       setIsUnlocking(false);
     }

@@ -840,6 +840,20 @@ const id: Record<string, string> = {
   'A profile from before sign-in is available': 'Profil dari sebelum masuk tersedia',
   'Link it to this account to keep the age, weight, and FTP already entered.': 'Tautkan ke akun ini agar usia, berat, dan FTP yang sudah diisi tidak hilang.',
   'Link the earlier profile': 'Tautkan profil sebelumnya',
+  'Failed to export configuration': 'Gagal mengekspor konfigurasi',
+  'Failed to import configuration': 'Gagal mengimpor konfigurasi',
+  'Failed to restore configuration': 'Gagal memulihkan konfigurasi',
+  'Restore failed': 'Pemulihan gagal',
+  'Password required': 'Kata sandi wajib diisi',
+  'Could not set master password': 'Tidak dapat menetapkan kata sandi master',
+  'Incorrect master password': 'Kata sandi master salah',
+  'Could not verify password. Check connection.': 'Tidak dapat memverifikasi kata sandi. Periksa koneksi.',
+  'Validate Supabase': 'Validasi Supabase',
+  'Verifying...': 'Memverifikasi...',
+  'Export failed': 'Ekspor gagal',
+  'SAVING...': 'MENYIMPAN...',
+  'SYSTEM UPDATED!': 'SISTEM DIPERBARUI!',
+  'APPLY CONFIGURATION': 'TERAPKAN KONFIGURASI',
 };
 
 type I18nValue = {

@@ -72,7 +72,7 @@ export const SetupLanding = ({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to restore configuration');
+        throw new Error(data.error || t('Failed to restore configuration'));
       }
 
       // Token versi baru membawa riwayat berat/resting HR; simpan sebelum reload.
@@ -83,7 +83,7 @@ export const SetupLanding = ({
         window.location.reload();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Restore failed');
+      setError(err instanceof Error ? err.message : t('Restore failed'));
     } finally {
       setIsRestoring(false);
     }
@@ -228,7 +228,7 @@ export const SetupLanding = ({
                           <textarea
                             value={token}
                             onChange={(e) => setToken(e.target.value)}
-                            placeholder="Paste token here..."
+                            placeholder={t('Paste token here...')}
                             rows={3}
                             className="w-full rounded-xl border border-white/10 bg-white/5 p-3 font-mono text-[9px] text-hw-text outline-none resize-none focus:border-hw-accent/30"
                           />
@@ -289,7 +289,7 @@ export const SetupLanding = ({
                           <p className="text-[10px] font-mono text-red-400 mt-2">{error}</p>
                         )}
                         {success && (
-                          <p className="text-[10px] font-mono text-hw-accent mt-2">Import success! Reloading...</p>
+                          <p className="text-[10px] font-mono text-hw-accent mt-2">{t('Import success! Reloading...')}</p>
                         )}
                       </motion.div>
                     )}
