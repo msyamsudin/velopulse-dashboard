@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { writeBodyHistory } from '@/lib/body-history';
 import { ShieldCheck, ArrowRight, LogIn, Settings, Activity, Zap, Server, User, Loader2, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
@@ -73,6 +74,9 @@ export const SetupLanding = ({
       if (!res.ok) {
         throw new Error(data.error || 'Failed to restore configuration');
       }
+
+      // Token versi baru membawa riwayat berat/resting HR; simpan sebelum reload.
+      if (data.bodyHistory) writeBodyHistory(data.bodyHistory);
 
       setSuccess(true);
       setTimeout(() => {

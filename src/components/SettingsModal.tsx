@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings, User, X } from 'lucide-react';
 import { AppConfig } from '@/lib/config-helper';
 import { resetSupabaseClientCache } from '@/lib/supabase';
+import { readBodyHistory, writeBodyHistory } from '@/lib/body-history';
 import { validateSupabaseConfig } from '@/lib/config-validator';
 import type { UserProfile } from '@/lib/profile';
 import { fetchProfileApi } from '@/lib/profile-api';
@@ -151,7 +152,9 @@ export const SettingsModal = ({
       body: JSON.stringify({
         action: 'export',
         password, // current master password to authorize
-        encryptionPassword
+        encryptionPassword,
+        // Riwayat tubuh hanya ada di perangkat ini, jadi klien yang mengirimnya.
+        bodyHistory: readBodyHistory(),
       })
     });
     
@@ -178,6 +181,7 @@ export const SettingsModal = ({
     if (!res.ok) {
       throw new Error(data.error || 'Failed to import configuration');
     }
+    if (data.bodyHistory) writeBodyHistory(data.bodyHistory);
     return data.success || false;
   };
 

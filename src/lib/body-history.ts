@@ -142,6 +142,40 @@ export const summarizeBodyTrend = (entries: BodyHistoryEntry[] = []): BodyTrend 
   restingHr: buildTrend(entries, 'restingHr'),
 });
 
+/**
+ * Membersihkan data luar (localStorage, backup impor) menjadi riwayat yang sah.
+ *
+ * Entri tanpa tanggal yang valid, nilai non-positif, atau tanggal ganda
+ * digabung dan diurutkan seperti penyimpanan biasa, lalu dipotong ke batas
+ * yang sama. Tidak pernah melempar.
+ */
+export const sanitizeBodyHistory = (raw: unknown): BodyHistoryEntry[] => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.reduce<BodyHistoryEntry[]>((entries, item) => {
+    if (!item || typeof item !== 'object') return entries;
+    const candidate = item as Partial<BodyHistoryEntry>;
+    return appendBodyEntry(entries, {
+      date: typeof candidate.date === 'string' ? candidate.date : '',
+      weight: typeof candidate.weight === 'number' ? candidate.weight : undefined,
+      restingHr: typeof candidate.restingHr === 'number' ? candidate.restingHr : undefined,
+    });
+  }, []);
+};
+
+/** Mengganti seluruh riwayat perangkat (dipakai saat impor backup). */
+export const writeBodyHistory = (raw: unknown): BodyHistoryEntry[] => {
+  const entries = sanitizeBodyHistory(raw);
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(BODY_HISTORY_STORAGE_KEY, JSON.stringify(entries));
+    } catch {
+      // Penyimpanan penuh atau tidak tersedia: nilai kembalian tetap berguna.
+    }
+  }
+  return entries;
+};
+
 /** Reads the stored history. Never throws: a corrupt entry is dropped. */
 export const readBodyHistory = (): BodyHistoryEntry[] => {
   if (typeof window === 'undefined') return [];

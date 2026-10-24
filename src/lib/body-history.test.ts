@@ -6,7 +6,9 @@ import {
   readBodyHistory,
   recordBodyEntry,
   resolveBodyMetric,
+  sanitizeBodyHistory,
   summarizeBodyTrend,
+  writeBodyHistory,
   type BodyHistoryEntry,
 } from './body-history';
 
@@ -129,6 +131,30 @@ describe('local storage round trip', () => {
     expect(readBodyHistory()).toHaveLength(2);
     // The second save only carried a weight: the resting HR entry is intact.
     expect(readBodyHistory()[0]).toEqual({ date: '2026-05-01', weight: 80, restingHr: 55 });
+  });
+
+  it('sanitises imported history before it replaces the device copy', () => {
+    const cleaned = sanitizeBodyHistory([
+      { date: '2026-05-02', weight: 74, restingHr: 52 },
+      { date: '2026-05-02', weight: 73.5 },
+      { date: 'nope', weight: 80 },
+      { date: '2026-05-01', weight: -4 },
+      'not an entry',
+      null,
+    ]);
+
+    // Tanggal ganda digabung, nilai tidak sah dan baris rusak dibuang.
+    expect(cleaned).toEqual([{ date: '2026-05-02', weight: 73.5, restingHr: 52 }]);
+    expect(sanitizeBodyHistory('nope')).toEqual([]);
+  });
+
+  it('replaces the stored history with the imported one', () => {
+    recordBodyEntry({ date: '2026-01-01', weight: 82 });
+
+    const written = writeBodyHistory([{ date: '2026-09-01', weight: 76.5 }]);
+
+    expect(written).toEqual([{ date: '2026-09-01', weight: 76.5 }]);
+    expect(readBodyHistory()).toEqual([{ date: '2026-09-01', weight: 76.5 }]);
   });
 
   it('ignores a corrupt stored payload instead of throwing', () => {
