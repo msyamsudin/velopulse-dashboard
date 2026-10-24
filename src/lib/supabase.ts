@@ -141,12 +141,16 @@ export type Workout = {
   created_at: string;
 };
 
-/** The single row in `profiles` addressed by `MASTER_PROFILE_ID`. */
+/** Baris `profiles` milik satu akun (unik per `user_id`). */
 export type Profile = {
   id: string;
+  user_id: string | null;
   age: number;
   max_hr: number;
+  /** `auto` menurunkan max HR dari usia; `manual` memakai hasil pengukuran. */
+  max_hr_source: 'auto' | 'manual';
   ftp: number;
   weight: number;
+  resting_hr: number;
   updated_at: string;
 };

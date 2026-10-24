@@ -119,12 +119,28 @@ describe('POST /api/profile', () => {
 
     expect(response.status).toBe(200);
     expect(mocks.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: 'user-1', age: 40, ftp: 220, weight: 74 }),
+      expect.objectContaining({
+        user_id: 'user-1',
+        age: 40,
+        ftp: 220,
+        weight: 74,
+        resting_hr: 52,
+      }),
       { onConflict: 'user_id' }
     );
     // max_hr tetap nilai dari klien pada langkah ini; server baru menurunkannya
     // sendiri saat mode Auto diperkenalkan.
     expect(mocks.upsert.mock.calls[0][0].max_hr).toBe(190);
+    // Cache perangkat mengikuti penyimpanan terakhir, termasuk saat login.
+    expect(mocks.saveUserProfile).toHaveBeenCalledWith({ ...validProfile, maxHr: 190 });
+  });
+
+  it('keeps the cloud save successful when the local cache cannot be written', async () => {
+    mocks.saveUserProfile.mockReturnValue(false);
+
+    const response = await post(validProfile, { Authorization: 'Bearer token' });
+
+    expect(response.status).toBe(200);
   });
 });
 

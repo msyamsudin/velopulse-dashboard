@@ -100,6 +100,7 @@ export async function GET(request: Request) {
           max_hr: localProfile.maxHr,
           ftp: localProfile.ftp,
           weight: localProfile.weight,
+          resting_hr: localProfile.restingHr,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .select('*')
@@ -152,10 +153,20 @@ export async function POST(request: NextRequest) {
         max_hr: normalized.maxHr,
         ftp: normalized.ftp,
         weight: normalized.weight,
+        resting_hr: normalized.restingHr,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
 
     if (error) throw error;
+
+    // Cache perangkat selalu mengikuti penyimpanan terakhir, baik pengguna
+    // sedang login atau tidak. Sebelumnya jalur login tidak menyentuh berkas
+    // lokal, sehingga profil yang terbaca setelah logout bisa tertinggal
+    // berbulan-bulan. Kegagalan cache tidak membatalkan penyimpanan cloud.
+    if (!saveUserProfile(normalized)) {
+      console.warn('Failed to cache profile locally after cloud save', buildLogTag());
+    }
+
     return NextResponse.json({ success: true });
   } catch (err) {
     return errorResponse(err);
