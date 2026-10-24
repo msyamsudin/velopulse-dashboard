@@ -1,17 +1,9 @@
 import { motion } from 'motion/react';
 import { Activity, AlertTriangle, Save, Target, User, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { calculateMaxHr } from '@/lib/constants';
+import { calculateMaxHr, type UserProfile } from '@/lib/profile';
 import { getProfileGate } from '@/lib/profile-gate';
 import { useI18n } from '@/i18n';
-
-interface UserProfile {
-  age: number;
-  maxHr: number;
-  ftp: number;
-  weight: number;
-  restingHr: number;
-}
 
 interface ProfileTabProps {
   profile: UserProfile;

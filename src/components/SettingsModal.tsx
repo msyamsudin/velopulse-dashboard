@@ -4,6 +4,7 @@ import { Settings, User, X } from 'lucide-react';
 import { AppConfig } from '@/lib/config-helper';
 import { resetSupabaseClientCache } from '@/lib/supabase';
 import { validateSupabaseConfig } from '@/lib/config-validator';
+import type { UserProfile } from '@/lib/profile';
 import { fetchProfileApi } from '@/lib/profile-api';
 
 // Components
@@ -12,14 +13,6 @@ import { SystemTab } from './settings/SystemTab';
 import { MasterLock } from './settings/MasterLock';
 import { IconButton, SegmentedControl } from './ui';
 import { useI18n } from '@/i18n';
-
-interface UserProfile {
-  age: number;
-  maxHr: number;
-  ftp: number;
-  weight: number;
-  restingHr: number;
-}
 
 interface SettingsModalProps {
   onClose: () => void;

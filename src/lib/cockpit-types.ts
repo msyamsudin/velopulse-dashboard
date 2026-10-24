@@ -1,14 +1,8 @@
 import type { HistoryData, LiveWorkoutStats, WorkoutSession } from '@/store/useWorkoutStore';
+import type { UserProfile } from './profile';
 
-/** Rider calibration profile (age / maxHr / ftp / weight / resting HR). */
-export interface RiderProfile {
-  age: number;
-  maxHr: number;
-  ftp: number;
-  weight: number;
-  /** Optional, device-local (see lib/body-history.ts); 0 means "not set". */
-  restingHr: number;
-}
+/** Nama lama untuk profil pesepeda; definisinya ada di lib/profile.ts. */
+export type RiderProfile = UserProfile;
 
 /** Latest live telemetry snapshot shown by the cockpits. */
 export interface TelemetrySnapshot {

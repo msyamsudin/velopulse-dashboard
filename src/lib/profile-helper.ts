@@ -1,32 +1,19 @@
 import fs from 'fs';
 import path from 'path';
+import { DEFAULT_PROFILE, normalizeProfile, type UserProfile } from './profile';
 
 const CONFIG_DIR = path.join(process.cwd(), '.app-data');
 const PROFILE_PATH = path.join(CONFIG_DIR, 'profile.json');
 
-export interface UserProfile {
-  age: number;
-  maxHr: number;
-  ftp: number;
-  weight: number;
-  restingHr: number;
-  displayName?: string;
-}
-
-// Must stay in sync with DEFAULT_PROFILE in @/lib/constants.ts
-const DEFAULT_PROFILE: UserProfile = {
-  age: 0,
-  maxHr: 190,
-  ftp: 0,
-  weight: 0,
-  restingHr: 0,
-};
+export type { UserProfile } from './profile';
 
 export function getUserProfile(): UserProfile {
   try {
     if (fs.existsSync(PROFILE_PATH)) {
       const data = fs.readFileSync(PROFILE_PATH, 'utf-8');
-      return { ...DEFAULT_PROFILE, ...JSON.parse(data) };
+      // Nilai yang hilang memakai default; nilai yang tidak terbaca menjadi NaN
+      // dan ditolak validasi saat profil hendak disimpan.
+      return normalizeProfile(JSON.parse(data));
     }
   } catch (err) {
     console.error('Failed to read profile file:', err);

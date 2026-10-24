@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DEFAULT_PROFILE } from '@/lib/constants';
+import { DEFAULT_PROFILE, type UserProfile } from '@/lib/profile';
 import {
   getLatestRestingHr,
   readBodyHistory,
@@ -39,7 +39,7 @@ export const useAppInitialization = () => {
    * read against the weight they were actually ridden at. Saving does not go
    * through the cloud for this (no column exists), so it stays device-local.
    */
-  const setUserProfile = useCallback((profile: typeof DEFAULT_PROFILE) => {
+  const setUserProfile = useCallback((profile: UserProfile) => {
     setUserProfileState(profile);
     setBodyHistory(recordBodyEntry({ weight: profile.weight, restingHr: profile.restingHr }));
   }, []);

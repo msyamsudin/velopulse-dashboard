@@ -1,15 +1,4 @@
-export const DEFAULT_PROFILE = {
-  age: 0,
-  maxHr: 190,  // Safe fallback for division ops; age=0 still triggers onboarding
-  ftp: 0,
-  weight: 0,
-  /**
-   * Optional resting heart rate. It has no column in the Supabase `profiles`
-   * table yet, so it is kept in the device-local body history instead (see
-   * lib/body-history.ts) — the server simply ignores the field.
-   */
-  restingHr: 0
-};
+import { DEFAULT_PROFILE } from './profile';
 
 export const APP_METADATA = {
   name: 'VELOPULSE PRO',
@@ -34,15 +23,6 @@ export const POWER_ZONES = [
   { label: 'Z6', name: 'Anaerobic', minPct: 1.20, maxPct: 1.50, color: 'bg-red-500', shadow: 'shadow-red-500/50' },
   { label: 'Z7', name: 'Neuro', minPct: 1.50, maxPct: 2.00, color: 'bg-purple-500', shadow: 'shadow-purple-500/50' },
 ];
-
-/**
- * Calculate Max HR using Robergs & Landwehr formula.
- * More accurate than Fox (220-age) — based on meta-analysis of 18,712 subjects.
- */
-export const calculateMaxHr = (age: number): number => {
-  if (age <= 0) return DEFAULT_PROFILE.maxHr;
-  return Math.round(205.8 - (0.685 * age));
-};
 
 /** Safe maxHr — prevents division-by-zero throughout the app */
 export const getSafeMaxHr = (maxHr: number): number => maxHr > 0 ? maxHr : DEFAULT_PROFILE.maxHr;

@@ -4,9 +4,9 @@ import { getAppConfig } from '@/lib/config-helper';
 import { classifySupabaseError } from '@/lib/supabase-errors';
 import { buildLogTag } from '@/lib/version';
 import { getUserProfile, saveUserProfile } from '@/lib/profile-helper';
+import { DEFAULT_PROFILE, normalizeProfile } from '@/lib/profile';
 
 const SUPABASE_FETCH_TIMEOUT_MS = 10_000;
-const EMPTY_PROFILE = { age: 0, max_hr: 190, ftp: 0, weight: 0 };
 
 /**
  * Builds a Supabase client from the latest runtime config (config.json > .env).
@@ -99,7 +99,9 @@ export async function GET(request: Request) {
       profile = savedProfile;
     }
 
-    return NextResponse.json(profile || EMPTY_PROFILE);
+    // Kontrak API memakai camelCase; baris Supabase memakai snake_case dan
+    // dinormalkan di satu tempat agar klien tidak perlu menebak bentuknya.
+    return NextResponse.json(profile ? normalizeProfile(profile) : DEFAULT_PROFILE);
   } catch (err) {
     return errorResponse(err);
   }
@@ -108,16 +110,9 @@ export async function GET(request: Request) {
 // POST: Saves new profile
 export async function POST(request: NextRequest) {
   try {
-    const profile = await request.json();
     const hasAuthorization = Boolean(request.headers.get('authorization'));
     const auth = await getAuthenticatedClient(request);
-    const normalized = {
-      age: profile.age,
-      maxHr: profile.maxHr || profile.max_hr,
-      ftp: profile.ftp,
-      weight: profile.weight,
-      restingHr: profile.restingHr ?? profile.resting_hr,
-    };
+    const normalized = normalizeProfile(await request.json());
     if (!auth) {
       if (hasAuthorization) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
       const saved = saveUserProfile(normalized);
@@ -133,8 +128,8 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         age: normalized.age,
         max_hr: normalized.maxHr,
-        ftp: profile.ftp,
-        weight: profile.weight,
+        ftp: normalized.ftp,
+        weight: normalized.weight,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
 
