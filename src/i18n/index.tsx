@@ -819,6 +819,16 @@ const id: Record<string, string> = {
   'Build info': 'Info build',
   'Build identity of the running deployment — include it in bug reports.': 'Identitas build dari deployment yang sedang berjalan — sertakan saat melaporkan bug.',
   'Exported by {build}': 'Diekspor oleh {build}',
+
+  // Profil pesepeda: pemuatan, penyimpanan, dan validasi
+  'Retry': 'Coba lagi',
+  'Loading your profile...': 'Memuat profil Anda...',
+  'Profile could not be loaded': 'Profil tidak dapat dimuat',
+  'Saving is disabled until the stored profile is readable.': 'Menyimpan dinonaktifkan sampai profil yang tersimpan bisa dibaca.',
+  'Failed to save profile': 'Gagal menyimpan profil',
+  'Failed to save profile (HTTP {status})': 'Gagal menyimpan profil (HTTP {status})',
+  'Could not reach the server. Check your internet connection.': 'Tidak dapat menghubungi server. Periksa koneksi internet Anda.',
+  'Failed to save configuration': 'Gagal menyimpan konfigurasi',
 };
 
 type I18nValue = {

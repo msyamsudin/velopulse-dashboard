@@ -131,7 +131,9 @@ export default function App() {
   const cloudUnavailable = cloudStatus?.state === 'offline' || cloudStatus?.state === 'unreachable';
   const authConfigured = Boolean(sysConfigCheck?.configured);
   const authRequired = authConfigured && !cloudUnavailable;
-  const requiresSetup = (sysConfigCheck && !sysConfigCheck.configured) || profileStatus === 'new';
+  const requiresSetup = (sysConfigCheck && !sysConfigCheck.configured)
+    || profileStatus === 'new'
+    || profileStatus === 'error';
   const primarySurface: PrimarySurface = viewMode === 'telemetry'
     ? 'telemetry'
     : isRecording
@@ -287,6 +289,10 @@ export default function App() {
         <AnimatePresence>
           {showSettings && (
             <SettingsModal
+              profile={userProfile}
+              profileStatus={profileStatus}
+              profileError={profileError}
+              onRetryProfile={retryProfile}
               onClose={() => {
                 setShowSettings(false);
                 refetchSysCheck();
@@ -362,6 +368,10 @@ export default function App() {
       <AnimatePresence>
         {showSettings && (
           <SettingsModal
+            profile={userProfile}
+            profileStatus={profileStatus}
+            profileError={profileError}
+            onRetryProfile={retryProfile}
             onClose={() => setShowSettings(false)}
             onSave={(profile) => setUserProfile(profile)}
           />

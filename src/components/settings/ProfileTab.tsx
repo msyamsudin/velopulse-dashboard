@@ -19,6 +19,11 @@ interface ProfileTabProps {
   onSave: () => void;
   saveStatus: string;
   saveError?: string;
+  /** False saat profil belum diketahui: menyimpan akan menulis nilai default. */
+  canSave?: boolean;
+  loadStatus?: 'loading' | 'ready' | 'new' | 'error';
+  loadError?: string | null;
+  onRetryLoad?: () => void;
 }
 
 interface NumberFieldProps {
@@ -53,7 +58,17 @@ const NumberField = ({ label, value, icon, readOnly = false, suffix, onChange }:
   </div>
 );
 
-export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError }: ProfileTabProps) => {
+export const ProfileTab = ({
+  profile,
+  setProfile,
+  onSave,
+  saveStatus,
+  saveError,
+  canSave = true,
+  loadStatus = 'ready',
+  loadError,
+  onRetryLoad,
+}: ProfileTabProps) => {
   const { t } = useI18n();
   // FTP and weight gate *metrics*, not riding: the notice explains what stays
   // hidden, it never disables anything in this form or on the cockpit.
@@ -72,6 +87,32 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError 
           {t('These values calibrate heart-rate zones, power context, and ride summaries.')}
         </p>
       </div>
+
+      {loadStatus === 'loading' && (
+        <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+          {t('Loading your profile...')}
+        </div>
+      )}
+
+      {loadStatus === 'error' && (
+        <div className="rounded-lg border border-vp-danger/30 bg-vp-danger/10 px-3 py-3">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-vp-danger">
+            {t('Profile could not be loaded')}
+          </div>
+          <p className="mt-1 text-[11px] leading-5 text-vp-muted">
+            {loadError || t('Saving is disabled until the stored profile is readable.')}
+          </p>
+          {onRetryLoad && (
+            <button
+              type="button"
+              onClick={onRetryLoad}
+              className="vp-focus-ring mt-2 rounded border border-vp-danger/40 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-danger"
+            >
+              {t('Retry')}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField
@@ -143,7 +184,7 @@ export const ProfileTab = ({ profile, setProfile, onSave, saveStatus, saveError 
 
       <button
         onClick={onSave}
-        disabled={saveStatus === 'saving'}
+        disabled={!canSave || saveStatus === 'saving'}
         className="vp-focus-ring flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-vp-accent px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-vp-bg transition-colors hover:bg-vp-accent/90 disabled:pointer-events-none disabled:opacity-50"
       >
         <Save size={18} />

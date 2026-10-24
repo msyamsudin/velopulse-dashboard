@@ -117,8 +117,13 @@ export const useAppInitialization = () => {
   // gate metrics (power zones, W/kg, kcal/kg/h), so they are surfaced as an
   // invitation in Settings and never turn into a locked cockpit. Consumers ask
   // `getProfileGate()` for those, so "complete" has one definition.
+  //
+  // `error` is kept distinct from `new`: a profile that failed to load tells us
+  // nothing about what is stored, so the form must not treat it as empty and
+  // save zeros over a profile that still exists in the cloud.
   const profileStatus = ((): 'loading' | 'ready' | 'error' | 'new' => {
     if (isLoadingProfile) return 'loading';
+    if (profileError) return 'error';
     const isUsable = userProfile.age > 0 && userProfile.maxHr > 0;
     return isUsable ? 'ready' : 'new';
   })();
