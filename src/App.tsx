@@ -109,6 +109,8 @@ export default function App() {
     bodyHistory,
     profileStatus,
     profileError,
+    orphanProfileAvailable,
+    claimOrphanProfile,
     retryProfile,
     sysConfigCheck,
     refetchSysCheck,
@@ -284,6 +286,8 @@ export default function App() {
           isProfileMissing={profileStatus === 'new'}
           connectionError={profileError}
           onRetryConnection={retryProfile}
+          orphanProfileAvailable={orphanProfileAvailable}
+          onClaimOrphanProfile={claimOrphanProfile}
           onBackToSignIn={authConfigured ? handleSignIn : undefined}
         />
         <AnimatePresence>

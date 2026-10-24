@@ -17,6 +17,9 @@ interface SetupLandingProps {
   connectionError?: ConnectionError | null;
   onRetryConnection?: () => void;
   onBackToSignIn?: () => void;
+  /** Ada profil lama tanpa pemilik yang bisa ditautkan ke akun ini. */
+  orphanProfileAvailable?: boolean;
+  onClaimOrphanProfile?: () => Promise<boolean> | void;
 }
 
 const ERROR_TITLE: Record<string, string> = {
@@ -27,7 +30,16 @@ const ERROR_TITLE: Record<string, string> = {
   UNKNOWN: 'Cloud database error',
 };
 
-export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, connectionError, onRetryConnection, onBackToSignIn }: SetupLandingProps) => {
+export const SetupLanding = ({
+  onInitialize,
+  missingFields,
+  isProfileMissing,
+  connectionError,
+  onRetryConnection,
+  onBackToSignIn,
+  orphanProfileAvailable,
+  onClaimOrphanProfile,
+}: SetupLandingProps) => {
   const { t } = useI18n();
 
   // Restore states
@@ -144,6 +156,28 @@ export const SetupLanding = ({ onInitialize, missingFields, isProfileMissing, co
                       )}
                     </div>
                   </div>
+                </motion.div>
+              )}
+
+              {orphanProfileAvailable && onClaimOrphanProfile && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-hw-accent/30 bg-hw-accent/5 p-4"
+                >
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-hw-accent">
+                    {t('A profile from before sign-in is available')}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-hw-text/80">
+                    {t('Link it to this account to keep the age, weight, and FTP already entered.')}
+                  </p>
+                  <button
+                    onClick={() => { void onClaimOrphanProfile(); }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full border border-hw-accent/50 bg-hw-accent/10 px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-hw-accent transition-colors hover:bg-hw-accent hover:text-hw-bg"
+                  >
+                    <User size={12} />
+                    {t('Link the earlier profile')}
+                  </button>
                 </motion.div>
               )}
 

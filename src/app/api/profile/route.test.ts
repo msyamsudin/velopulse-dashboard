@@ -178,6 +178,21 @@ describe('GET /api/profile', () => {
     expect(response.status).toBe(401);
   });
 
+  it('falls back to the device profile without claiming a row', async () => {
+    mocks.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+    const local = {
+      age: 39, maxHr: 179, maxHrSource: 'manual' as const, ftp: 210, weight: 75, restingHr: 50,
+    };
+    mocks.getUserProfile.mockReturnValue(local);
+
+    const response = await get({ Authorization: 'Bearer token' });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(local);
+    // Klaim hanya lewat endpoint eksplisit; GET tidak boleh memindahkan baris.
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
   it('normalises the cloud row to the camelCase contract', async () => {
     const response = await get({ Authorization: 'Bearer token' });
     const body = await response.json();

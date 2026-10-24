@@ -837,6 +837,9 @@ const id: Record<string, string> = {
   'Max HR source': 'Sumber detak jantung maks.',
   'Automatic follows the age formula. Manual keeps a measured value.': 'Otomatis mengikuti rumus usia. Manual memakai nilai hasil pengukuran.',
   'Manual': 'Manual',
+  'A profile from before sign-in is available': 'Profil dari sebelum masuk tersedia',
+  'Link it to this account to keep the age, weight, and FTP already entered.': 'Tautkan ke akun ini agar usia, berat, dan FTP yang sudah diisi tidak hilang.',
+  'Link the earlier profile': 'Tautkan profil sebelumnya',
 };
 
 type I18nValue = {

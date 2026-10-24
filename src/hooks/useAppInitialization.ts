@@ -27,6 +27,8 @@ export const useAppInitialization = () => {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [userProfile, setUserProfileState] = useState(DEFAULT_PROFILE);
   const [profileError, setProfileError] = useState<ProfileLoadError | null>(null);
+  // Ada baris profil lama tanpa pemilik yang bisa ditawarkan untuk ditautkan.
+  const [orphanProfileAvailable, setOrphanProfileAvailable] = useState(false);
   // Dated weight / resting-HR entries, kept on this device (lib/body-history).
   const [bodyHistory, setBodyHistory] = useState<BodyHistoryEntry[]>([]);
 
@@ -114,6 +116,48 @@ export const useAppInitialization = () => {
     loadProfile();
   }, [loadProfile, authUserId]);
 
+  /**
+   * Klaim profil lama hanya ditawarkan, tidak pernah dilakukan otomatis: dulu
+   * GET /api/profile mengambil baris tanpa pemilik saat akun pertama membuka
+   * aplikasi, sehingga profil perangkat lain bisa berpindah akun.
+   */
+  useEffect(() => {
+    if (!authUserId || isLoadingProfile) return undefined;
+    // Hanya relevan saat akun ini belum punya profil sendiri.
+    if (userProfile.age > 0) return undefined;
+    let cancelled = false;
+
+    fetchProfileApi('/api/profile/orphan')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!cancelled) setOrphanProfileAvailable(Boolean(data?.available));
+      })
+      .catch(() => {
+        // Tanpa kepastian, jangan tawarkan sesuatu yang mungkin gagal diklaim.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, isLoadingProfile, userProfile.age]);
+
+  const claimOrphanProfile = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetchProfileApi('/api/profile/claim', { method: 'POST' });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data?.claimed || !data.profile) {
+        setOrphanProfileAvailable(false);
+        return false;
+      }
+      setUserProfile(data.profile as UserProfile);
+      setOrphanProfileAvailable(false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [setUserProfile]);
+
   // The setup gate asks a different question than the metric gates: it only
   // needs the values the app cannot work without (age → maxHr). FTP and weight
   // gate metrics (power zones, W/kg, kcal/kg/h), so they are surfaced as an
@@ -153,6 +197,8 @@ export const useAppInitialization = () => {
     bodyHistory,
     profileStatus,
     profileError,
+    orphanProfileAvailable,
+    claimOrphanProfile,
     retryProfile: loadProfile,
     sysConfigCheck,
     refetchSysCheck,

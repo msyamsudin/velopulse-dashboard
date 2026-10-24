@@ -14,6 +14,7 @@
 --   20261015000100_workouts_source_session_id.sql
 --   20261016000000_profiles_claim_orphan.sql
 --   20261024000000_profiles_columns.sql
+--   20261024000100_profiles_orphan_availability.sql
 -- ============================================================================
 
 -- ===== 20260524000000_baseline_workouts.sql ====================================
@@ -272,3 +273,35 @@ drop trigger if exists profiles_touch_updated_at on public.profiles;
 create trigger profiles_touch_updated_at
   before update on public.profiles
   for each row execute function public.touch_profiles_updated_at();
+
+-- ===== 20261024000100_profiles_orphan_availability.sql =========================
+
+-- ============================================================================
+-- 20261024000100_profiles_orphan_availability.sql
+--
+-- Klaim profil lama tidak lagi terjadi di dalam GET: kepemilikan baris hanya
+-- berpindah setelah pengguna menyetujuinya. Untuk menawarkan pilihan itu, layar
+-- setup perlu tahu apakah ada baris tanpa pemilik — sesuatu yang tidak bisa
+-- dibaca lewat RLS karena baris tersebut bukan milik siapa pun.
+--
+-- Fungsi ini hanya membocorkan satu bit (ada atau tidak), bukan isi profil, dan
+-- hanya untuk pengguna terautentikasi.
+-- ============================================================================
+
+create or replace function public.orphan_profile_available()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where user_id is null
+  );
+$$;
+
+revoke all on function public.orphan_profile_available() from public;
+revoke all on function public.orphan_profile_available() from anon;
+grant execute on function public.orphan_profile_available() to authenticated;
