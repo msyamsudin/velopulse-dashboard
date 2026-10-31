@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/msyamsudin/velopulse-dashboard/compare/v0.5.0...v0.6.0) (2026-10-31)
+
+
+### Features
+
+* **ftp:** tambahkan pengukuran FTP 20 menit ([c185f95](https://github.com/msyamsudin/velopulse-dashboard/commit/c185f951c10bd69f2997a1c157df14a8b989a0a0))
+
+
+### Bug Fixes
+
+* **auth:** perjelas alur konfigurasi Supabase ([9348f0d](https://github.com/msyamsudin/velopulse-dashboard/commit/9348f0d7c4e16520b16b695ef28d73763119f005))
+
+
+### Documentation
+
+* **adr:** hapus catatan strategi rilis ([a2a5d9b](https://github.com/msyamsudin/velopulse-dashboard/commit/a2a5d9b3f0439ea1e7c1aa2f38c2c8bf7aa98a8b))
+
 ## [0.5.0](https://github.com/msyamsudin/velopulse-dashboard/compare/v0.4.1...v0.5.0) (2026-10-24)
 
 
