@@ -13,6 +13,7 @@ export interface ConnectionError {
 
 interface SetupLandingProps {
   onInitialize: () => void;
+  needsSystemSetup?: boolean;
   missingFields: string[];
   isProfileMissing?: boolean;
   connectionError?: ConnectionError | null;
@@ -33,6 +34,7 @@ const ERROR_TITLE: Record<string, string> = {
 
 export const SetupLanding = ({
   onInitialize,
+  needsSystemSetup = false,
   missingFields,
   isProfileMissing,
   connectionError,
@@ -106,18 +108,38 @@ export const SetupLanding = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-3 text-hw-accent mb-2">
                   <Activity size={24} className="animate-pulse" />
-                  <span className="text-[10px] font-mono uppercase tracking-[0.4em] font-bold">{t('System Initialization Required')}</span>
+                  <span className="text-[10px] font-mono uppercase tracking-[0.4em] font-bold">
+                    {t(needsSystemSetup ? 'Connect Supabase to continue' : 'Setup needed to continue')}
+                  </span>
                 </div>
                 <h1 className="text-5xl font-black tracking-tighter leading-[1.1]">
-                  {t('WELCOME TO')} <br />
-                  <span className="text-hw-accent">VELOPULSE</span> PRO
+                  {needsSystemSetup ? (
+                    <>{t('Connect your')} <br /><span className="text-hw-accent">{t('Supabase project')}</span></>
+                  ) : (
+                    <>{t('WELCOME TO')} <br /><span className="text-hw-accent">VELOPULSE</span> PRO</>
+                  )}
                 </h1>
                 <p className="text-hw-muted text-sm leading-relaxed max-w-md">
-                  {t('Your advanced fitness telemetry hub is almost ready. We need to establish a secure connection with your external data providers and cloud infrastructure.')}
+                  {t(needsSystemSetup
+                    ? 'This app needs a one-time connection to its Supabase project. The app manager can find the project URL and anon key in Supabase Project Settings > API.'
+                    : 'Your profile could not be loaded. Check the message below, then retry the connection or contact the app manager.')}
                 </p>
               </div>
 
-              <div className="space-y-4">
+              {needsSystemSetup && (
+                <div role="status" className="rounded-xl border border-hw-accent/30 bg-hw-accent/5 p-4">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-hw-accent">
+                    {t('What to do next')}
+                  </p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] leading-relaxed text-hw-text/80">
+                    <li>{t('Create a device master password when prompted.')}</li>
+                    <li>{t('Enter the Supabase project URL and anon key in System settings.')}</li>
+                    <li>{t('Validate the connection, then apply the configuration. Login opens next.')}</li>
+                  </ol>
+                </div>
+              )}
+
+              {!needsSystemSetup && <div className="space-y-4">
                 <h3 className="text-[10px] font-mono uppercase tracking-widest text-hw-muted">{t('Connection Checklist:')}</h3>
                 <div className="grid grid-cols-1 gap-3">
                   <CheckItem
@@ -132,7 +154,7 @@ export const SetupLanding = ({
                     isMissing={!!isProfileMissing}
                   />
                 </div>
-              </div>
+              </div>}
 
               {connectionError && (
                 <motion.div
@@ -191,7 +213,7 @@ export const SetupLanding = ({
                   className="group relative flex items-center justify-center gap-4 px-8 py-4 bg-hw-accent text-hw-bg font-black uppercase tracking-widest text-xs rounded-full overflow-hidden transition-all hover:scale-105 active:scale-95 w-fit"
                 >
                   <span className="relative z-10 flex items-center gap-2">
-                    {t('Initialize System')} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    {t(needsSystemSetup ? 'Set up Supabase connection' : 'Open setup settings')} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </span>
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                 </button>

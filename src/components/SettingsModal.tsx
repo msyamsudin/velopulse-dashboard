@@ -21,6 +21,7 @@ interface SettingsModalProps {
   /** Profil yang sudah dimuat induk. Modal tidak mengambil ulang sendiri. */
   profile: UserProfile;
   profileStatus: 'loading' | 'ready' | 'new' | 'error';
+  initialTab?: 'profile' | 'system';
   profileError?: { userMessage: string } | null;
   onRetryProfile?: () => void;
 }
@@ -34,11 +35,12 @@ export const SettingsModal = ({
   onSave,
   profile: loadedProfile,
   profileStatus,
+  initialTab = 'profile',
   profileError,
   onRetryProfile,
 }: SettingsModalProps) => {
   const { locale, setLocale, t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'profile' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'system'>(initialTab);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [password, setPassword] = useState('');
@@ -124,6 +126,12 @@ export const SettingsModal = ({
       if (res.ok) {
         resetSupabaseClientCache();
         setSystemSave({ status: 'success', message: '' });
+
+        if (sysConfig.NEXT_PUBLIC_SUPABASE_URL && sysConfig.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+          window.setTimeout(() => {
+            window.location.reload();
+          }, 900);
+        }
         
         // If master password was changed, update local password state so validation/saving continues to work
         if (sysConfig.MASTER_PASSWORD && sysConfig.MASTER_PASSWORD !== '●●●●●●●●●') {

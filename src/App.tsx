@@ -133,9 +133,8 @@ export default function App() {
   const cloudUnavailable = cloudStatus?.state === 'offline' || cloudStatus?.state === 'unreachable';
   const authConfigured = Boolean(sysConfigCheck?.configured);
   const authRequired = authConfigured && !cloudUnavailable;
-  const requiresSetup = (sysConfigCheck && !sysConfigCheck.configured)
-    || profileStatus === 'new'
-    || profileStatus === 'error';
+  const needsSystemSetup = Boolean(sysConfigCheck && !sysConfigCheck.configured);
+  const requiresSetup = needsSystemSetup || profileStatus === 'new' || profileStatus === 'error';
   const primarySurface: PrimarySurface = viewMode === 'telemetry'
     ? 'telemetry'
     : isRecording
@@ -278,10 +277,29 @@ export default function App() {
   }
 
   if (requiresSetup) {
+    // Jika Supabase sudah siap tetapi profil belum dibuat, buka langsung
+    // formulir profil agar pengguna tidak melewati halaman inisialisasi.
+    if (!needsSystemSetup && profileStatus === 'new') {
+      return (
+        <SettingsModal
+          profile={userProfile}
+          profileStatus={profileStatus}
+          profileError={profileError}
+          onRetryProfile={retryProfile}
+          onClose={() => {
+            setShowSettings(false);
+            refetchSysCheck();
+          }}
+          onSave={(profile) => setUserProfile(profile)}
+        />
+      );
+    }
+
     return (
       <>
         <SetupLanding
           onInitialize={() => setShowSettings(true)}
+          needsSystemSetup={needsSystemSetup}
           missingFields={sysConfigCheck?.missingFields || []}
           isProfileMissing={profileStatus === 'new'}
           connectionError={profileError}
@@ -295,6 +313,7 @@ export default function App() {
             <SettingsModal
               profile={userProfile}
               profileStatus={profileStatus}
+              initialTab={needsSystemSetup ? 'system' : 'profile'}
               profileError={profileError}
               onRetryProfile={retryProfile}
               onClose={() => {

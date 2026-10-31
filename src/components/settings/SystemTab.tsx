@@ -103,6 +103,15 @@ export const SystemTab = ({
       className="space-y-6"
     >
       <div className="space-y-4">
+        <div role="status" className="rounded-lg border border-vp-info/25 bg-vp-info/5 p-4">
+          <p className="text-xs font-semibold text-vp-text">{t('Connect this app to Supabase once')}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-vp-muted">
+            {t('Use the project URL and anon key from Supabase Project Settings > API. This connects the app for everyone; each person still signs in with their own account.')}
+          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-vp-muted">
+            {t('Step 1: enter both values. Step 2: validate the connection. Step 3: apply the configuration to continue to sign in.')}
+          </p>
+        </div>
         <div className="grid grid-cols-1 gap-4">
           <div className="grid grid-cols-1 gap-4 border-b border-vp-border pb-4 sm:grid-cols-2">
             <div className="space-y-2">
