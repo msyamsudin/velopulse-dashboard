@@ -7,14 +7,15 @@ const PROFILE = { age: 30, maxHr: 190, maxHrSource: 'auto' as const, ftp: 200, w
 
 const DATA = { hr: 0, cadence: 0, power: 0, speed: 0, distance: 0, resistance: 0, calories: 0 };
 
-const renderCockpit = (connected: boolean) => {
+const renderCockpit = (connected: boolean, profile: typeof PROFILE = PROFILE) => {
   const onStart = vi.fn();
+  const onStartFtpTest = vi.fn();
 
   render(
     <I18nProvider>
       <PreRideCockpit
         currentData={DATA}
-        userProfile={PROFILE}
+        userProfile={profile}
         hrConnected={connected}
         bikeConnected={connected}
         bleError={null}
@@ -23,11 +24,12 @@ const renderCockpit = (connected: boolean) => {
         onStart={onStart}
         onDisconnect={vi.fn()}
         onOpenSettings={vi.fn()}
+        onStartFtpTest={onStartFtpTest}
       />
     </I18nProvider>
   );
 
-  return { onStart };
+  return { onStart, onStartFtpTest };
 };
 
 describe('PreRideCockpit start gate', () => {
@@ -45,5 +47,34 @@ describe('PreRideCockpit start gate', () => {
 
     fireEvent.click(startButton);
     expect(onStart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('PreRideCockpit FTP invitation', () => {
+  it('invites a rider without an FTP to measure it', () => {
+    const { onStartFtpTest } = renderCockpit(true, { ...PROFILE, ftp: 0 });
+
+    expect(screen.getByText('No FTP yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Measure FTP' }));
+
+    expect(onStartFtpTest).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the measurement available once an FTP is already set', () => {
+    const { onStartFtpTest } = renderCockpit(true);
+
+    expect(screen.getByText('FTP measurement')).toBeInTheDocument();
+    expect(screen.getByText(/Your profile FTP is 200 W/)).toBeInTheDocument();
+    expect(screen.queryByText('No FTP yet')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Measure again' }));
+    expect(onStartFtpTest).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks the test button until the bike streams power', () => {
+    renderCockpit(false, { ...PROFILE, ftp: 0 });
+
+    expect(screen.getByRole('button', { name: 'Measure FTP' })).toBeDisabled();
+    expect(screen.getByText('Connect the bike to start the test.')).toBeInTheDocument();
   });
 });

@@ -25,6 +25,8 @@ interface ProfileTabProps {
   loadStatus?: 'loading' | 'ready' | 'new' | 'error';
   loadError?: string | null;
   onRetryLoad?: () => void;
+  /** Membuka tes FTP dari dalam Settings; hanya tersedia saat profil siap. */
+  onMeasureFtp?: () => void;
 }
 
 interface NumberFieldProps {
@@ -130,6 +132,7 @@ export const ProfileTab = ({
   loadStatus = 'ready',
   loadError,
   onRetryLoad,
+  onMeasureFtp,
 }: ProfileTabProps) => {
   const { t } = useI18n();
   // FTP and weight gate *metrics*, not riding: the notice explains what stays
@@ -283,6 +286,25 @@ export const ProfileTab = ({
           onChange={(restingHr) => setProfile({ ...profile, restingHr })}
         />
       </div>
+
+      {onMeasureFtp && (
+        <div className="flex flex-col gap-3 rounded-lg border border-vp-power/25 bg-vp-power/[0.04] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="vp-label text-vp-power">{t('FTP test')}</div>
+            <p className="mt-1 max-w-md text-[10px] leading-4 text-vp-muted">
+              {t('Measure any time with a 20-minute test. Applying the result is optional.')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onMeasureFtp}
+            className="vp-focus-ring flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-vp-power/40 bg-vp-power/10 px-4 py-2 text-[10px] font-mono font-bold uppercase tracking-[0.12em] text-vp-power transition-colors hover:bg-vp-power/20"
+          >
+            <Zap size={13} />
+            {t('Measure FTP')}
+          </button>
+        </div>
+      )}
 
       <div className="rounded-lg border border-vp-border bg-white/[0.025] px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
         {t('Max HR uses the Robergs and Landwehr formula: 205.8 - 0.685 x age.')}

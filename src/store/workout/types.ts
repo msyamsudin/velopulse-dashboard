@@ -45,6 +45,16 @@ export interface WorkoutSession {
     hrvReadiness?: ReadinessLevel;
     /** Subjective effort 1–10 entered when saving (sRPE = RPE × minutes). */
     rpe?: number;
+    /**
+     * Menandai sesi sebagai hasil tes FTP. History menampilkan badge "FTP test"
+     * alih-alih bucket kualitas, karena klasifikasi kualitas dihitung dari
+     * HR/power rata-rata dan tidak mewakili effort maksimal 20 menit.
+     */
+    testType?: 'ftp';
+    /** Hasil 95% rata-rata daya yang terukur saat tes, bila hasilnya valid. */
+    ftpTestWatts?: number;
+    /** Nama perangkat yang mengalirkan daya saat tes, untuk konteks hasil. */
+    ftpTestDevice?: string;
   };
   history: HistoryData[];
   /**
@@ -103,6 +113,19 @@ export interface ImportTcxResult {
 export interface DeleteSessionResult {
   success: boolean;
   message?: string;
+}
+
+/**
+ * Bahan sesi tes FTP. History dibangun oleh layar tes (bukan oleh rekaman
+ * latihan), lalu disimpan lewat jalur yang sama dengan sesi lain supaya ikut
+ * History, best effort, dan sinkronisasi.
+ */
+export interface SaveTestSessionInput {
+  history: HistoryData[];
+  testType: 'ftp';
+  /** Hasil tes; null/undefined bila cakupan data belum memenuhi ambang. */
+  ftpWatts?: number | null;
+  deviceName?: string | null;
 }
 
 export interface ActiveSessionSnapshot {
@@ -167,6 +190,8 @@ export interface WorkoutActions {
    * rider who does not want to rate the ride saves exactly as before.
    */
   saveSession: (rpe?: number) => Promise<void>;
+  /** Menyimpan sesi tes FTP langsung dari history yang dibangun layar tes. */
+  saveTestSession: (input: SaveTestSessionInput) => Promise<WorkoutSession | null>;
   syncPendingSupabaseSessions: () => Promise<void>;
   importTCX: (
     tcxContent: string,

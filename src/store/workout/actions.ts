@@ -47,6 +47,7 @@ import type {
   HistoryData,
   ImportTcxResult,
   SaveSessionPhase,
+  SaveTestSessionInput,
   WorkoutActions,
   WorkoutSession,
   WorkoutState,
@@ -318,6 +319,54 @@ export const createWorkoutActions = (api: StoreApi<WorkoutState>): WorkoutAction
       } finally {
         set({ isSavingSession: false, saveSessionPhase: 'idle' });
       }
+    },
+
+    saveTestSession: async (input: SaveTestSessionInput) => {
+      const { history, testType, ftpWatts, deviceName } = input;
+
+      // Satu titik hanya punya satu detik data: tidak ada sesi yang layak
+      // disimpan, dan stats dari rentang nol akan menyesatkan.
+      if (history.length < 2) return null;
+
+      const firstTs = history[0]?.ts ?? Date.now();
+      const lastTs = history[history.length - 1]?.ts ?? firstTs;
+      const duration = Math.max(1, Math.round((lastTs - firstTs) / 1000));
+      const computed = calculateLiveStats(history);
+
+      const session: WorkoutSession = {
+        id: `session_${Date.now()}`,
+        sessionStartTime: firstTs,
+        date: new Date(firstTs).toISOString(),
+        duration,
+        stats: {
+          ...computed.stats,
+          testType,
+          // Angka tes hanya disimpan bila hasilnya valid; sesi yang gagal
+          // memenuhi cakupan tetap tersimpan sebagai latihan, bukan sebagai FTP.
+          ftpTestWatts: typeof ftpWatts === 'number' && ftpWatts > 0 ? ftpWatts : undefined,
+          ftpTestDevice: deviceName || undefined,
+        },
+        history,
+        // Tes di simulator tidak pernah menjadi angka FTP yang disinkronkan.
+        simulated: useBluetoothStore.getState().isSimulating || undefined,
+        synced_to_google: false,
+        synced_to_supabase: false,
+      };
+
+      const updatedHistory = [session, ...get().sessionHistory];
+      set({ sessionHistory: updatedHistory });
+      await persistSessionHistory(updatedHistory);
+
+      const syncedSession = await syncSessionToSupabase(session);
+      set(state => {
+        const nextHistory = state.sessionHistory.map(item =>
+          item.id === syncedSession.id ? syncedSession : item
+        );
+        persistSessionHistory(nextHistory);
+        return { sessionHistory: nextHistory };
+      });
+
+      return syncedSession;
     },
 
     syncPendingSupabaseSessions: async () => {

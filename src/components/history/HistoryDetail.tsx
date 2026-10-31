@@ -412,6 +412,18 @@ export const HistoryDetail = ({
                 <span className="text-white/25">{t('at {weight} kg', { weight: sessionWeight })}</span>
               </div>
             )}
+
+            {session.stats.testType === 'ftp' && typeof session.stats.ftpTestWatts === 'number' && (
+              <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-vp-power/20 pt-3 text-[10px] font-mono uppercase tracking-[0.12em] text-white/45">
+                <span>
+                  {t('Measured FTP')} <b className="text-vp-power tabular-nums">{session.stats.ftpTestWatts} W</b>
+                </span>
+                {session.stats.ftpTestDevice && (
+                  <span className="truncate text-white/25">{session.stats.ftpTestDevice}</span>
+                )}
+                <span className="text-white/25">{t('95% of the 20-minute average power')}</span>
+              </div>
+            )}
           </div>
 
           {hrrScore !== null && (

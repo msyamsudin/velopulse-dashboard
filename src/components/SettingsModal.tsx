@@ -24,6 +24,8 @@ interface SettingsModalProps {
   initialTab?: 'profile' | 'system';
   profileError?: { userMessage: string } | null;
   onRetryProfile?: () => void;
+  /** Membuka tes FTP dari tab Profil; App menutup Settings lebih dulu. */
+  onStartFtpTest?: () => void;
 }
 
 type SaveState = { status: 'idle' | 'saving' | 'success' | 'error'; message: string };
@@ -38,6 +40,7 @@ export const SettingsModal = ({
   initialTab = 'profile',
   profileError,
   onRetryProfile,
+  onStartFtpTest,
 }: SettingsModalProps) => {
   const { locale, setLocale, t } = useI18n();
   const [activeTab, setActiveTab] = useState<'profile' | 'system'>(initialTab);
@@ -304,6 +307,7 @@ export const SettingsModal = ({
                 loadStatus={profileStatus}
                 loadError={profileError?.userMessage ?? null}
                 onRetryLoad={onRetryProfile}
+                onMeasureFtp={profileStatus === 'ready' ? onStartFtpTest : undefined}
               />
             ) : !isUnlocked ? (
               <MasterLock 

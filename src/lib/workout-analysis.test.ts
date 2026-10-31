@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPersonalRecords, getSessionTypeBucket, SESSION_TYPE_BUCKETS, SESSION_TYPE_LABELS } from './workout-analysis';
+import { getPersonalRecords, getSessionTypeBucket, getWorkoutQuality, SESSION_TYPE_BUCKETS, SESSION_TYPE_LABELS } from './workout-analysis';
 import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 const makeSession = (
@@ -148,5 +148,25 @@ describe('getSessionTypeBucket', () => {
   it('keeps the display order and labels in step with the bucket list', () => {
     expect(SESSION_TYPE_BUCKETS).toEqual(['easy', 'moderate', 'hard']);
     expect(SESSION_TYPE_BUCKETS.map(bucket => SESSION_TYPE_LABELS[bucket])).toEqual(['Easy', 'Tempo', 'Hard']);
+  });
+});
+
+describe('getWorkoutQuality', () => {
+  it('labels an FTP test instead of pretending it was an easy ride', () => {
+    const base = makeSession('ftp', '2026-01-01T08:00:00Z', 1500, 0, 0, 30);
+    const testSession: WorkoutSession = {
+      ...base,
+      stats: { ...base.stats, testType: 'ftp', ftpTestWatts: 220 },
+    };
+
+    expect(getWorkoutQuality(testSession, 190).label).toBe('FTP test');
+    expect(getSessionTypeBucket(getWorkoutQuality(testSession, 190).label)).toBe('hard');
+  });
+
+  it('keeps the heart-rate classification for regular sessions', () => {
+    const base = makeSession('ride', '2026-01-01T08:00:00Z', 1800, 10_000, 12, 30);
+    const easy: WorkoutSession = { ...base, stats: { ...base.stats, avgHr: 100 } };
+
+    expect(getWorkoutQuality(easy, 190).label).toBe('Easy');
   });
 });

@@ -27,9 +27,12 @@ import { DashboardFooter } from './components/layout/DashboardFooter';
 import { RecordingCockpit } from './components/dashboard/RecordingCockpit';
 import { PreRideCockpit } from './components/dashboard/PreRideCockpit';
 import { useHeartRateRecovery } from './hooks/useHeartRateRecovery';
+import { useFtpTest } from './hooks/useFtpTest';
 import { HrrModal } from './components/dashboard/HrrModal';
+import { FtpTestModal } from './components/dashboard/FtpTestModal';
 import { EmptyState } from './components/ui';
 import { useI18n } from './i18n';
+import { fetchProfileApi } from './lib/profile-api';
 
 const DeferredPanelLoader = () => {
   const { t } = useI18n();
@@ -65,6 +68,7 @@ export default function App() {
   const authLoading = useAuthStore(state => state.loading);
   const signOut = useAuthStore(state => state.signOut);
   const hrr = useHeartRateRecovery();
+  const ftpTest = useFtpTest();
   const isRecording = useWorkoutStore(state => state.isRecording);
   const { status: cloudStatus } = useConnectionStatus();
   const { autoSyncNotice, dismissAutoSyncNotice } = useAutoSync(cloudStatus);
@@ -272,6 +276,32 @@ export default function App() {
     if (authSession) void signOut();
   };
 
+  /**
+   * Menerapkan hasil tes FTP ke profil. Penerapan selalu eksplisit: hasil tes
+   * tidak pernah menimpa angka yang sedang dipakai tanpa persetujuan pengguna.
+   */
+  const applyFtp = async (ftp: number) => {
+    const nextProfile = { ...userProfile, ftp };
+    const response = await fetchProfileApi('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nextProfile),
+    });
+
+    if (!response.ok) {
+      let message = t('Could not save your FTP. Try again.');
+      try {
+        const data = await response.json();
+        message = data.userMessage || data.error || message;
+      } catch {
+        // Respons tanpa JSON: pakai pesan umum.
+      }
+      throw new Error(message);
+    }
+
+    setUserProfile(nextProfile);
+  };
+
   if (authConfigured && !authLoading && !authSession && (forceAuthFlow || (authRequired && !skipAuth))) {
     return <AuthScreen onContinueLocal={handleContinueLocal} />;
   }
@@ -397,6 +427,11 @@ export default function App() {
             onRetryProfile={retryProfile}
             onClose={() => setShowSettings(false)}
             onSave={(profile) => setUserProfile(profile)}
+            onStartFtpTest={() => {
+              // Tes berjalan di atas layar utama, jadi Settings ditutup dulu.
+              setShowSettings(false);
+              ftpTest.open();
+            }}
           />
         )}
       </AnimatePresence>
@@ -483,6 +518,7 @@ export default function App() {
                     }}
                     onDisconnect={disconnect}
                     onOpenSettings={() => setShowSettings(true)}
+                    onStartFtpTest={ftpTest.open}
                   />
                 )}
               </div>
@@ -531,6 +567,27 @@ export default function App() {
         notice={autoSyncNotice}
         onDismiss={dismissAutoSyncNotice}
         onOpenHistory={() => setShowHistory(true)}
+      />
+
+      <FtpTestModal
+        status={ftpTest.status}
+        warmupRemaining={ftpTest.warmupRemaining}
+        effortRemaining={ftpTest.effortRemaining}
+        effortElapsed={ftpTest.effortElapsed}
+        avgPower={ftpTest.avgPower}
+        currentPower={ftpTest.currentPower}
+        currentHr={ftpTest.currentHr}
+        bikeConnected={ftpTest.bikeConnected}
+        deviceName={ftpTest.deviceName}
+        currentFtp={userProfile.ftp}
+        result={ftpTest.result}
+        saveState={ftpTest.saveState}
+        abortReason={ftpTest.abortReason}
+        onStart={ftpTest.start}
+        onSkipWarmup={ftpTest.skipWarmup}
+        onCancel={ftpTest.cancel}
+        onClose={ftpTest.close}
+        onApply={applyFtp}
       />
 
       <HrrModal

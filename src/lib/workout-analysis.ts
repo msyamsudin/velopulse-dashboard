@@ -47,6 +47,13 @@ export const getSessionOutcome = (session: WorkoutSession) => {
 };
 
 export const getWorkoutQuality = (session: WorkoutSession, maxHr: number) => {
+  // Sesi tes FTP bukan latihan biasa: bucket kualitas dihitung dari HR/power
+  // rata-rata dan tidak mewakili effort maksimal 20 menit. Badge-nya dibuat
+  // eksplisit supaya sesi itu terbaca sebagai tes, bukan sebagai latihan mudah.
+  if (session?.stats?.testType === 'ftp') {
+    return { label: 'FTP test', color: 'text-vp-power', bg: 'bg-vp-power/10 border-vp-power/25' };
+  }
+
   const safeMax = getSafeMaxHr(maxHr);
   const avgHr = session?.stats?.avgHr || 0;
   const ratio = avgHr > 0 ? avgHr / safeMax : 0;
@@ -81,6 +88,8 @@ export const SESSION_TYPE_LABELS: Record<SessionTypeBucket, string> = {
 export const getSessionTypeBucket = (qualityLabel: string): SessionTypeBucket => {
   if (qualityLabel === 'Easy' || qualityLabel === 'Endurance') return 'easy';
   if (qualityLabel === 'Tempo') return 'moderate';
+  // Tes FTP adalah effort 20 menit all-out, bukan sesi mudah; ia tetap dihitung
+  // sebagai latihan berat agar total sesi tidak berubah diam-diam.
   return 'hard';
 };
 

@@ -37,6 +37,7 @@ interface PreRideCockpitProps {
   onStart: () => void;
   onDisconnect: () => void;
   onOpenSettings: () => void;
+  onStartFtpTest: () => void;
 }
 
 interface ReadinessRowProps {
@@ -135,7 +136,8 @@ export const PreRideCockpit = ({
   connectBike,
   onStart,
   onDisconnect,
-  onOpenSettings
+  onOpenSettings,
+  onStartFtpTest
 }: PreRideCockpitProps) => {
   const { t } = useI18n();
   const hrvReadiness = useBluetoothStore((s) => s.hrvReadiness);
@@ -144,6 +146,9 @@ export const PreRideCockpit = ({
   // Same gate the Summary blocks use: the badge warns about missing metric
   // inputs (FTP / weight) and never blocks the Start button.
   const profileReady = getProfileGate(userProfile).complete;
+  // Pengukuran FTP selalu tersedia: pengguna yang sudah punya angka tetap bisa
+  // mengukur ulang, dan hasilnya tidak wajib diterapkan ke profil.
+  const hasFtp = userProfile.ftp > 0;
   // The HR strap is REQUIRED to start a workout: there is no fallback
   // heart-rate source anymore, so a session without it would record no HR.
   const canStart = hrConnected;
@@ -250,6 +255,38 @@ export const PreRideCockpit = ({
               )}
             </div>
           </div>
+        </Panel>
+
+        <Panel className="border-vp-power/30" aria-label={t('FTP measurement')}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="vp-label text-vp-power">{hasFtp ? t('FTP measurement') : t('No FTP yet')}</div>
+              <h3 className="mt-1.5 text-lg font-semibold text-vp-text">
+                {hasFtp ? t('Measure your FTP again') : t('Measure your FTP before your first ride')}
+              </h3>
+              <p className="mt-1.5 max-w-xl text-sm leading-6 text-vp-muted">
+                {hasFtp
+                  ? t('Your profile FTP is {ftp} W. This test only measures; it does not change your profile unless you apply the result.', { ftp: userProfile.ftp })
+                  : t('Ride 20 minutes all-out and the app finds the number that unlocks your power zones. A heart-rate strap is optional.')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onStartFtpTest}
+              disabled={!bikeConnected}
+              aria-label={hasFtp ? t('Measure again') : t('Measure FTP')}
+              title={bikeConnected ? t('Measure again') : t('Connect the bike to start the test.')}
+              className="vp-focus-ring flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg border border-vp-power/40 bg-vp-power/10 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-vp-power transition-colors hover:bg-vp-power/20 disabled:cursor-not-allowed disabled:border-vp-border disabled:bg-transparent disabled:text-vp-dim"
+            >
+              <Zap size={16} />
+              {hasFtp ? t('Measure again') : t('Measure FTP')}
+            </button>
+          </div>
+          {!bikeConnected && (
+            <p className="mt-3 text-[10px] font-mono uppercase tracking-[0.12em] text-vp-muted">
+              {t('Connect the bike to start the test.')}
+            </p>
+          )}
         </Panel>
 
         {hasSignal ? (
