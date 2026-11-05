@@ -2,6 +2,7 @@ import {
   Activity,
   Bike,
   Bluetooth,
+  CalendarClock,
   ChevronRight,
   Heart,
   Play,
@@ -11,14 +12,16 @@ import {
   WifiOff,
   Zap
 } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { InlineNotice, MetricCard, Panel, StatusPill } from '../ui';
 import { ResistancePlanPanel } from './ResistancePlanPanel';
 import { useI18n } from '@/i18n';
 import type { RiderProfile, TelemetrySnapshot } from '@/lib/cockpit-types';
 import { HRV_READINESS_LABEL_KEYS } from '@/lib/hrv';
+import { daysSinceLastWorkout } from '@/lib/last-workout';
 import { getProfileGate } from '@/lib/profile-gate';
 import { useBluetoothStore } from '@/store/useBluetoothStore';
+import type { WorkoutSession } from '@/store/useWorkoutStore';
 
 const HRV_READINESS_TONES: Record<string, 'danger' | 'warning' | 'ready'> = {
   strained: 'danger',
@@ -29,6 +32,8 @@ const HRV_READINESS_TONES: Record<string, 'danger' | 'warning' | 'ready'> = {
 interface PreRideCockpitProps {
   currentData: TelemetrySnapshot;
   userProfile: RiderProfile;
+  /** Riwayat sesi tersimpan, dipakai untuk menghitung jeda sejak latihan terakhir. */
+  sessions: WorkoutSession[];
   hrConnected: boolean;
   bikeConnected: boolean;
   bleError: string | null;
@@ -129,6 +134,7 @@ const SummaryMetric = ({ label, value, tone = 'text-vp-text' }: SummaryMetricPro
 export const PreRideCockpit = ({
   currentData,
   userProfile,
+  sessions,
   hrConnected,
   bikeConnected,
   bleError,
@@ -143,6 +149,20 @@ export const PreRideCockpit = ({
   const hrvReadiness = useBluetoothStore((s) => s.hrvReadiness);
   const sensorCount = Number(hrConnected) + Number(bikeConnected);
   const hasSignal = Boolean(currentData.hr || currentData.cadence || currentData.power || currentData.speed);
+  // Jeda latihan dihitung dari tanggal lokal: pengguna perlu tahu berapa hari
+  // tubuh sudah beristirahat, bukan selisih jam sejak sesi terakhir berakhir.
+  const restDays = useMemo(() => daysSinceLastWorkout(sessions), [sessions]);
+  const restDaysLabel = restDays === null
+    ? t('Never')
+    : restDays === 0
+      ? t('Today')
+      : restDays === 1
+        ? t('1 day ago')
+        : t('{count} days ago', { count: restDays });
+  // Warna hanya membedakan "belum pernah" dan "sudah latihan hari ini"; angka
+  // berapa pun tetap ditampilkan netral agar jeda istirahat tidak terasa seperti
+  // peringatan.
+  const restDaysTone = restDays === null ? 'text-vp-dim' : restDays === 0 ? 'text-vp-accent' : 'text-vp-text';
   // Same gate the Summary blocks use: the badge warns about missing metric
   // inputs (FTP / weight) and never blocks the Start button.
   const profileReady = getProfileGate(userProfile).complete;
@@ -202,7 +222,7 @@ export const PreRideCockpit = ({
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-3 rounded-lg border border-vp-border bg-white/[0.025] p-3">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-vp-border bg-white/[0.025] p-3 lg:grid-cols-4">
               <SummaryMetric label="FTP" value={`${userProfile.ftp || '--'} W`} tone="text-vp-power" />
               <SummaryMetric label={t('Max HR')} value={`${userProfile.maxHr || '--'} BPM`} tone="text-vp-hr" />
               <SummaryMetric
@@ -214,6 +234,16 @@ export const PreRideCockpit = ({
                   </span>
                 }
                 tone="text-vp-speed"
+              />
+              <SummaryMetric
+                label={t('Last workout')}
+                value={
+                  <span className="inline-flex items-center gap-2" title={restDaysLabel}>
+                    <CalendarClock size={15} />
+                    {restDaysLabel}
+                  </span>
+                }
+                tone={restDaysTone}
               />
             </div>
           </div>
